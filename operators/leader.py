@@ -316,6 +316,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             kwargs = parse_kwargs(getattr(m, "kwargs_json", "{}"))
             call_ctx = (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
             
+            # Capture full context for context-sensitive operators (e.g., view3d.view_all)
+            # Store the current context as a copy to use later
+            ctx = context.copy()
+            
             # Finish the modal operator FIRST to ensure clean state before calling other operators
             # This prevents blocking issues when opening preferences or other UI operations
             self._finish(context)
@@ -327,9 +331,16 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     mod_name, fn_name = op.split(".", 1)
                     opmod = getattr(bpy.ops, mod_name)
                     opfn = getattr(opmod, fn_name)
-                    opfn(call_ctx, **kwargs)
-                except Exception:
-                    pass
+                    
+                    # Use temp_override for Blender 4.0+ context override
+                    # This is the proper way to provide context to operators
+                    with bpy.context.temp_override(**ctx):
+                        opfn(call_ctx, **kwargs)
+                except Exception as e:
+                    # Log error for debugging
+                    import traceback
+                    print(f"Chord Song: Failed to execute operator {op}: {e}")
+                    traceback.print_exc()
                 return None  # Run once
             
             bpy.app.timers.register(execute_operator_delayed, first_interval=0.01)
