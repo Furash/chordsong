@@ -2,6 +2,8 @@ import json
 
 # pylint: disable=broad-exception-caught
 
+from .engine import parse_kwargs
+
 
 CONFIG_VERSION = 1
 
@@ -10,27 +12,27 @@ def dump_prefs(prefs) -> dict:
     """Serialize addon preferences to a JSON-serializable dict."""
     mappings = []
     for m in getattr(prefs, "mappings", []):
-        kwargs_json = (getattr(m, "kwargs_json", "{}") or "{}").strip()
-        kwargs_obj = {}
-        try:
-            parsed = json.loads(kwargs_json)
-            if isinstance(parsed, dict):
-                kwargs_obj = parsed
-        except Exception:
-            kwargs_obj = {}
+        kwargs_json = (getattr(m, "kwargs_json", "") or "").strip()
+        # Parse Python-like syntax to dict for JSON serialization
+        kwargs_obj = parse_kwargs(kwargs_json)
 
-        mappings.append(
-            {
-                "enabled": bool(getattr(m, "enabled", True)),
-                "chord": (getattr(m, "chord", "") or "").strip(),
-                "label": (getattr(m, "label", "") or "").strip(),
-                "group": (getattr(m, "group", "") or "").strip(),
-                "operator": (getattr(m, "operator", "") or "").strip(),
-                "call_context": (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT"),
-                # Config format (v1): always a real JSON object.
-                "kwargs": kwargs_obj,
-            }
-        )
+        mapping_type = getattr(m, "mapping_type", "OPERATOR")
+        mapping_dict = {
+            "enabled": bool(getattr(m, "enabled", True)),
+            "chord": (getattr(m, "chord", "") or "").strip(),
+            "label": (getattr(m, "label", "") or "").strip(),
+            "group": (getattr(m, "group", "") or "").strip(),
+            "mapping_type": mapping_type,
+        }
+        
+        if mapping_type == "PYTHON_FILE":
+            mapping_dict["python_file"] = (getattr(m, "python_file", "") or "").strip()
+        else:
+            mapping_dict["operator"] = (getattr(m, "operator", "") or "").strip()
+            # Config format (v1): always a real JSON object.
+            mapping_dict["kwargs"] = kwargs_obj
+        
+        mappings.append(mapping_dict)
 
     return {
         "version": CONFIG_VERSION,
@@ -162,18 +164,47 @@ def apply_config(prefs, data: dict) -> list[str]:
         m = prefs.mappings.add()
         m.enabled = bool(item.get("enabled", True))
         m.chord = (item.get("chord", "") or "").strip()
-        m.label = (
-            (item.get("label", "") or "").strip()
-            or (item.get("operator", "") or "").strip()
-            or "(missing label)"
-        )
         m.group = (item.get("group", "") or "").strip()
-        m.operator = (item.get("operator", "") or "").strip()
-        m.call_context = (item.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
-        # Config format (v1): require "kwargs" object (no legacy support).
-        if "kwargs" in item and not isinstance(item["kwargs"], dict):
-            raise ValueError("mappings[].kwargs must be an object")
-        m.kwargs_json = json.dumps(item.get("kwargs", {}), ensure_ascii=False)
+        
+        # Handle mapping type (default to OPERATOR for backward compatibility)
+        mapping_type = item.get("mapping_type", "OPERATOR")
+        m.mapping_type = mapping_type
+        
+        if mapping_type == "PYTHON_FILE":
+            m.python_file = (item.get("python_file", "") or "").strip()
+            m.label = (
+                (item.get("label", "") or "").strip()
+                or (item.get("python_file", "") or "").strip()
+                or "(missing label)"
+            )
+        else:
+            m.operator = (item.get("operator", "") or "").strip()
+            # Use call_context from JSON if specified, otherwise default to EXEC_DEFAULT
+            m.call_context = (item.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+            m.label = (
+                (item.get("label", "") or "").strip()
+                or (item.get("operator", "") or "").strip()
+                or "(missing label)"
+            )
+            # Config format (v1): require "kwargs" object (no legacy support).
+            if "kwargs" in item and not isinstance(item["kwargs"], dict):
+                raise ValueError("mappings[].kwargs must be an object")
+            kwargs_dict = item.get("kwargs", {})
+            # Convert dict to Python-like syntax: key = value, key2 = value2
+            if kwargs_dict:
+                parts = []
+                for key, value in kwargs_dict.items():
+                    if isinstance(value, str):
+                        parts.append(f'{key} = "{value}"')
+                    elif isinstance(value, bool):
+                        parts.append(f"{key} = {str(value)}")
+                    elif value is None:
+                        parts.append(f"{key} = None")
+                    else:
+                        parts.append(f"{key} = {value}")
+                m.kwargs_json = ", ".join(parts)
+            else:
+                m.kwargs_json = ""
 
     return warnings
 

@@ -80,9 +80,26 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         default="",
         update=_on_mapping_changed,
     )
+    mapping_type: EnumProperty(
+        name="Type",
+        description="Type of action to execute",
+        items=(
+            ("OPERATOR", "Operator", "Blender operator ID"),
+            ("PYTHON_FILE", "Python File", "Execute a Python script file"),
+        ),
+        default="OPERATOR",
+        update=_on_mapping_changed,
+    )
     operator: StringProperty(
         name="Operator",
         description="Blender operator id, e.g. 'view3d.view_selected'",
+        default="",
+        update=_on_mapping_changed,
+    )
+    python_file: StringProperty(
+        name="Python File",
+        description="Path to Python script file to execute",
+        subtype="FILE_PATH",
         default="",
         update=_on_mapping_changed,
     )
@@ -97,9 +114,9 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         update=_on_mapping_changed,
     )
     kwargs_json: StringProperty(
-        name="Kwargs (JSON)",
-        description="Optional JSON dict passed as kwargs to the operator",
-        default="{}",
+        name="Parameters",
+        description="Python-like parameters: use_all_regions = False, mode = \"EDIT\"\nOr full call: bpy.ops.mesh.primitive_cube_add(enter_editmode=False, location=(0,0,0))",
+        default="",
         update=_on_mapping_changed,
     )
     enabled: BoolProperty(name="Enabled", default=True, update=_on_mapping_changed)
@@ -245,11 +262,12 @@ class CHORDSONG_Preferences(AddonPreferences):
         if self.mappings:
             return
 
-        def add(chord, label, group, operator, kwargs_json="{}"):
+        def add(chord, label, group, operator, kwargs_json=""):
             m = self.mappings.add()
             m.chord = chord
             m.label = label
             m.group = group
+            m.mapping_type = "OPERATOR"
             m.operator = operator
             m.call_context = "EXEC_DEFAULT"
             m.kwargs_json = kwargs_json

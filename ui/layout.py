@@ -126,13 +126,29 @@ def draw_addon_preferences(prefs, context, layout):
         )
 
         for idx, m in items:
+            # Main row with enabled, chord, label, and remove button
             r = box.row(align=True)
             r.prop(m, "enabled", text="")
             r.prop(m, "chord", text="")
             r.prop(m, "label", text="")
-            r.prop(m, "operator", text="")
             op = r.operator("chordsong.mapping_remove", text="", icon="X", emboss=False)
             op.index = idx
+            
+            # Second row with type selector and type-specific fields
+            r2 = box.row(align=True)
+            r2.prop(m, "mapping_type", text="")
+            
+            if m.mapping_type == "PYTHON_FILE":
+                r2.prop(m, "python_file", text="")
+            else:
+                r2.prop(m, "operator", text="")
+                op_convert = r2.operator("chordsong.mapping_convert", text="CONVERT", emboss=True)
+                op_convert.index = idx
+            
+            # Third row for parameters (only for operator type)
+            if m.mapping_type == "OPERATOR":
+                r3 = box.row()
+                r3.prop(m, "kwargs_json", text="Parameters")
 
     col.separator()
     box = col.box()

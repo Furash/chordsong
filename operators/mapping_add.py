@@ -23,7 +23,7 @@ class CHORDSONG_OT_mapping_add(bpy.types.Operator):
         m.group = ""
         m.operator = ""
         m.call_context = "EXEC_DEFAULT"
-        m.kwargs_json = "{}"
+        m.kwargs_json = ""
 
         # Autosave is handled by update callbacks, but adding a new item may not trigger them.
         try:
