@@ -84,8 +84,8 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         name="Type",
         description="Type of action to execute",
         items=(
-            ("OPERATOR", "Operator", "Blender operator ID"),
-            ("PYTHON_FILE", "Python File", "Execute a Python script file"),
+            ("OPERATOR", "Operator", "Blender operator ID", "SETTINGS", 0),
+            ("PYTHON_FILE", "Script", "Execute a Python script file", "FILE_SCRIPT", 1),
         ),
         default="OPERATOR",
         update=_on_mapping_changed,

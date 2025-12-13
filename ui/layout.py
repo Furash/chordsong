@@ -129,20 +129,30 @@ def draw_addon_preferences(prefs, context, layout):
             # Main row with enabled, chord, label, and remove button
             r = box.row(align=True)
             r.prop(m, "enabled", text="")
+            r.separator()
             r.prop(m, "chord", text="")
+            r.separator()
             r.prop(m, "label", text="")
+            r.separator()
             op = r.operator("chordsong.mapping_remove", text="", icon="X", emboss=False)
             op.index = idx
             
             # Second row with type selector and type-specific fields
             r2 = box.row(align=True)
-            r2.prop(m, "mapping_type", text="")
+            # Icon-only mapping type selector
+            r2.prop_enum(m, "mapping_type", "OPERATOR", icon="SETTINGS", text="")
+            r2.prop_enum(m, "mapping_type", "PYTHON_FILE", icon="FILE_SCRIPT", text="")
             
             if m.mapping_type == "PYTHON_FILE":
                 r2.prop(m, "python_file", text="")
             else:
                 r2.prop(m, "operator", text="")
-                op_convert = r2.operator("chordsong.mapping_convert", text="CONVERT", emboss=True)
+                # Small convert button - create subsection with tight scaling
+                sub = r2.row(align=True)
+                sub.separator()
+                sub.scale_x = 0.9
+                sub.alignment = 'LEFT'
+                op_convert = sub.operator("chordsong.mapping_convert", text="Convert", emboss=True)
                 op_convert.index = idx
             
             # Third row for parameters (only for operator type)
@@ -151,6 +161,8 @@ def draw_addon_preferences(prefs, context, layout):
                 r3.prop(m, "kwargs_json", text="Parameters")
 
     col.separator()
+
+    # Config box
     box = col.box()
     box.label(text="Config")
     box.prop(prefs, "config_path")
