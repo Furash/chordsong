@@ -48,6 +48,7 @@ class Candidate:
     label: str
     group: str
     icon: str = ""
+    is_final: bool = False  # True if this is the last token in the chord
 
 
 def build_match_sets(mappings):
@@ -100,8 +101,14 @@ def candidates_for_prefix(mappings, buffer_tokens):
         label = get_str_attr(m, "label") or "(missing label)"
         group = get_str_attr(m, "group")
         icon = get_str_attr(m, "icon")
+        # Check if this is the final token in the chord
+        is_final = len(tokens) == len(bt) + 1
         # Keep first label per next token for minimal UI
-        out.setdefault(nxt, Candidate(nxt, label, group, icon))
+        if nxt not in out:
+            out[nxt] = Candidate(nxt, label, group, icon, is_final)
+        elif not out[nxt].is_final and is_final:
+            # If we already have a non-final candidate, but found a final one, update it
+            out[nxt] = Candidate(nxt, label, group, icon, is_final)
     return list(out.values())
 
 

@@ -10,6 +10,7 @@ from .load_config import CHORDSONG_OT_Load_Config
 from .load_default import CHORDSONG_OT_Load_Default
 from .mapping_add import CHORDSONG_OT_Mapping_Add
 from .mapping_convert import CHORDSONG_OT_Mapping_Convert
+from .mapping_duplicate import CHORDSONG_OT_Mapping_Duplicate
 from .mapping_remove import CHORDSONG_OT_Mapping_Remove
 from .open_keymap import CHORDSONG_OT_Open_Keymap
 from .open_prefs import CHORDSONG_OT_Open_Prefs
@@ -29,6 +30,7 @@ __all__ = [
     "CHORDSONG_OT_Load_Default",
     "CHORDSONG_OT_Mapping_Add",
     "CHORDSONG_OT_Mapping_Convert",
+    "CHORDSONG_OT_Mapping_Duplicate",
     "CHORDSONG_OT_Mapping_Remove",
     "CHORDSONG_OT_Open_Keymap",
     "CHORDSONG_OT_Open_Prefs",

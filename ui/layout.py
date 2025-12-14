@@ -172,7 +172,9 @@ def draw_addon_preferences(prefs, _context, layout):
             icon_sub.separator()
             op = r.operator("chordsong.icon_select", text="", icon="DOWNARROW_HLT", emboss=False)
             op.mapping_index = idx
-            op = r.operator("chordsong.mapping_remove", text="", icon="X", emboss=False)
+            op = r.operator("chordsong.mapping_duplicate", text="", icon="DUPLICATE", emboss=True)
+            op.index = idx
+            op = r.operator("chordsong.mapping_remove", text="", icon="X", emboss=True)
             op.index = idx
 
             # Second row with type selector and type-specific fields

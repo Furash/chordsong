@@ -4,6 +4,7 @@
 # pyright: reportMissingModuleSource=false
 # pylint: disable=import-error,broad-exception-caught
 
+import time
 from ..core.engine import candidates_for_prefix
 
 # Import gpu modules at module level for better performance
@@ -67,11 +68,26 @@ def build_overlay_rows(cands, has_buffer):
     
     rows = []
     for token, group in sorted(token_groups.items()):
-        # If multiple chords share this prefix, show a summary
-        if len(group) > 1:
-            # Use first icon if available, or empty string
-            icon = group[0].icon if group[0].icon else ""
+        # Use first icon if available, or empty string
+        icon = group[0].icon if group[0].icon else ""
+        
+        # Check if any candidate in this group is non-final (intermediate level)
+        has_non_final = any(not c.is_final for c in group)
+        
+        if has_non_final:
+            # Intermediate chord level - show group name instead of label
+            # Check if all items in this group have the same group name
+            group_names = {c.group for c in group if c.group}
+            if len(group_names) == 1:
+                # All belong to the same group, use group name
+                label = f"{list(group_names)[0]}..."
+            else:
+                # Mixed groups or no group, use generic label
+                label = "More..."
             
+            rows.append({"kind": "item", "token": token.upper(), "label": label, "icon": icon})
+        elif len(group) > 1:
+            # Multiple final chords share this prefix, show a summary
             # Check if all items in this group have the same group name
             group_names = {c.group for c in group if c.group}
             if len(group_names) == 1:
@@ -83,7 +99,7 @@ def build_overlay_rows(cands, has_buffer):
             
             rows.append({"kind": "item", "token": token.upper(), "label": label, "icon": icon})
         else:
-            # Single chord, show its label
+            # Single final chord, show its label
             c = group[0]
             rows.append({"kind": "item", "token": (c.next_token or "").upper(), "label": c.label, "icon": c.icon})
 
@@ -502,3 +518,102 @@ def draw_overlay(context, p, buffer_tokens):
         region_w,
         layout["header_w"],
     )
+
+
+def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_duration=1.5):
+    """Draw a fading overlay showing the executed chord."""
+    try:
+        import blf  # type: ignore
+    except Exception:
+        return False
+
+    # Calculate fade alpha based on elapsed time
+    elapsed = time.time() - start_time
+    if elapsed >= fade_duration:
+        return False  # Signal that overlay should be removed
+
+    # Fade out: alpha goes from 1.0 to 0.0
+    fade_alpha = max(0.0, 1.0 - (elapsed / fade_duration))
+
+    # Basic metrics
+    region_w = context.region.width if context.region else 600
+    region_h = context.region.height if context.region else 400
+
+    scale_factor = calculate_scale_factor(context)
+    
+    # Font sizes
+    header_size = max(int(p.overlay_font_size_header * scale_factor), 12)
+    body_size = max(int(p.overlay_font_size_body * scale_factor), 10)
+    icon_size = header_size
+
+    # Measure text dimensions
+    blf.size(0, header_size)
+    chord_w, _ = blf.dimensions(0, chord_text)
+    
+    blf.size(0, body_size)
+    label_w, _ = blf.dimensions(0, label)
+
+    # Layout
+    gap = int(10 * scale_factor)
+    padding = int(20 * scale_factor)
+    
+    # Calculate total width
+    icon_w = icon_size if icon else 0
+    total_w = icon_w + gap + chord_w + gap + label_w + padding * 2
+    total_h = int(header_size * 1.8)
+
+    # Center horizontally, position near bottom
+    x = (region_w - total_w) // 2
+    y = int(region_h * 0.15)  # 15% from bottom
+
+    # Draw semi-transparent background with fade
+    bg_alpha = 0.5 * fade_alpha
+    
+    gpu.state.blend_set('ALPHA')
+    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+    vertices = (
+        (x, y),
+        (x + total_w, y),
+        (x + total_w, y + total_h),
+        (x, y + total_h),
+    )
+    indices = ((0, 1, 2), (0, 2, 3))
+    batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
+    shader.bind()
+    shader.uniform_float("color", (0.0, 0.0, 0.0, bg_alpha))
+    batch.draw(shader)
+    gpu.state.blend_set('NONE')
+
+    # Draw content
+    text_y = y + (total_h - header_size) // 2
+    current_x = x + padding
+
+    # Draw icon if present
+    if icon:
+        try:
+            col_icon = p.overlay_color_icon
+            blf.size(0, icon_size)
+            blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3] * fade_alpha)
+            blf.position(0, current_x, text_y, 0)
+            blf.draw(0, icon)
+        except Exception:
+            pass
+        current_x += icon_w + gap
+
+    # Draw chord text
+    col_chord = p.overlay_color_chord
+    blf.size(0, header_size)
+    blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * fade_alpha)
+    blf.position(0, current_x, text_y, 0)
+    blf.draw(0, chord_text)
+    current_x += chord_w + gap
+
+    # Draw label
+    col_label = p.overlay_color_label
+    blf.size(0, body_size)
+    label_y = text_y + (header_size - body_size) // 3  # Vertically align with chord
+    blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3] * fade_alpha)
+    blf.position(0, current_x, label_y, 0)
+    blf.draw(0, label)
+
+    return True  # Continue showing overlay

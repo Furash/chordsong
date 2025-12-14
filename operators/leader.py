@@ -4,11 +4,104 @@
 # pyright: reportMissingModuleSource=false
 # pylint: disable=import-error,broad-exception-caught
 
+import time
 import bpy  # type: ignore
 
 from ..core.engine import candidates_for_prefix, find_exact_mapping, normalize_token, parse_kwargs
-from ..ui.overlay import draw_overlay
+from ..ui.overlay import draw_overlay, draw_fading_overlay
 from .common import prefs
+
+
+# Global state for fading overlay
+_fading_overlay_state = {
+    "active": False,
+    "chord_text": "",
+    "label": "",
+    "icon": "",
+    "start_time": 0,
+    "draw_handle": None,
+    "area": None,
+}
+
+
+def _show_fading_overlay(context, chord_tokens, label, icon):
+    """Start showing a fading overlay for the executed chord."""
+    state = _fading_overlay_state
+    
+    # Clean up any existing overlay
+    if state["draw_handle"] is not None:
+        try:
+            bpy.types.SpaceView3D.draw_handler_remove(state["draw_handle"], "WINDOW")
+        except Exception:
+            pass
+    
+    # Set up new fading overlay
+    state["active"] = True
+    state["chord_text"] = "+".join(chord_tokens).upper()
+    state["label"] = label
+    state["icon"] = icon
+    state["start_time"] = time.time()
+    state["area"] = context.area
+    
+    # Add draw handler
+    def draw_callback():
+        try:
+            p = prefs(bpy.context)
+            still_active = draw_fading_overlay(
+                bpy.context, p, 
+                state["chord_text"], 
+                state["label"], 
+                state["icon"], 
+                state["start_time"]
+            )
+            
+            if not still_active:
+                # Time to remove the overlay
+                _cleanup_fading_overlay()
+        except Exception:
+            _cleanup_fading_overlay()
+    
+    state["draw_handle"] = bpy.types.SpaceView3D.draw_handler_add(
+        draw_callback, (), "WINDOW", "POST_PIXEL"
+    )
+    
+    # Tag for redraw
+    if state["area"]:
+        try:
+            state["area"].tag_redraw()
+        except Exception:
+            pass
+    
+    # Set up a timer to periodically redraw while fading
+    def redraw_timer():
+        if state["active"] and state["area"]:
+            try:
+                state["area"].tag_redraw()
+                return 0.03  # Redraw every 30ms for smooth fade
+            except Exception:
+                pass
+        return None
+    
+    bpy.app.timers.register(redraw_timer, first_interval=0.03)
+
+
+def _cleanup_fading_overlay():
+    """Clean up the fading overlay."""
+    state = _fading_overlay_state
+    state["active"] = False
+    
+    if state["draw_handle"] is not None:
+        try:
+            bpy.types.SpaceView3D.draw_handler_remove(state["draw_handle"], "WINDOW")
+        except Exception:
+            pass
+        state["draw_handle"] = None
+    
+    if state["area"]:
+        try:
+            state["area"].tag_redraw()
+        except Exception:
+            pass
 
 
 class CHORDSONG_OT_Leader(bpy.types.Operator):
@@ -142,6 +235,13 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             kwargs = parse_kwargs(getattr(m, "kwargs_json", "{}"))
             call_ctx = (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
 
+            # Get label and icon for fading overlay
+            label = getattr(m, "label", "") or "(no label)"
+            icon = getattr(m, "icon", "") or ""
+            
+            # Capture the buffer before finishing
+            chord_tokens = list(self._buffer)
+
             # Capture full context for context-sensitive operators (e.g., view3d.view_all)
             # Store the current context as a copy to use later
             ctx = context.copy()
@@ -153,15 +253,33 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             # Defer operator execution to next frame using a timer
             # This ensures the modal operator fully finishes before the next operator runs
             def execute_operator_delayed():
+                result_set = set()
                 try:
                     mod_name, fn_name = op.split(".", 1)
                     opmod = getattr(bpy.ops, mod_name)
                     opfn = getattr(opmod, fn_name)
 
-                    # Use temp_override for Blender 4.0+ context override
-                    # This is the proper way to provide context to operators
-                    with bpy.context.temp_override(**ctx):
-                        opfn(call_ctx, **kwargs)
+                    # Execute operator with proper context
+                    # For INVOKE_DEFAULT, we need to ensure the operator is called with the right context
+                    # For EXEC_DEFAULT, we can call it directly
+                    
+                    if call_ctx == "INVOKE_DEFAULT":
+                        # For invoke context, use temp_override to provide the right area/region
+                        with bpy.context.temp_override(**ctx):
+                            result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                    else:
+                        # For exec context, call directly with temp_override
+                        # This ensures proper integration with undo/redo and operator repeat
+                        with bpy.context.temp_override(**ctx):
+                            result_set = opfn('EXEC_DEFAULT', **kwargs)
+                    
+                    # Show fading overlay on success
+                    if result_set and 'FINISHED' in result_set:
+                        _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                    elif result_set and 'CANCELLED' not in result_set:
+                        # Also show for RUNNING_MODAL or PASS_THROUGH
+                        _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                    
                 except Exception as e:
                     # Log error for debugging
                     import traceback
