@@ -9,7 +9,7 @@ import bpy
 from .common import prefs
 
 
-class CHORDSONG_OT_group_cleanup(bpy.types.Operator):
+class CHORDSONG_OT_Group_Cleanup(bpy.types.Operator):
     """Clean up duplicate groups and sync with mappings."""
 
     bl_idname = "chordsong.group_cleanup"

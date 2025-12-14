@@ -7,7 +7,7 @@ import bpy  # type: ignore
 from .common import prefs
 
 
-class CHORDSONG_OT_load_default(bpy.types.Operator):
+class CHORDSONG_OT_Load_Default(bpy.types.Operator):
     bl_idname = "chordsong.load_default"
     bl_label = "Load Default Chord Song Config"
     bl_options = {"INTERNAL"}
@@ -18,8 +18,6 @@ class CHORDSONG_OT_load_default(bpy.types.Operator):
             p._chordsong_suspend_autosave = True
 
             # Reset core prefs to their defaults (as defined in Property declarations).
-            p.timeout_ms = 0
-
             p.overlay_enabled = True
             p.overlay_max_items = 14
             p.overlay_column_rows = 12
@@ -41,6 +39,3 @@ class CHORDSONG_OT_load_default(bpy.types.Operator):
             return {"FINISHED"}
         finally:
             p._chordsong_suspend_autosave = False
-
-
-

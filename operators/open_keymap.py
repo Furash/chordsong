@@ -5,7 +5,7 @@
 import bpy  # type: ignore
 
 
-class CHORDSONG_OT_open_keymap(bpy.types.Operator):
+class CHORDSONG_OT_Open_Keymap(bpy.types.Operator):
     bl_idname = "chordsong.open_keymap"
     bl_label = "Open Keymap Preferences"
     bl_options = {"INTERNAL"}

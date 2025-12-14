@@ -45,7 +45,6 @@ def dump_prefs(prefs) -> dict:
 
     return {
         "version": CONFIG_VERSION,
-        "timeout_ms": int(getattr(prefs, "timeout_ms", 1200)),
         "overlay": {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
             "max_items": int(getattr(prefs, "overlay_max_items", 14)),
@@ -85,13 +84,6 @@ def apply_config(prefs, data: dict) -> list[str]:
     version = data.get("version", None)
     if version not in (None, CONFIG_VERSION):
         warnings.append(f"Unsupported config version: {version} (expected {CONFIG_VERSION})")
-
-    # Timeout
-    if "timeout_ms" in data:
-        try:
-            prefs.timeout_ms = int(data["timeout_ms"])
-        except Exception:
-            warnings.append("Invalid timeout_ms, keeping current")
 
     # Overlay
     overlay = data.get("overlay", {})

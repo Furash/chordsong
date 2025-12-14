@@ -5,7 +5,7 @@
 import bpy  # type: ignore
 
 
-class CHORDSONG_OT_open_prefs(bpy.types.Operator):
+class CHORDSONG_OT_Open_Prefs(bpy.types.Operator):
     bl_idname = "chordsong.open_prefs"
     bl_label = "Open Chord Song Preferences"
     bl_options = {"INTERNAL", "UNDO"}

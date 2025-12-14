@@ -8,7 +8,7 @@ from bpy.props import IntProperty  # type: ignore
 from .common import prefs
 
 
-class CHORDSONG_OT_mapping_remove(bpy.types.Operator):
+class CHORDSONG_OT_Mapping_Remove(bpy.types.Operator):
     bl_idname = "chordsong.mapping_remove"
     bl_label = "Remove Chord"
     bl_options = {"INTERNAL"}

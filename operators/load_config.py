@@ -12,7 +12,7 @@ from ..core.config_io import apply_config, loads_json
 from .common import prefs
 
 
-class CHORDSONG_OT_load_config(bpy.types.Operator, ImportHelper):
+class CHORDSONG_OT_Load_Config(bpy.types.Operator, ImportHelper):
     bl_idname = "chordsong.load_config"
     bl_label = "Load User Config"
 

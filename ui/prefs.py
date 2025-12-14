@@ -18,6 +18,7 @@ from bpy.props import (
 )
 
 from .layout import draw_addon_preferences
+from .nerd_icons import NERD_ICONS
 
 
 def _addon_root_pkg() -> str:
@@ -75,6 +76,20 @@ def _on_group_changed(_self, context):
         pass
 
 
+class CHORDSONG_PG_NerdIcon(PropertyGroup):
+    """Nerd Font icon definition for searchable dropdown."""
+    name: StringProperty(
+        name="Icon Name",
+        description="Display name for the icon",
+        default="",
+    )
+    icon: StringProperty(
+        name="Icon Character",
+        description="The actual Nerd Font icon character",
+        default="",
+    )
+
+
 class CHORDSONG_PG_Group(PropertyGroup):
     """Group property for organizing chord mappings."""
     name: StringProperty(
@@ -107,7 +122,7 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     )
     icon: StringProperty(
         name="Icon",
-        description="Blender icon name for this chord (e.g. 'FILE_FOLDER', 'VIEWZOOM')",
+        description="Nerd Fonts emoji/icon for this chord (e.g. '', '', '', '')",
         default="",
         update=_on_mapping_changed,
     )
@@ -185,14 +200,6 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
-    timeout_ms: IntProperty(
-        name="Chords Timeout (ms)",
-        description="Cancel chord capture if idle for this many milliseconds",
-        default=600,
-        min=0,
-        max=30_000,
-        update=_on_prefs_changed,
-    )
     overlay_enabled: BoolProperty(
         name="Overlay",
         description="Show which-key style overlay while capturing chords",
@@ -301,11 +308,15 @@ class CHORDSONG_Preferences(AddonPreferences):
 
     mappings: CollectionProperty(type=CHORDSONG_PG_Mapping)
     groups: CollectionProperty(type=CHORDSONG_PG_Group)
+    nerd_icons: CollectionProperty(type=CHORDSONG_PG_NerdIcon)
 
     def ensure_defaults(self):
         """Ensure default config path and mappings are set."""
         if not (self.config_path or "").strip():
             self.config_path = default_config_path()
+
+        # Populate nerd icons
+        self._populate_nerd_icons()
 
         # Sync groups from mappings
         self._sync_groups_from_mappings()
@@ -331,6 +342,16 @@ class CHORDSONG_Preferences(AddonPreferences):
 
         # Sync groups after adding default mappings
         self._sync_groups_from_mappings()
+
+    def _populate_nerd_icons(self):
+        """Populate the nerd_icons collection with Blender/3D-relevant Nerd Font icons."""
+        if self.nerd_icons:
+            return  # Already populated
+
+        for name, icon_char in NERD_ICONS:
+            icon_item = self.nerd_icons.add()
+            icon_item.name = name
+            icon_item.icon = icon_char
 
     def _sync_groups_from_mappings(self):
         """

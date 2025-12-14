@@ -10,12 +10,12 @@ from bpy.props import StringProperty
 from .common import prefs
 
 
-class CHORDSONG_OT_group_add(bpy.types.Operator):
+class CHORDSONG_OT_Group_Add(bpy.types.Operator):
     """Add a new group."""
 
     bl_idname = "chordsong.group_add"
     bl_label = "Add New Group"
-    bl_options = {"INTERNAL"}
+    bl_options = {"REGISTER", "UNDO", "INTERNAL"}
 
     name: StringProperty(
         name="Group Name",

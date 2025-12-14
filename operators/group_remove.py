@@ -22,7 +22,7 @@ def _get_target_groups(self, context):
     return items
 
 
-class CHORDSONG_OT_group_remove(bpy.types.Operator):
+class CHORDSONG_OT_Group_Remove(bpy.types.Operator):
     """Remove a group and optionally reassign its mappings."""
 
     bl_idname = "chordsong.group_remove"

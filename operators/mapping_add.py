@@ -7,7 +7,7 @@ import bpy  # type: ignore
 from .common import prefs
 
 
-class CHORDSONG_OT_mapping_add(bpy.types.Operator):
+class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
     bl_idname = "chordsong.mapping_add"
     bl_label = "Add New Chord"
     bl_options = {"INTERNAL"}
@@ -22,6 +22,11 @@ class CHORDSONG_OT_mapping_add(bpy.types.Operator):
         m.operator = ""
         m.call_context = "EXEC_DEFAULT"
         m.kwargs_json = ""
+
+        # Move the new item to the top of the list
+        last_index = len(p.mappings) - 1
+        if last_index > 0:
+            p.mappings.move(last_index, 0)
 
         # Autosave is handled by update callbacks, but adding a new item may not trigger them.
         from .common import schedule_autosave_safe

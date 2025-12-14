@@ -11,7 +11,7 @@ from ..core.config_io import apply_config, loads_json
 from .common import prefs
 
 
-class CHORDSONG_OT_load_autosave(bpy.types.Operator):
+class CHORDSONG_OT_Load_Autosave(bpy.types.Operator):
     bl_idname = "chordsong.load_autosave"
     bl_label = "Restore Autosave"
     bl_options = {"INTERNAL"}

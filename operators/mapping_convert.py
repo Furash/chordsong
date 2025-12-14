@@ -99,7 +99,7 @@ def extract_operator_and_kwargs(text: str):
     return operator_name, args_text
 
 
-class CHORDSONG_OT_mapping_convert(bpy.types.Operator):
+class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
     bl_idname = "chordsong.mapping_convert"
     bl_label = "Convert Function Call"
     bl_description = "Parse full operator call (e.g. bpy.ops.mesh.primitive_cube_add(size=2)) into operator name and parameters"

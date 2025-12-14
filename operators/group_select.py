@@ -22,13 +22,13 @@ def _get_available_groups(_self, context):
     return items if len(items) > 1 else [("", "(No Groups)", "No groups available")]
 
 
-class CHORDSONG_OT_group_select(bpy.types.Operator):
+class CHORDSONG_OT_Group_Select(bpy.types.Operator):
     """Select group from existing groups for a mapping."""
 
     bl_idname = "chordsong.group_select"
     bl_label = "Select Group"
     bl_description = "Select from existing groups"
-    bl_options = {"INTERNAL"}
+    bl_options = {"REGISTER", "UNDO", "INTERNAL"}
 
     mapping_index: IntProperty(
         name="Mapping Index",

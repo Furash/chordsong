@@ -10,7 +10,7 @@ from bpy.props import IntProperty, StringProperty
 from .common import prefs
 
 
-class CHORDSONG_OT_group_rename(bpy.types.Operator):
+class CHORDSONG_OT_Group_Rename(bpy.types.Operator):
     """Rename a group and update all mappings using it."""
 
     bl_idname = "chordsong.group_rename"
