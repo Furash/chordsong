@@ -1,3 +1,9 @@
+"""
+Chord Song Blender Add-on.
+
+Vim-like <Leader> chord launcher with which-key style overlay.
+"""
+
 bl_info = {
     "name": "Chord Song",
     "author": "Cyrill Vitkovskiy",
@@ -10,13 +16,18 @@ bl_info = {
 
 # pyright: reportMissingImports=false
 # pyright: reportMissingModuleSource=false
-# pylint: disable=import-error,wrong-import-position,broad-exception-caught
+# pylint: disable=import-error,wrong-import-position,broad-exception-caught,import-outside-toplevel
 # ruff: noqa: E402
 
-import bpy  # type: ignore
+import bpy
 
-from .ui import CHORDSONG_Preferences, CHORDSONG_PG_Mapping
+from .ui import CHORDSONG_Preferences, CHORDSONG_PG_Group, CHORDSONG_PG_Mapping
 from .operators import (
+    CHORDSONG_OT_group_add,
+    CHORDSONG_OT_group_cleanup,
+    CHORDSONG_OT_group_remove,
+    CHORDSONG_OT_group_rename,
+    CHORDSONG_OT_group_select,
     CHORDSONG_OT_Leader,
     CHORDSONG_OT_load_autosave,
     CHORDSONG_OT_load_config,
@@ -30,8 +41,14 @@ from .operators import (
 )
 
 _classes = (
+    CHORDSONG_PG_Group,
     CHORDSONG_PG_Mapping,
     CHORDSONG_Preferences,
+    CHORDSONG_OT_group_add,
+    CHORDSONG_OT_group_cleanup,
+    CHORDSONG_OT_group_remove,
+    CHORDSONG_OT_group_rename,
+    CHORDSONG_OT_group_select,
     CHORDSONG_OT_Leader,
     CHORDSONG_OT_load_autosave,
     CHORDSONG_OT_load_config,
@@ -78,6 +95,7 @@ def _unregister_keymaps():
 
 
 def register():
+    """Register addon classes and keymaps."""
     for cls in _classes:
         bpy.utils.register_class(cls)
     _register_keymaps()
@@ -86,23 +104,23 @@ def register():
         prefs = bpy.context.preferences.addons[__package__].preferences
         if hasattr(prefs, "ensure_defaults"):
             prefs.ensure_defaults()
-        
+
         # Try to load config from scripts/presets/chordsong/chordsong.json if it exists
         try:
             import os
             from .core.config_io import apply_config, loads_json
             from .ui.prefs import default_config_path
-            
+
             config_path = default_config_path()
             if config_path and os.path.exists(config_path):
                 with open(config_path, "r", encoding="utf-8") as f:
                     data = loads_json(f.read())
                 # Suspend autosave during initial load
-                prefs._chordsong_suspend_autosave = True
+                prefs._chordsong_suspend_autosave = True  # pylint: disable=protected-access
                 try:
                     apply_config(prefs, data)
                 finally:
-                    prefs._chordsong_suspend_autosave = False
+                    prefs._chordsong_suspend_autosave = False  # pylint: disable=protected-access
         except Exception:
             # Silently ignore errors during initial config load
             # User can still load config manually if needed
@@ -112,8 +130,7 @@ def register():
 
 
 def unregister():
+    """Unregister addon classes and keymaps."""
     _unregister_keymaps()
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)
-
-

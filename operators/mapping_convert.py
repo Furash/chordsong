@@ -109,8 +109,6 @@ class CHORDSONG_OT_mapping_convert(bpy.types.Operator):
 
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
-        p.ensure_defaults()
-
         idx = int(self.index)
         if idx < 0 or idx >= len(p.mappings):
             self.report({"WARNING"}, "Invalid mapping index")

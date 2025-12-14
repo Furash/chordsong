@@ -1,9 +1,12 @@
+"""Addon preferences and property groups."""
+
 # pyright: reportMissingImports=false
 # pyright: reportMissingModuleSource=false
-# pylint: disable=import-error,broad-exception-caught
+# pylint: disable=import-error,broad-exception-caught,invalid-name,import-outside-toplevel
+
+import os
 
 import bpy
-import os
 from bpy.types import AddonPreferences, PropertyGroup
 from bpy.props import (
     BoolProperty,
@@ -19,7 +22,7 @@ from .layout import draw_addon_preferences
 
 def _addon_root_pkg() -> str:
     # This module lives under "chordsong.ui", but AddonPreferences bl_idname must be "chordsong".
-    return __package__.split(".")[0]
+    return __package__.split(".", maxsplit=1)[0]
 
 
 def default_config_path() -> str:
@@ -61,7 +64,35 @@ def _on_mapping_changed(_self, context):
         _autosave_now(prefs)
     except Exception:
         pass
+
+
+def _on_group_changed(_self, context):
+    # Called when a group item changes; fetch prefs via context.
+    try:
+        prefs = context.preferences.addons[_addon_root_pkg()].preferences
+        _autosave_now(prefs)
+    except Exception:
+        pass
+
+
+class CHORDSONG_PG_Group(PropertyGroup):
+    """Group property for organizing chord mappings."""
+    name: StringProperty(
+        name="Group Name",
+        description="Name of the group",
+        default="",
+        update=_on_group_changed,
+    )
+    display_order: IntProperty(
+        name="Display Order",
+        description="Order in which groups are displayed",
+        default=0,
+    )
+
+
 class CHORDSONG_PG_Mapping(PropertyGroup):
+    """Mapping property group for chord-to-action mappings."""
+
     chord: StringProperty(
         name="Chord",
         description="Chord sequence, space-separated tokens (e.g. 'g g')",
@@ -71,6 +102,12 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     label: StringProperty(
         name="Label",
         description="Human-readable description shown in the which-key overlay",
+        default="",
+        update=_on_mapping_changed,
+    )
+    icon: StringProperty(
+        name="Icon",
+        description="Blender icon name for this chord (e.g. 'FILE_FOLDER', 'VIEWZOOM')",
         default="",
         update=_on_mapping_changed,
     )
@@ -115,7 +152,10 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     )
     kwargs_json: StringProperty(
         name="Parameters",
-        description="Python-like parameters: use_all_regions = False, mode = \"EDIT\"\nOr full call: bpy.ops.mesh.primitive_cube_add(enter_editmode=False, location=(0,0,0))",
+        description=(
+            "Python-like parameters: use_all_regions = False, mode = \"EDIT\"\n"
+            "Or full call: bpy.ops.mesh.primitive_cube_add(enter_editmode=False, location=(0,0,0))"
+        ),
         default="",
         update=_on_mapping_changed,
     )
@@ -123,12 +163,15 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
 
 
 class CHORDSONG_Preferences(AddonPreferences):
+    """Chord Song addon preferences."""
+
     bl_idname = _addon_root_pkg()
 
     prefs_tab: EnumProperty(
         name="Tab",
         items=(
             ("MAPPINGS", "Mappings", "Chord mappings"),
+            ("GROUPS", "Groups", "Manage groups"),
             ("UI", "UI", "Overlay/UI customization"),
         ),
         default="MAPPINGS",
@@ -143,7 +186,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     )
 
     timeout_ms: IntProperty(
-        name="Chord Timeout (ms)",
+        name="Chords Timeout (ms)",
         description="Cancel chord capture if idle for this many milliseconds",
         default=600,
         min=0,
@@ -165,7 +208,10 @@ class CHORDSONG_Preferences(AddonPreferences):
     )
     overlay_column_rows: IntProperty(
         name="Column rows",
-        description="Maximum number of rows per column in the overlay before wrapping to the next column",
+        description=(
+            "Maximum number of rows per column in the overlay "
+            "before wrapping to the next column"
+        ),
         default=12,
         min=3,
         max=60,
@@ -254,10 +300,15 @@ class CHORDSONG_Preferences(AddonPreferences):
     )
 
     mappings: CollectionProperty(type=CHORDSONG_PG_Mapping)
+    groups: CollectionProperty(type=CHORDSONG_PG_Group)
 
     def ensure_defaults(self):
+        """Ensure default config path and mappings are set."""
         if not (self.config_path or "").strip():
             self.config_path = default_config_path()
+
+        # Sync groups from mappings
+        self._sync_groups_from_mappings()
 
         if self.mappings:
             return
@@ -278,7 +329,46 @@ class CHORDSONG_Preferences(AddonPreferences):
         add("s r", "Run Active Script", "Script", "text.run_script", "{}")
         add("k c", "Open Preferences", "Chord Song", "chordsong.open_prefs", "{}")
 
+        # Sync groups after adding default mappings
+        self._sync_groups_from_mappings()
+
+    def _sync_groups_from_mappings(self):
+        """
+        Extract unique groups from mappings and populate groups collection.
+
+        Also removes duplicate groups.
+        """
+        # First, remove duplicate groups from the groups collection
+        seen_names = set()
+        indices_to_remove = []
+
+        for idx, grp in enumerate(self.groups):
+            name = grp.name.strip() if grp.name else ""
+            if not name or name in seen_names:
+                # Empty name or duplicate - mark for removal
+                indices_to_remove.append(idx)
+            else:
+                seen_names.add(name)
+
+        # Remove duplicates in reverse order to maintain indices
+        for idx in reversed(indices_to_remove):
+            self.groups.remove(idx)
+
+        # Get unique group names from mappings
+        unique_groups = set()
+        for m in self.mappings:
+            group_name = (getattr(m, "group", "") or "").strip()
+            if group_name:
+                unique_groups.add(group_name)
+
+        # Get existing group names (after duplicate removal)
+        existing_groups = {grp.name for grp in self.groups}
+
+        # Add new groups that don't exist yet
+        for group_name in sorted(unique_groups - existing_groups):
+            grp = self.groups.add()
+            grp.name = group_name
+
     def draw(self, context: bpy.types.Context):
+        """Draw preferences UI."""
         draw_addon_preferences(self, context, self.layout)
-
-

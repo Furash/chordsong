@@ -14,8 +14,6 @@ class CHORDSONG_OT_mapping_add(bpy.types.Operator):
 
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
-        p.ensure_defaults()
-
         m = p.mappings.add()
         m.enabled = True
         m.chord = ""
@@ -26,12 +24,8 @@ class CHORDSONG_OT_mapping_add(bpy.types.Operator):
         m.kwargs_json = ""
 
         # Autosave is handled by update callbacks, but adding a new item may not trigger them.
-        try:
-            from ..core.autosave import schedule_autosave
-
-            schedule_autosave(p, delay_s=5.0)
-        except Exception:
-            pass
+        from .common import schedule_autosave_safe
+        schedule_autosave_safe(p, delay_s=5.0)
 
         return {"FINISHED"}
 

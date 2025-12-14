@@ -1,3 +1,8 @@
+from .group_add import CHORDSONG_OT_group_add
+from .group_cleanup import CHORDSONG_OT_group_cleanup
+from .group_remove import CHORDSONG_OT_group_remove
+from .group_rename import CHORDSONG_OT_group_rename
+from .group_select import CHORDSONG_OT_group_select
 from .leader import CHORDSONG_OT_Leader
 from .load_autosave import CHORDSONG_OT_load_autosave
 from .load_config import CHORDSONG_OT_load_config
@@ -10,6 +15,11 @@ from .open_prefs import CHORDSONG_OT_open_prefs
 from .save_config import CHORDSONG_OT_save_config
 
 __all__ = [
+    "CHORDSONG_OT_group_add",
+    "CHORDSONG_OT_group_cleanup",
+    "CHORDSONG_OT_group_remove",
+    "CHORDSONG_OT_group_rename",
+    "CHORDSONG_OT_group_select",
     "CHORDSONG_OT_Leader",
     "CHORDSONG_OT_load_autosave",
     "CHORDSONG_OT_load_config",

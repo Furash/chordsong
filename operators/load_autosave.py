@@ -18,8 +18,6 @@ class CHORDSONG_OT_load_autosave(bpy.types.Operator):
 
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
-        p.ensure_defaults()
-
         ap = autosave_path(getattr(p, "config_path", "") or "")
         if not ap or not os.path.exists(ap):
             self.report({"WARNING"}, "No autosave file found")
@@ -38,9 +36,6 @@ class CHORDSONG_OT_load_autosave(bpy.types.Operator):
             self.report({"ERROR"}, f"Failed to restore autosave: {ex}")
             return {"CANCELLED"}
         finally:
-            try:
-                p._chordsong_suspend_autosave = False
-            except Exception:
-                pass
+            p._chordsong_suspend_autosave = False
 
 

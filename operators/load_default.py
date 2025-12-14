@@ -40,10 +40,7 @@ class CHORDSONG_OT_load_default(bpy.types.Operator):
             self.report({"INFO"}, "Loaded default config")
             return {"FINISHED"}
         finally:
-            try:
-                p._chordsong_suspend_autosave = False
-            except Exception:
-                pass
+            p._chordsong_suspend_autosave = False
 
 
 

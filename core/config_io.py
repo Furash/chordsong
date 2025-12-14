@@ -2,7 +2,7 @@ import json
 
 # pylint: disable=broad-exception-caught
 
-from .engine import parse_kwargs
+from .engine import parse_kwargs, get_str_attr
 
 
 CONFIG_VERSION = 1
@@ -12,27 +12,36 @@ def dump_prefs(prefs) -> dict:
     """Serialize addon preferences to a JSON-serializable dict."""
     mappings = []
     for m in getattr(prefs, "mappings", []):
-        kwargs_json = (getattr(m, "kwargs_json", "") or "").strip()
+        kwargs_json = get_str_attr(m, "kwargs_json")
         # Parse Python-like syntax to dict for JSON serialization
         kwargs_obj = parse_kwargs(kwargs_json)
 
         mapping_type = getattr(m, "mapping_type", "OPERATOR")
         mapping_dict = {
             "enabled": bool(getattr(m, "enabled", True)),
-            "chord": (getattr(m, "chord", "") or "").strip(),
-            "label": (getattr(m, "label", "") or "").strip(),
-            "group": (getattr(m, "group", "") or "").strip(),
+            "chord": get_str_attr(m, "chord"),
+            "label": get_str_attr(m, "label"),
+            "icon": get_str_attr(m, "icon"),
+            "group": get_str_attr(m, "group"),
             "mapping_type": mapping_type,
         }
         
         if mapping_type == "PYTHON_FILE":
-            mapping_dict["python_file"] = (getattr(m, "python_file", "") or "").strip()
+            mapping_dict["python_file"] = get_str_attr(m, "python_file")
         else:
-            mapping_dict["operator"] = (getattr(m, "operator", "") or "").strip()
+            mapping_dict["operator"] = get_str_attr(m, "operator")
             # Config format (v1): always a real JSON object.
             mapping_dict["kwargs"] = kwargs_obj
         
         mappings.append(mapping_dict)
+
+    # Serialize groups
+    groups = []
+    for grp in getattr(prefs, "groups", []):
+        groups.append({
+            "name": (getattr(grp, "name", "") or "").strip(),
+            "display_order": int(getattr(grp, "display_order", 0)),
+        })
 
     return {
         "version": CONFIG_VERSION,
@@ -51,6 +60,7 @@ def dump_prefs(prefs) -> dict:
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
         },
+        "groups": groups,
         "mappings": mappings,
     }
 
@@ -86,50 +96,47 @@ def apply_config(prefs, data: dict) -> list[str]:
     # Overlay
     overlay = data.get("overlay", {})
     if isinstance(overlay, dict):
+        # Boolean properties
         if "enabled" in overlay:
             prefs.overlay_enabled = bool(overlay["enabled"])
-        if "max_items" in overlay:
-            try:
-                prefs.overlay_max_items = int(overlay["max_items"])
-            except Exception:
-                warnings.append("Invalid overlay.max_items, keeping current")
-        if "column_rows" in overlay:
-            try:
-                prefs.overlay_column_rows = int(overlay["column_rows"])
-            except Exception:
-                warnings.append("Invalid overlay.column_rows, keeping current")
-        if "font_size_header" in overlay:
-            try:
-                prefs.overlay_font_size_header = int(overlay["font_size_header"])
-            except Exception:
-                warnings.append("Invalid overlay.font_size_header, keeping current")
-        if "font_size_chord" in overlay:
-            try:
-                prefs.overlay_font_size_chord = int(overlay["font_size_chord"])
-            except Exception:
-                warnings.append("Invalid overlay.font_size_chord, keeping current")
-        if "font_size_body" in overlay:
-            try:
-                prefs.overlay_font_size_body = int(overlay["font_size_body"])
-            except Exception:
-                warnings.append("Invalid overlay.font_size_body, keeping current")
-
-        def _apply_color(attr, key):
-            if key not in overlay:
-                return
-            v = overlay.get(key)
-            if isinstance(v, (list, tuple)) and len(v) == 4:
+        
+        # Integer properties - use a loop to reduce duplication
+        int_props = {
+            "max_items": "overlay_max_items",
+            "column_rows": "overlay_column_rows",
+            "font_size_header": "overlay_font_size_header",
+            "font_size_chord": "overlay_font_size_chord",
+            "font_size_body": "overlay_font_size_body",
+            "offset_x": "overlay_offset_x",
+            "offset_y": "overlay_offset_y",
+        }
+        
+        for key, attr in int_props.items():
+            if key in overlay:
                 try:
-                    setattr(prefs, attr, tuple(float(x) for x in v))
+                    setattr(prefs, attr, int(overlay[key]))
                 except Exception:
                     warnings.append(f"Invalid overlay.{key}, keeping current")
-            else:
-                warnings.append(f"Invalid overlay.{key}, keeping current")
-
-        _apply_color("overlay_color_chord", "color_chord")
-        _apply_color("overlay_color_label", "color_label")
-        _apply_color("overlay_color_header", "color_header")
-
+        
+        # Color properties - use a loop
+        color_props = {
+            "color_chord": "overlay_color_chord",
+            "color_label": "overlay_color_label",
+            "color_header": "overlay_color_header",
+        }
+        
+        for key, attr in color_props.items():
+            if key in overlay:
+                v = overlay[key]
+                if isinstance(v, (list, tuple)) and len(v) == 4:
+                    try:
+                        setattr(prefs, attr, tuple(float(x) for x in v))
+                    except Exception:
+                        warnings.append(f"Invalid overlay.{key}, keeping current")
+                else:
+                    warnings.append(f"Invalid overlay.{key}, keeping current")
+        
+        # Position enum
         pos = overlay.get("position", None)
         if isinstance(pos, str):
             valid = _enum_items_as_set(prefs, "overlay_position")
@@ -138,16 +145,20 @@ def apply_config(prefs, data: dict) -> list[str]:
             else:
                 warnings.append(f'Unknown overlay.position "{pos}", keeping current')
 
-        if "offset_x" in overlay:
-            try:
-                prefs.overlay_offset_x = int(overlay["offset_x"])
-            except Exception:
-                warnings.append("Invalid overlay.offset_x, keeping current")
-        if "offset_y" in overlay:
-            try:
-                prefs.overlay_offset_y = int(overlay["offset_y"])
-            except Exception:
-                warnings.append("Invalid overlay.offset_y, keeping current")
+    # Groups - Load groups before mappings for proper validation
+    groups_data = data.get("groups", None)
+    if groups_data is not None:
+        if not isinstance(groups_data, list):
+            warnings.append("groups must be a list, skipping")
+        else:
+            prefs.groups.clear()
+            for i, grp_item in enumerate(groups_data):
+                if not isinstance(grp_item, dict):
+                    warnings.append(f"Skipping group #{i} (not an object)")
+                    continue
+                grp = prefs.groups.add()
+                grp.name = (grp_item.get("name", "") or "").strip()
+                grp.display_order = int(grp_item.get("display_order", 0))
 
     # Mappings
     mappings = data.get("mappings", None)
@@ -164,6 +175,7 @@ def apply_config(prefs, data: dict) -> list[str]:
         m = prefs.mappings.add()
         m.enabled = bool(item.get("enabled", True))
         m.chord = (item.get("chord", "") or "").strip()
+        m.icon = (item.get("icon", "") or "").strip()
         m.group = (item.get("group", "") or "").strip()
         
         # Handle mapping type (default to OPERATOR for backward compatibility)
@@ -174,7 +186,7 @@ def apply_config(prefs, data: dict) -> list[str]:
             m.python_file = (item.get("python_file", "") or "").strip()
             m.label = (
                 (item.get("label", "") or "").strip()
-                or (item.get("python_file", "") or "").strip()
+                or m.python_file
                 or "(missing label)"
             )
         else:
@@ -183,7 +195,7 @@ def apply_config(prefs, data: dict) -> list[str]:
             m.call_context = (item.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
             m.label = (
                 (item.get("label", "") or "").strip()
-                or (item.get("operator", "") or "").strip()
+                or m.operator
                 or "(missing label)"
             )
             # Config format (v1): require "kwargs" object (no legacy support).
@@ -205,6 +217,18 @@ def apply_config(prefs, data: dict) -> list[str]:
                 m.kwargs_json = ", ".join(parts)
             else:
                 m.kwargs_json = ""
+
+    # Backward compatibility: if no groups were in config, extract from mappings
+    if groups_data is None:
+        unique_groups = set()
+        for m in prefs.mappings:
+            group_name = (getattr(m, "group", "") or "").strip()
+            if group_name:
+                unique_groups.add(group_name)
+        
+        for group_name in sorted(unique_groups):
+            grp = prefs.groups.add()
+            grp.name = group_name
 
     return warnings
 

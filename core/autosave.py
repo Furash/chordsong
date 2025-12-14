@@ -1,15 +1,25 @@
 import os
+from dataclasses import dataclass
+from typing import Any
 
 from .config_io import dump_prefs
-
-# Debounced autosave: schedule a single write after N seconds since the last change.
-_DEFAULT_DELAY_S = 3.0
-_PENDING_PREFS = [None]
-_PENDING_DELAY_S = [_DEFAULT_DELAY_S]
 
 # pyright: reportMissingImports=false
 # pyright: reportMissingModuleSource=false
 # pylint: disable=import-error,broad-exception-caught
+
+# Debounced autosave: schedule a single write after N seconds since the last change.
+_DEFAULT_DELAY_S = 3.0
+
+
+@dataclass
+class _AutosaveState:
+    """Module state for debounced autosave."""
+    pending_prefs: Any = None
+    pending_delay_s: float = _DEFAULT_DELAY_S
+
+
+_state = _AutosaveState()
 
 
 def autosave_path(config_path: str) -> str:
@@ -52,8 +62,8 @@ def _timer_cb():
     """
     Blender app timer callback. Runs once, writes autosave, then stops.
     """
-    prefs = _PENDING_PREFS[0]
-    _PENDING_PREFS[0] = None
+    prefs = _state.pending_prefs
+    _state.pending_prefs = None
     try:
         if not prefs:
             return None
@@ -78,14 +88,14 @@ def schedule_autosave(prefs, delay_s: float | None = None):
 
     if delay_s is None:
         delay_s = _DEFAULT_DELAY_S
-    _PENDING_DELAY_S[0] = float(delay_s)
-    _PENDING_PREFS[0] = prefs
+    _state.pending_delay_s = float(delay_s)
+    _state.pending_prefs = prefs
 
     try:
         # Reset if already registered.
         if bpy.app.timers.is_registered(_timer_cb):
             bpy.app.timers.unregister(_timer_cb)
-        bpy.app.timers.register(_timer_cb, first_interval=_PENDING_DELAY_S[0])
+        bpy.app.timers.register(_timer_cb, first_interval=_state.pending_delay_s)
     except Exception:
         # If timers aren't available, do nothing.
         return

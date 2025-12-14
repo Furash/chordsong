@@ -2,6 +2,11 @@ import json
 from dataclasses import dataclass
 
 
+def get_str_attr(obj, attr, default=""):
+    """Get string attribute with fallback and strip whitespace."""
+    return (getattr(obj, attr, default) or default).strip()
+
+
 def normalize_token(event_type: str):
     """
     Convert a Blender event.type into a chord token.
@@ -42,6 +47,7 @@ class Candidate:
     next_token: str
     label: str
     group: str
+    icon: str = ""
 
 
 def build_match_sets(mappings):
@@ -54,7 +60,7 @@ def build_match_sets(mappings):
     for m in mappings:
         if not getattr(m, "enabled", True):
             continue
-        chord_tokens = tuple(split_chord(getattr(m, "chord", "")))
+        chord_tokens = tuple(split_chord(get_str_attr(m, "chord")))
         if not chord_tokens:
             continue
         exact.add(chord_tokens)
@@ -68,7 +74,7 @@ def find_exact_mapping(mappings, buffer_tokens):
     for m in mappings:
         if not getattr(m, "enabled", True):
             continue
-        if tuple(split_chord(getattr(m, "chord", ""))) == bt:
+        if tuple(split_chord(get_str_attr(m, "chord"))) == bt:
             return m
     return None
 
@@ -83,7 +89,7 @@ def candidates_for_prefix(mappings, buffer_tokens):
     for m in mappings:
         if not getattr(m, "enabled", True):
             continue
-        tokens = split_chord(getattr(m, "chord", ""))
+        tokens = split_chord(get_str_attr(m, "chord"))
         if not tokens:
             continue
         if bt and tuple(tokens[: len(bt)]) != bt:
@@ -91,10 +97,11 @@ def candidates_for_prefix(mappings, buffer_tokens):
         if len(tokens) <= len(bt):
             continue
         nxt = tokens[len(bt)]
-        label = (getattr(m, "label", "") or "").strip() or "(missing label)"
-        group = (getattr(m, "group", "") or "").strip()
+        label = get_str_attr(m, "label") or "(missing label)"
+        group = get_str_attr(m, "group")
+        icon = get_str_attr(m, "icon")
         # Keep first label per next token for minimal UI
-        out.setdefault(nxt, Candidate(nxt, label, group))
+        out.setdefault(nxt, Candidate(nxt, label, group, icon))
     return list(out.values())
 
 

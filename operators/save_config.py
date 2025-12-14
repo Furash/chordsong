@@ -1,6 +1,8 @@
+"""Save config operator."""
+
 # pyright: reportMissingImports=false
 # pyright: reportMissingModuleSource=false
-# pylint: disable=import-error,broad-exception-caught,attribute-defined-outside-init
+# pylint: disable=import-error,broad-exception-caught,attribute-defined-outside-init,invalid-name
 
 import json
 import os
@@ -14,6 +16,8 @@ from .common import prefs
 
 
 class CHORDSONG_OT_save_config(bpy.types.Operator, ExportHelper):
+    """Save chord mappings to a JSON config file."""
+
     bl_idname = "chordsong.save_config"
     bl_label = "Save User Config"
 
@@ -21,6 +25,7 @@ class CHORDSONG_OT_save_config(bpy.types.Operator, ExportHelper):
     filter_glob: StringProperty(default="*.json", options={"HIDDEN"})
 
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
+        """Show file browser or save directly if config path is set."""
         p = prefs(context)
         config_path = getattr(p, "config_path", "") or ""
         if config_path:
@@ -38,6 +43,7 @@ class CHORDSONG_OT_save_config(bpy.types.Operator, ExportHelper):
         return super().invoke(context, event)
 
     def execute(self, context: bpy.types.Context):
+        """Save config to file."""
         p = prefs(context)
         try:
             data = dump_prefs(p)
@@ -51,5 +57,3 @@ class CHORDSONG_OT_save_config(bpy.types.Operator, ExportHelper):
         except Exception as ex:
             self.report({"ERROR"}, f"Failed to save config: {ex}")
             return {"CANCELLED"}
-
-

@@ -44,9 +44,6 @@ class CHORDSONG_OT_load_config(bpy.types.Operator, ImportHelper):
             self.report({"ERROR"}, f"Failed to load config: {ex}")
             return {"CANCELLED"}
         finally:
-            try:
-                p._chordsong_suspend_autosave = False
-            except Exception:
-                pass
+            p._chordsong_suspend_autosave = False
 
 

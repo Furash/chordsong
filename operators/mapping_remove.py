@@ -17,8 +17,6 @@ class CHORDSONG_OT_mapping_remove(bpy.types.Operator):
 
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
-        p.ensure_defaults()
-
         idx = int(self.index)
         if idx < 0 or idx >= len(p.mappings):
             self.report({"WARNING"}, "Invalid mapping index")
@@ -26,12 +24,8 @@ class CHORDSONG_OT_mapping_remove(bpy.types.Operator):
 
         p.mappings.remove(idx)
 
-        try:
-            from ..core.autosave import schedule_autosave
-
-            schedule_autosave(p, delay_s=5.0)
-        except Exception:
-            pass
+        from .common import schedule_autosave_safe
+        schedule_autosave_safe(p, delay_s=5.0)
 
         return {"FINISHED"}
 

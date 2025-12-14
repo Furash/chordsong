@@ -2,47 +2,10 @@
 Addon Preferences UI layout.
 """
 
-# pyright: reportMissingImports=false
-# pyright: reportMissingModuleSource=false
-# pylint: disable=import-error,broad-exception-caught
+# pylint: disable=import-outside-toplevel
 
-
-def _draw_leader_keymap(layout, context):
-    """
-    Draw the add-on keymap item for the leader operator directly in our preferences UI.
-    """
-    try:
-        import rna_keymap_ui  # type: ignore
-    except Exception:
-        layout.label(text="Keymap UI module not available in this Blender build.")
-        return
-
-    wm = context.window_manager
-    kc = wm.keyconfigs.addon if wm else None
-    if not kc:
-        layout.label(text="No add-on keyconfig available (kc.keyconfigs.addon is None).")
-        return
-
-    km = kc.keymaps.get("3D View")
-    if not km:
-        layout.label(text='Keymap "3D View" not found (enable the addon once to register it).')
-        return
-
-    kmi = None
-    for item in km.keymap_items:
-        if item.idname == "chordsong.leader":
-            kmi = item
-            break
-
-    if not kmi:
-        layout.label(text='Keymap item for "chordsong.leader" not found.')
-        return
-
-    # Draw the standard Blender keymap UI row.
-    rna_keymap_ui.draw_kmi([], kc, km, kmi, layout, 0)
-
-
-def draw_addon_preferences(prefs, context, layout):
+def draw_addon_preferences(prefs, _context, layout):
+    """Draw the addon preferences UI."""
     prefs.ensure_defaults()
 
     col = layout.column()
@@ -51,14 +14,81 @@ def draw_addon_preferences(prefs, context, layout):
     col.row(align=True).prop(prefs, "prefs_tab", expand=True)
     col.separator()
 
+    # Config box
+    box = col.box()
+    header = box.row()
+    header.alignment = 'CENTER'
+    header.label(text="C O N F I G")
+    box.separator()
+    r = box.row(align=True)
+    r.prop(prefs, "config_path")
+    r = box.row(align=True)
+    r.operator("chordsong.save_config", text="Save Config", icon="FILE_TICK")
+    r.separator()
+    r.operator("chordsong.load_config", text="Load Config", icon="FILE_FOLDER")
+    r.separator()
+    r.operator("chordsong.load_default", text="Load Default Config", icon="LOOP_BACK")
+    r.separator()
+    r.operator("chordsong.load_autosave", text="Restore Autosave", icon="RECOVER_LAST")
+
+    if prefs.prefs_tab == "GROUPS":
+        # Groups management tab
+        box = col.box()
+        header = box.row()
+        header.alignment = 'CENTER'
+        header.label(text=f"GROUPS ({len(prefs.groups)})")
+        box.separator()
+
+        # Add new group and cleanup buttons
+        row = box.row(align=True)
+        row.operator("chordsong.group_add", text="Add New Group", icon="ADD")
+        row.operator("chordsong.group_cleanup", text="Clean Up Duplicates", icon="BRUSH_DATA")
+        box.separator()
+
+        if not prefs.groups:
+            box.label(text="No groups defined yet")
+            box.label(text="Groups are auto-created from mappings")
+        else:
+            # List all groups
+            for idx, grp in enumerate(prefs.groups):
+                # Count mappings using this group
+                count = sum(1 for m in prefs.mappings if m.group == grp.name)
+
+                row = box.row(align=True)
+                # Group name (editable inline)
+                row.prop(grp, "name", text="")
+
+                # Mapping count badge
+                sub = row.row(align=True)
+                sub.scale_x = 0.6
+                sub.label(text=f"({count})")
+
+                # Rename button
+                op = row.operator(
+                    "chordsong.group_rename", text="", icon="GREASEPENCIL", emboss=False
+                )
+                op.index = idx
+
+                # Remove button
+                op = row.operator("chordsong.group_remove", text="", icon="X", emboss=False)
+                op.index = idx
+
+                box.separator()
+
+        return
+
     if prefs.prefs_tab == "UI":
         box = col.box()
-        box.label(text="Overlay")
+        header = box.row()
+        header.alignment = 'CENTER'
+        header.label(text="Overlay")
+        box.separator()
 
         r = box.row(align=True)
         r.prop(prefs, "overlay_enabled")
         r.prop(prefs, "overlay_max_items")
         r.prop(prefs, "overlay_column_rows")
+        box.separator()
 
         r = box.row(align=True)
         r.prop(prefs, "overlay_font_size_header")
@@ -66,42 +96,40 @@ def draw_addon_preferences(prefs, context, layout):
         r.prop(prefs, "overlay_font_size_body")
 
         box.separator()
-        box.label(text="Colors")
+        header = box.row()
+        header.alignment = 'CENTER'
+        header.label(text="Colors")
+        box.separator()
         r = box.row(align=True)
         r.prop(prefs, "overlay_color_chord", text="Chord")
         r.prop(prefs, "overlay_color_label", text="Label")
+        box.separator()
         r = box.row(align=True)
         r.prop(prefs, "overlay_color_header", text="Header")
 
         box.separator()
-        box.label(text="Position")
+        header = box.row()
+        header.alignment = 'CENTER'
+        header.label(text="Position")
+        box.separator()
         r = box.row(align=True)
         r.prop(prefs, "overlay_position", text="")
+        box.separator()
         r = box.row(align=True)
         r.prop(prefs, "overlay_offset_x")
         r.prop(prefs, "overlay_offset_y")
 
         col.separator()
-        col.label(text="Modal")
-        col.prop(prefs, "timeout_ms")
-
-        col.separator()
         box = col.box()
-        box.label(text="Config")
-        box.prop(prefs, "config_path")
-        r = box.row(align=True)
-        r.operator("chordsong.save_config", text="Save User", icon="FILE_TICK")
-        r.separator()           
-        r.operator("chordsong.load_config", text="Load User", icon="FILE_FOLDER")
-        r.separator()
-        r.operator("chordsong.load_default", text="Load Default", icon="LOOP_BACK")
-        r.separator()
-        r.operator("chordsong.load_autosave", text="Restore Autosave", icon="RECOVER_LAST")
+        header = box.row()
+        header.alignment = 'CENTER'
+        header.label(text="Modal")
+        box.separator()
+        box.prop(prefs, "timeout_ms")
 
         return
 
     # MAPPINGS tab
-    col.separator()
     row = col.row(align=True)
     row.operator("chordsong.mapping_add", text="Add New Chord", icon="ADD")
     row.separator()
@@ -109,19 +137,24 @@ def draw_addon_preferences(prefs, context, layout):
     # actions_row = col.row(align=True)
 
     # Grouped UI boxes
+    from ..core.engine import get_str_attr
+
     groups = {}
     for idx, m in enumerate(prefs.mappings):
-        group = (getattr(m, "group", "") or "").strip() or "Ungrouped"
+        group = get_str_attr(m, "group") or "Ungrouped"
         groups.setdefault(group, []).append((idx, m))
 
     for group_name in sorted(groups.keys(), key=lambda s: (s == "Ungrouped", s.lower())):
         box = col.box()
-        box.label(text=group_name)
+        header = box.row()
+        header.alignment = 'CENTER'
+        header.label(text=group_name)
+        box.separator()
         items = groups[group_name]
         items.sort(
             key=lambda im: (
-                (getattr(im[1], "label", "") or "").lower(),
-                (getattr(im[1], "chord", "") or "").lower(),
+                get_str_attr(im[1], "label").lower(),
+                get_str_attr(im[1], "chord").lower(),
             )
         )
 
@@ -136,13 +169,25 @@ def draw_addon_preferences(prefs, context, layout):
             r.separator()
             op = r.operator("chordsong.mapping_remove", text="", icon="X", emboss=False)
             op.index = idx
-            
+            box.separator()
+
+            # Icon and Group row
+            r_meta = box.row(align=True)
+            r_meta.prop(m, "icon", text="Icon", icon="IMAGE_DATA")
+            r_meta.separator()
+            r_meta.prop(m, "group", text="Group", icon="NEWFOLDER")
+            # Add a button for quick group selection from existing groups
+            if prefs.groups:
+                op = r_meta.operator("chordsong.group_select", text="", icon="DOWNARROW_HLT")
+                op.mapping_index = idx
+            box.separator()
+
             # Second row with type selector and type-specific fields
             r2 = box.row(align=True)
             # Icon-only mapping type selector
             r2.prop_enum(m, "mapping_type", "OPERATOR", icon="SETTINGS", text="")
             r2.prop_enum(m, "mapping_type", "PYTHON_FILE", icon="FILE_SCRIPT", text="")
-            
+
             if m.mapping_type == "PYTHON_FILE":
                 r2.prop(m, "python_file", text="")
             else:
@@ -154,25 +199,11 @@ def draw_addon_preferences(prefs, context, layout):
                 sub.alignment = 'LEFT'
                 op_convert = sub.operator("chordsong.mapping_convert", text="Convert", emboss=True)
                 op_convert.index = idx
-            
+
             # Third row for parameters (only for operator type)
             if m.mapping_type == "OPERATOR":
                 r3 = box.row()
                 r3.prop(m, "kwargs_json", text="Parameters")
+                box.separator()
 
     col.separator()
-
-    # Config box
-    box = col.box()
-    box.label(text="Config")
-    box.prop(prefs, "config_path")
-    r = box.row(align=True)
-    r.operator("chordsong.save_config", text="Save User", icon="FILE_TICK")
-    r.separator()
-    r.operator("chordsong.load_config", text="Load User", icon="FILE_FOLDER")
-    r.separator()
-    r.operator("chordsong.load_default", text="Load Default", icon="LOOP_BACK")
-    r.separator()
-    r.operator("chordsong.load_autosave", text="Restore Autosave", icon="RECOVER_LAST")
-
-
