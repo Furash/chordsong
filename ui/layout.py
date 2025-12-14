@@ -36,10 +36,10 @@ def draw_addon_preferences(prefs, _context, layout):
     if prefs.prefs_tab == "GROUPS":
         # Groups management tab
         box = col.box()
-        header = box.row()
-        header.alignment = 'CENTER'
-        header.label(text="GROUPS")
-        box.separator()
+        # header = box.row()
+        # header.alignment = 'CENTER'
+        # header.label(text="GROUPS")
+        # box.separator()
 
         # Add new group and cleanup buttons
         row = box.row(align=True)
@@ -57,22 +57,18 @@ def draw_addon_preferences(prefs, _context, layout):
                 count = sum(1 for m in prefs.mappings if m.group == grp.name)
 
                 row = box.row(align=True)
+                row.scale_x = 0.8
                 # Group name (editable inline)
                 row.prop(grp, "name", text="")
+                row.separator()
 
                 # Mapping count badge
                 sub = row.row(align=True)
-                sub.scale_x = 0.6
+                sub.scale_x = 0.2
                 sub.label(text=f"({count})")
 
-                # Rename button
-                op = row.operator(
-                    "chordsong.group_rename", text="", icon="GREASEPENCIL", emboss=False
-                )
-                op.index = idx
-
                 # Remove button
-                op = row.operator("chordsong.group_remove", text="", icon="X", emboss=False)
+                op = row.operator("chordsong.group_remove", text="", icon="X", emboss=True)
                 op.index = idx
 
                 box.separator()
@@ -80,53 +76,46 @@ def draw_addon_preferences(prefs, _context, layout):
         return
 
     if prefs.prefs_tab == "UI":
+        # Overlay settings
         box = col.box()
-        header = box.row()
-        header.alignment = 'CENTER'
-        header.label(text="Overlay")
-        box.separator()
-
         r = box.row(align=True)
-        r.prop(prefs, "overlay_enabled")
+        r.prop(prefs, "overlay_enabled", toggle=True)
+        r.separator()
         r.prop(prefs, "overlay_max_items")
+        r.separator()
         r.prop(prefs, "overlay_column_rows")
+        r.separator()
         box.separator()
 
+        # Font size settings
         r = box.row(align=True)
         r.prop(prefs, "overlay_font_size_header")
+        r.separator()
         r.prop(prefs, "overlay_font_size_chord")
+        r.separator()
         r.prop(prefs, "overlay_font_size_body")
+        box.separator()
 
-        box.separator()
-        header = box.row()
-        header.alignment = 'CENTER'
-        header.label(text="Colors")
-        box.separator()
-        r = box.row(align=True)
-        r.prop(prefs, "overlay_color_chord", text="Chord")
-        r.prop(prefs, "overlay_color_label", text="Label")
-        box.separator()
-        r = box.row(align=True)
-        r.prop(prefs, "overlay_color_header", text="Header")
-
-        box.separator()
-        header = box.row()
-        header.alignment = 'CENTER'
-        header.label(text="Position")
-        box.separator()
+        # Position settings
         r = box.row(align=True)
         r.prop(prefs, "overlay_position", text="")
-        box.separator()
-        r = box.row(align=True)
+        r.separator()
         r.prop(prefs, "overlay_offset_x")
+        r.separator()
         r.prop(prefs, "overlay_offset_y")
-
-        col.separator()
-        box = col.box()
-        header = box.row()
-        header.alignment = 'CENTER'
-        header.label(text="Modal")
         box.separator()
+
+        # Color settings
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_color_chord", text="Chord")
+        r.separator()
+        r.prop(prefs, "overlay_color_label", text="Label")
+        r.separator()
+        r.prop(prefs, "overlay_color_header", text="Header")
+        r.separator()
+        r.prop(prefs, "overlay_color_icon", text="Icon")
+        box.separator()
+
 
         return
 

@@ -6,6 +6,25 @@
 
 from ..core.engine import candidates_for_prefix
 
+# Import gpu modules at module level for better performance
+import gpu  # type: ignore
+from gpu_extras.batch import batch_for_shader  # type: ignore
+
+
+# Cache for overlay layout to avoid recalculating every frame
+_overlay_cache = {
+    "buffer_tokens": None,
+    "prefs_hash": None,
+    "layout_data": None,
+}
+
+
+def clear_overlay_cache():
+    """Clear the overlay cache. Call when mappings are updated."""
+    _overlay_cache["buffer_tokens"] = None
+    _overlay_cache["prefs_hash"] = None
+    _overlay_cache["layout_data"] = None
+
 
 def calculate_scale_factor(context):
     """Calculate UI scale factor for fonts and spacing."""
@@ -18,6 +37,22 @@ def calculate_scale_factor(context):
             return context.preferences.system.dpi / 72.0
         except Exception:
             return 1.0
+
+
+def get_prefs_hash(p, region_w, region_h):
+    """Get a hash of preferences that affect overlay layout."""
+    return (
+        p.overlay_font_size_header,
+        p.overlay_font_size_chord,
+        p.overlay_font_size_body,
+        p.overlay_column_rows,
+        p.overlay_max_items,
+        p.overlay_offset_x,
+        p.overlay_offset_y,
+        p.overlay_position,
+        region_w,
+        region_h,
+    )
 
 
 def build_overlay_rows(cands, has_buffer):
@@ -54,7 +89,7 @@ def build_overlay_rows(cands, has_buffer):
 
     # Footer items (always at bottom)
     footer = []
-    footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": "󰅖"})
+    footer.append({"kind": "item", "token": "ESC", "label": "Close"})
     if has_buffer:
         footer.append({"kind": "item", "token": "BS", "label": "Back"})
 
@@ -89,6 +124,9 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
     max_label_w = 0.0
     max_header_row_w = 0.0
 
+    # Set font sizes once
+    blf.size(0, chord_size)
+    
     # Check all columns
     for col in columns:
         for r in col:
@@ -96,29 +134,34 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
                 blf.size(0, body_size)
                 w, _ = blf.dimensions(0, r["text"])
                 max_header_row_w = max(max_header_row_w, w)
+                blf.size(0, chord_size)  # Reset to chord size
             else:
-                blf.size(0, chord_size)
+                # Token width (already at chord_size)
                 tw, _ = blf.dimensions(0, r["token"])
                 max_token_w = max(max_token_w, tw)
+                
+                # Label width
                 blf.size(0, body_size)
                 lw, _ = blf.dimensions(0, r["label"])
                 max_label_w = max(max_label_w, lw)
+                blf.size(0, chord_size)  # Reset to chord size
 
-    # Check footer items
+    # Check footer items (already at chord_size)
     for r in footer:
-        blf.size(0, chord_size)
         tw, _ = blf.dimensions(0, r["token"])
         max_token_w = max(max_token_w, tw)
+        
         blf.size(0, body_size)
         lw, _ = blf.dimensions(0, r["label"])
         max_label_w = max(max_label_w, lw)
+        blf.size(0, chord_size)  # Reset to chord size
 
     return max_token_w, max_label_w, max_header_row_w
 
 
 def calculate_overlay_position(p, region_w, region_h, block_w, block_h, pad_x, pad_y):
     """Calculate overlay position based on anchor setting."""
-    pos = getattr(p, "overlay_position", "TOP_LEFT")
+    pos = p.overlay_position
     if pos == "TOP_RIGHT":
         return region_w - pad_x - block_w, region_h - pad_y
     elif pos == "BOTTOM_LEFT":
@@ -143,37 +186,75 @@ def draw_icon(icon_text, x, y, size):
 
 
 def render_overlay(_context, p, columns, footer, x, y, header, header_size, chord_size, body_size,
-                   max_token_w, gap, col_w, col_gap, line_h, icon_size):
+                   max_token_w, gap, col_w, col_gap, line_h, icon_size, block_w, max_label_w, region_w, header_w):
     """Render the overlay at the calculated position."""
     import blf  # type: ignore
 
     # Colors
-    col_header = getattr(p, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))
-    col_chord = getattr(p, "overlay_color_chord", (0.65, 0.8, 1.0, 1.0))
-    col_label = getattr(p, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))
+    col_header = p.overlay_color_header
+    col_chord = p.overlay_color_chord
+    col_label = p.overlay_color_label
+    col_icon = p.overlay_color_icon
 
-    # Header
+    # Header with full-width background
+    # Calculate header background dimensions
+    text_center_y = y + (header_size / 2)
+    text_height = max(header_size, body_size) * 1.3
+    
+    # Full width background
+    bg_x1 = 0
+    bg_x2 = region_w
+    
+    # Vertically centered around text
+    bg_y1 = text_center_y - (text_height * 0.75)
+    bg_y2 = text_center_y + (text_height * 0.45)
+    
+    # Enable GPU blending for transparency
+    gpu.state.blend_set('ALPHA')
+    
+    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+    vertices = (
+        (bg_x1, bg_y1),
+        (bg_x2, bg_y1),
+        (bg_x2, bg_y2),
+        (bg_x1, bg_y2),
+    )
+    indices = ((0, 1, 2), (0, 2, 3))
+    batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
+    shader.bind()
+    shader.uniform_float("color", (0.0, 0.0, 0.0, 0.35))
+    batch.draw(shader)
+    
+    # Restore default blending
+    gpu.state.blend_set('NONE')
+    
+    # Center header text
+    header_x = (region_w - header_w) // 2
     blf.size(0, header_size)
     blf.color(0, col_header[0], col_header[1], col_header[2], col_header[3])
-    blf.position(0, x, y, 0)
+    blf.position(0, header_x, y, 0)
     blf.draw(0, header)
-    y -= int(header_size * 1.6)
+    # Account for background extension when calculating spacing
+    y -= int(header_size / 2 + text_height * 0.75 + chord_size)
 
     # Render columns top-down, left-to-right
     start_y = y
+    current_size = header_size  # Track current font size to avoid redundant blf.size() calls
+    
     for col_idx, col_rows in enumerate(columns):
         cx = x + col_idx * (col_w + col_gap)
         cy = start_y
 
         # Icon, token, label layout
         icon_x = cx
-        arrow_x = icon_x + icon_size + gap // 2
-        token_col_right_x = arrow_x + gap + max_token_w
+        token_col_right_x = cx + icon_size + gap // 2 + max_token_w
         label_col_x = token_col_right_x + gap
 
         for r in col_rows:
             if r["kind"] == "header":
-                blf.size(0, body_size)
+                if current_size != body_size:
+                    blf.size(0, body_size)
+                    current_size = body_size
                 blf.color(0, col_header[0], col_header[1], col_header[2], col_header[3])
                 blf.position(0, icon_x, cy, 0)
                 blf.draw(0, r["text"])
@@ -188,22 +269,25 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             # Draw icon if present
             if icon_text:
                 try:
-                    # Set icon color (same as labels but slightly dimmed)
-                    blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3] * 0.7)
+                    blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3])
                     draw_icon(icon_text, icon_x, cy, icon_size)
                 except Exception:
                     pass
 
             # Draw token (right-aligned)
+            if current_size != chord_size:
+                blf.size(0, chord_size)
+                current_size = chord_size
             blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
-            blf.size(0, chord_size)
             tw, _ = blf.dimensions(0, token_txt)
             blf.position(0, token_col_right_x - tw, cy, 0)
             blf.draw(0, token_txt)
 
             # Draw label
+            if current_size != body_size:
+                blf.size(0, body_size)
+                current_size = body_size
             blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
-            blf.size(0, body_size)
             blf.position(0, label_col_x, cy, 0)
             blf.draw(0, label_txt)
             cy -= line_h
@@ -211,15 +295,53 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
     # Render footer at the bottom
     if footer:
         # Add spacing before footer
-        footer_y = start_y - (len(columns[0]) * line_h if columns and columns[0] else 0) - int(line_h * 0.5)
+        footer_y = start_y - (len(columns[0]) * line_h if columns and columns[0] else 0) - chord_size
 
-        # Calculate footer width to span all columns
-        footer_x = x
+        # Calculate total footer width
+        footer_item_width = icon_size + gap // 2 + max_token_w + gap + max_label_w
+        total_footer_width = len(footer) * footer_item_width + (len(footer) - 1) * gap
+        
+        # Center the footer relative to full viewport width
+        footer_x = (region_w - total_footer_width) // 2
+        
+        # Draw dark background for footer (full width, vertically centered)
+        # Calculate text center and height
+        text_center_y = footer_y + (chord_size / 2)
+        text_height = max(chord_size, body_size) * 1.3
+        
+        # Full width background
+        bg_x1 = 0
+        bg_x2 = region_w
+        
+        # Vertically centered around text
+        bg_y1 = text_center_y - (text_height * 0.75)
+        bg_y2 = text_center_y + (text_height * 0.45)
+        
+        # Enable GPU blending for transparency
+        gpu.state.blend_set('ALPHA')
+        
+        shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+        vertices = (
+            (bg_x1, bg_y1),
+            (bg_x2, bg_y1),
+            (bg_x2, bg_y2),
+            (bg_x1, bg_y2),
+        )
+        indices = ((0, 1, 2), (0, 2, 3))
+        batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
+        shader.bind()
+        shader.uniform_float("color", (0.0, 0.0, 0.0, 0.35))
+        batch.draw(shader)
+        
+        # Restore default blending
+        gpu.state.blend_set('NONE')
 
         icon_x = footer_x
-        arrow_x = icon_x + icon_size + gap // 2
-        token_col_right_x = arrow_x + gap + max_token_w
+        token_col_right_x = footer_x + icon_size + gap // 2 + max_token_w
         label_col_x = token_col_right_x + gap
+        
+        # Set chord_size once for all footer tokens
+        blf.size(0, chord_size)
 
         for r in footer:
             token_txt = r["token"]
@@ -229,30 +351,31 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             # Draw icon if present
             if icon_text:
                 try:
-                    blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3] * 0.7)
+                    blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3])
                     draw_icon(icon_text, icon_x, footer_y, icon_size)
                 except Exception:
                     pass
 
             # Draw token in angle brackets
             blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
-            blf.size(0, chord_size)
             display_token = f"<{token_txt.lower()}>"
             tw, _ = blf.dimensions(0, display_token)
             blf.position(0, token_col_right_x - tw, footer_y, 0)
             blf.draw(0, display_token)
 
             # Draw label
-            blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
             blf.size(0, body_size)
+            blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
             blf.position(0, label_col_x, footer_y, 0)
             blf.draw(0, label_txt)
+            
+            # Reset to chord size for next token
+            blf.size(0, chord_size)
 
-            # Move to next column for next footer item
-            footer_x += col_w + col_gap
+            # Move to next footer item
+            footer_x += footer_item_width + gap
             icon_x = footer_x
-            arrow_x = icon_x + icon_size + gap // 2
-            token_col_right_x = arrow_x + gap + max_token_w
+            token_col_right_x = footer_x + icon_size + gap // 2 + max_token_w
             label_col_x = token_col_right_x + gap
 
 
@@ -267,57 +390,115 @@ def draw_overlay(context, p, buffer_tokens):
     region_w = context.region.width if context.region else 600
     region_h = context.region.height if context.region else 400
 
-    scale_factor = calculate_scale_factor(context)
-    pad_x = int(getattr(p, "overlay_offset_x", 14) * scale_factor)
-    pad_y = int(getattr(p, "overlay_offset_y", 14) * scale_factor)
+    # Check cache validity
+    buffer_key = tuple(buffer_tokens) if buffer_tokens else ()
+    prefs_hash = get_prefs_hash(p, region_w, region_h)
+    
+    cache_valid = (
+        _overlay_cache["buffer_tokens"] == buffer_key and
+        _overlay_cache["prefs_hash"] == prefs_hash and
+        _overlay_cache["layout_data"] is not None
+    )
 
-    # Compute candidates
-    cands = candidates_for_prefix(p.mappings, buffer_tokens)
-    cands.sort(key=lambda c: (c.group.lower(), c.next_token))
-    cands = cands[: p.overlay_max_items]
+    if cache_valid:
+        # Use cached layout data
+        layout = _overlay_cache["layout_data"]
+    else:
+        # Recalculate layout
+        scale_factor = calculate_scale_factor(context)
+        pad_x = int(p.overlay_offset_x * scale_factor)
+        pad_y = int(p.overlay_offset_y * scale_factor)
 
-    # Display buffer with + separator instead of spaces
-    prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
-    header = f"Chord Song  |  {prefix}"
+        # Compute candidates
+        cands = candidates_for_prefix(p.mappings, buffer_tokens)
+        cands.sort(key=lambda c: (c.group.lower(), c.next_token))
+        cands = cands[: p.overlay_max_items]
 
-    # Scale font sizes
-    header_size = max(int(getattr(p, "overlay_font_size_header", 16) * scale_factor), 12)
-    chord_size = max(int(getattr(p, "overlay_font_size_chord", 14) * scale_factor), 11)
-    body_size = max(int(getattr(p, "overlay_font_size_body", 12) * scale_factor), 10)
-    icon_size = int(body_size * 1.2)
+        # Display buffer with + separator instead of spaces
+        prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
+        header = f"Chord Song  |  {prefix}"
 
-    # Precompute layout dimensions
-    blf.size(0, header_size)
-    header_w, header_h = blf.dimensions(0, header)
+        # Scale font sizes
+        header_size = max(int(p.overlay_font_size_header * scale_factor), 12)
+        chord_size = max(int(p.overlay_font_size_chord * scale_factor), 11)
+        body_size = max(int(p.overlay_font_size_body * scale_factor), 10)
+        icon_size = chord_size
 
-    # Scale spacing
-    gap = int(10 * scale_factor)
-    col_gap = int(30 * scale_factor)
-    line_h = int(body_size * 1.5)
+        # Precompute layout dimensions
+        blf.size(0, header_size)
+        header_w, header_h = blf.dimensions(0, header)
 
-    # Build rows and footer
-    rows, footer = build_overlay_rows(cands, bool(buffer_tokens))
-    max_rows = max(int(getattr(p, "overlay_column_rows", 12)), 3)
-    columns = wrap_into_columns(rows, max_rows)
+        # Scale spacing
+        gap = int(10 * scale_factor)
+        col_gap = int(30 * scale_factor)
+        line_h = int(body_size * 1.5)
 
-    # Calculate dimensions (including icon space and footer)
-    max_token_w, max_label_w, max_header_row_w = calculate_column_widths(columns, footer, chord_size, body_size)
+        # Build rows and footer
+        rows, footer = build_overlay_rows(cands, bool(buffer_tokens))
+        max_rows = max(int(p.overlay_column_rows), 1)
+        columns = wrap_into_columns(rows, max_rows)
 
-    # Account for icon and arrow in column width
-    arrow_w = gap
-    col_w = max(icon_size + gap + arrow_w + max_token_w + gap + max_label_w, max_header_row_w)
+        # Calculate dimensions (including icon space and footer)
+        max_token_w, max_label_w, max_header_row_w = calculate_column_widths(columns, footer, chord_size, body_size)
 
-    num_cols = len(columns)
-    block_w = max(header_w, num_cols * col_w + (num_cols - 1) * col_gap)
-    max_rows_in_any = min(max_rows, max(len(c) for c in columns) if columns else 0)
+        # Account for icon in column width
+        col_w = max(icon_size + max_token_w + gap + max_label_w, max_header_row_w)
 
-    # Add extra space for footer
-    footer_rows = 1 if footer else 0
-    block_h = int(header_h + (line_h * (max_rows_in_any + footer_rows + 2)))
+        num_cols = len(columns)
+        block_w = max(header_w, num_cols * col_w + (num_cols - 1) * col_gap)
+        max_rows_in_any = min(max_rows, max(len(c) for c in columns) if columns else 0)
 
-    # Calculate position
-    x, y = calculate_overlay_position(p, region_w, region_h, block_w, block_h, pad_x, pad_y)
+        # Add extra space for footer
+        footer_rows = 1 if footer else 0
+        block_h = int(header_h + (line_h * (max_rows_in_any + footer_rows + 2)))
 
-    # Render
-    render_overlay(context, p, columns, footer, x, y, header, header_size, chord_size, body_size,
-                   max_token_w, gap, col_w, col_gap, line_h, icon_size)
+        # Calculate position
+        x, y = calculate_overlay_position(p, region_w, region_h, block_w, block_h, pad_x, pad_y)
+
+        # Store layout in cache
+        layout = {
+            "columns": columns,
+            "footer": footer,
+            "x": x,
+            "y": y,
+            "header": header,
+            "header_size": header_size,
+            "header_w": header_w,
+            "chord_size": chord_size,
+            "body_size": body_size,
+            "max_token_w": max_token_w,
+            "gap": gap,
+            "col_w": col_w,
+            "col_gap": col_gap,
+            "line_h": line_h,
+            "icon_size": icon_size,
+            "block_w": block_w,
+            "max_label_w": max_label_w,
+        }
+
+        _overlay_cache["buffer_tokens"] = buffer_key
+        _overlay_cache["prefs_hash"] = prefs_hash
+        _overlay_cache["layout_data"] = layout
+
+    # Render (always done, only layout calculation is cached)
+    render_overlay(
+        context, p,
+        layout["columns"],
+        layout["footer"],
+        layout["x"],
+        layout["y"],
+        layout["header"],
+        layout["header_size"],
+        layout["chord_size"],
+        layout["body_size"],
+        layout["max_token_w"],
+        layout["gap"],
+        layout["col_w"],
+        layout["col_gap"],
+        layout["line_h"],
+        layout["icon_size"],
+        layout["block_w"],
+        layout["max_label_w"],
+        region_w,
+        layout["header_w"],
+    )

@@ -220,7 +220,7 @@ class CHORDSONG_Preferences(AddonPreferences):
             "before wrapping to the next column"
         ),
         default=12,
-        min=3,
+        min=1,
         max=60,
         update=_on_prefs_changed,
     )
@@ -276,6 +276,16 @@ class CHORDSONG_Preferences(AddonPreferences):
         min=0.0,
         max=1.0,
         default=(1.00, 1.00, 1.00, 1.00),
+        update=_on_prefs_changed,
+    )
+    overlay_color_icon: FloatVectorProperty(
+        name="Icon color",
+        description="Color for Nerd Font icons",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(0.80, 0.80, 0.80, 0.70),
         update=_on_prefs_changed,
     )
 

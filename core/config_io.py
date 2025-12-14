@@ -55,6 +55,7 @@ def dump_prefs(prefs) -> dict:
             "color_chord": list(getattr(prefs, "overlay_color_chord", (0.65, 0.8, 1.0, 1.0))),
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
             "color_header": list(getattr(prefs, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))),
+            "color_icon": list(getattr(prefs, "overlay_color_icon", (0.8, 0.8, 0.8, 0.7))),
             "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
@@ -115,6 +116,7 @@ def apply_config(prefs, data: dict) -> list[str]:
             "color_chord": "overlay_color_chord",
             "color_label": "overlay_color_label",
             "color_header": "overlay_color_header",
+            "color_icon": "overlay_color_icon",
         }
         
         for key, attr in color_props.items():
