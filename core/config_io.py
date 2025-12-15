@@ -30,6 +30,7 @@ def dump_prefs(prefs) -> dict:
             mapping_dict["python_file"] = get_str_attr(m, "python_file")
         else:
             mapping_dict["operator"] = get_str_attr(m, "operator")
+            mapping_dict["call_context"] = getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT"
             # Config format (v1): always a real JSON object.
             mapping_dict["kwargs"] = kwargs_obj
         
@@ -45,6 +46,7 @@ def dump_prefs(prefs) -> dict:
 
     return {
         "version": CONFIG_VERSION,
+        "scripts_folder": get_str_attr(prefs, "scripts_folder"),
         "overlay": {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
             "max_items": int(getattr(prefs, "overlay_max_items", 14)),
@@ -85,6 +87,12 @@ def apply_config(prefs, data: dict) -> list[str]:
     version = data.get("version", None)
     if version not in (None, CONFIG_VERSION):
         warnings.append(f"Unsupported config version: {version} (expected {CONFIG_VERSION})")
+
+    # Scripts folder
+    if "scripts_folder" in data:
+        scripts_folder = data.get("scripts_folder", "")
+        if isinstance(scripts_folder, str):
+            prefs.scripts_folder = scripts_folder.strip()
 
     # Overlay
     overlay = data.get("overlay", {})

@@ -11,7 +11,7 @@ from .common import prefs
 class CHORDSONG_OT_Mapping_Duplicate(bpy.types.Operator):
     bl_idname = "chordsong.mapping_duplicate"
     bl_label = "Duplicate Chord"
-    bl_options = {"REGISTER", "UNDO", "INTERNAL"}
+    bl_options = {"INTERNAL"}
 
     index: IntProperty(default=-1)
 

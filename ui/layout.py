@@ -23,6 +23,11 @@ def draw_addon_preferences(prefs, _context, layout):
     r.label(text="Config Path:")
     r.scale_x = 4
     r.prop(prefs, "config_path", text="", icon="FILE_CACHE")
+    r = box.row()
+    r.scale_x = 0.4
+    r.label(text="Scripts Folder:")
+    r.scale_x = 4
+    r.prop(prefs, "scripts_folder", text="", icon="FILE_FOLDER")
     r = box.row(align=True)
     r.operator("chordsong.save_config", text="Save Config", icon="FILE_TICK")
     r.separator()
@@ -121,11 +126,12 @@ def draw_addon_preferences(prefs, _context, layout):
 
     # MAPPINGS tab
     row = col.row(align=True)
-    row.scale_y = 2
+    row.scale_y = 1.5
     row.operator("chordsong.mapping_add", text="Add New Chord", icon="ADD")
-    # actions_row = col.row(align=True)
+    row.operator("chordsong.group_fold_all", text="", icon="TRIA_UP")
+    row.operator("chordsong.group_unfold_all", text="", icon="TRIA_DOWN")
 
-    # Grouped UI boxes
+    # Grouped UI boxes with foldable sections
     from ..core.engine import get_str_attr
 
     groups = {}
@@ -133,9 +139,12 @@ def draw_addon_preferences(prefs, _context, layout):
         group = get_str_attr(m, "group") or "Ungrouped"
         groups.setdefault(group, []).append((idx, m))
 
+    # Also include groups that exist but have no mappings yet
+    for grp in prefs.groups:
+        if grp.name and grp.name not in groups:
+            groups[grp.name] = []
+
     for group_name in sorted(groups.keys(), key=lambda s: (s != "Ungrouped", s.lower())):
-        box = col.box()
-        box.separator()
         items = groups[group_name]
         items.sort(
             key=lambda im: (
@@ -143,6 +152,51 @@ def draw_addon_preferences(prefs, _context, layout):
                 get_str_attr(im[1], "chord").lower(),
             )
         )
+
+        # Find the group object to get expanded state
+        if group_name == "Ungrouped":
+            # Use prefs-level property for ungrouped
+            is_expanded = prefs.ungrouped_expanded
+            expand_data = prefs
+            expand_prop = "ungrouped_expanded"
+        else:
+            # Find the group in the groups collection
+            grp_obj = None
+            for grp in prefs.groups:
+                if grp.name == group_name:
+                    grp_obj = grp
+                    break
+            if grp_obj:
+                is_expanded = grp_obj.expanded
+                expand_data = grp_obj
+                expand_prop = "expanded"
+            else:
+                # Group not found (shouldn't happen), default to expanded
+                is_expanded = True
+                expand_data = None
+                expand_prop = None
+
+        box = col.box()
+        
+        # Foldable header row
+        header = box.row(align=True)
+        if expand_data and expand_prop:
+            header.prop(
+                expand_data, expand_prop,
+                icon="TRIA_DOWN" if is_expanded else "TRIA_RIGHT",
+                text="",
+                emboss=False,
+            )
+        header.label(text=f"{group_name}")
+        
+        # Add new chord button in header
+        op = header.operator("chordsong.mapping_add", text="", icon="ADD")
+        op.group = group_name
+        
+        if not is_expanded:
+            continue
+
+        box.separator()
 
         for idx, m in items:
             # Main row with enabled, chord, label, and remove button
@@ -162,8 +216,6 @@ def draw_addon_preferences(prefs, _context, layout):
             op = r.operator("chordsong.group_add", text="", icon="ADD", emboss=True)
             op.name = "New Group"
             r.separator()
-            # Icon and Group row
-            # r_meta = box.row(align=True)
             
             # Icon display and selection button (compact)
             icon_sub = r.row(align=True)
@@ -187,6 +239,10 @@ def draw_addon_preferences(prefs, _context, layout):
 
             if m.mapping_type == "PYTHON_FILE":
                 r2.prop(m, "python_file", text="")
+                r2.separator()
+                # Script selector button
+                op = r2.operator("chordsong.script_select", text="Select Script", icon="FILEBROWSER", emboss=True)
+                op.mapping_index = idx
             else:
                 r2.prop(m, "operator", text="")
                 # Small convert button - create subsection with tight scaling
@@ -196,6 +252,9 @@ def draw_addon_preferences(prefs, _context, layout):
                 sub.alignment = 'LEFT'
                 op_convert = sub.operator("chordsong.mapping_convert", text="Convert", emboss=True)
                 op_convert.index = idx
+                # Call context selector (EXEC vs INVOKE)
+                sub.separator()
+                sub.prop(m, "call_context", text="")
 
             # Third row for parameters (only for operator type)
             if m.mapping_type == "OPERATOR":

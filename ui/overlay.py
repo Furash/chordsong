@@ -12,6 +12,15 @@ import gpu  # type: ignore
 from gpu_extras.batch import batch_for_shader  # type: ignore
 
 
+def get_last_chord_state():
+    """Get the last chord state from the leader module."""
+    try:
+        from ..operators import leader
+        return leader._last_chord_state  # pylint: disable=protected-access
+    except Exception:
+        return None
+
+
 # Cache for overlay layout to avoid recalculating every frame
 _overlay_cache = {
     "buffer_tokens": None,
@@ -105,9 +114,20 @@ def build_overlay_rows(cands, has_buffer):
 
     # Footer items (always at bottom)
     footer = []
-    footer.append({"kind": "item", "token": "ESC", "label": "Close"})
+    if not has_buffer:
+        # Only show repeat option at root level (no buffer)
+        last_chord = get_last_chord_state()
+        if last_chord and (last_chord.get("operator") or last_chord.get("python_file")):
+            # Show last chord's label and icon
+            last_label = last_chord.get("label") or "Last Chord"
+            last_icon = last_chord.get("icon") or ""
+            footer.append({"kind": "item", "token": "SPACE", "label": last_label, "icon": last_icon})
+        else:
+            # No previous chord to repeat
+            footer.append({"kind": "item", "token": "SPACE", "label": "Repeat Last Chord", "icon": ""})
+    footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})
     if has_buffer:
-        footer.append({"kind": "item", "token": "BS", "label": "Back"})
+        footer.append({"kind": "item", "token": "BS", "label": "Back", "icon": ""})
 
     return rows, footer
 
@@ -262,8 +282,10 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         cy = start_y
 
         # Icon, token, label layout
+        # Minimal gap between icon and chord
         icon_x = cx
-        token_col_right_x = cx + icon_size + gap // 2 + max_token_w
+        icon_gap = -16  # Minimal gap between icon and chord
+        token_col_right_x = cx + icon_size + icon_gap + max_token_w
         label_col_x = token_col_right_x + gap
 
         for r in col_rows:
@@ -314,7 +336,8 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         footer_y = start_y - (len(columns[0]) * line_h if columns and columns[0] else 0) - chord_size
 
         # Calculate total footer width
-        footer_item_width = icon_size + gap // 2 + max_token_w + gap + max_label_w
+        icon_gap = 2  # Minimal gap between icon and chord
+        footer_item_width = icon_size + icon_gap + max_token_w + gap + max_label_w
         total_footer_width = len(footer) * footer_item_width + (len(footer) - 1) * gap
         
         # Center the footer relative to full viewport width
@@ -353,7 +376,8 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         gpu.state.blend_set('NONE')
 
         icon_x = footer_x
-        token_col_right_x = footer_x + icon_size + gap // 2 + max_token_w
+        icon_gap = 2  # Minimal gap between icon and chord
+        token_col_right_x = footer_x + icon_size + icon_gap + max_token_w
         label_col_x = token_col_right_x + gap
         
         # Set chord_size once for all footer tokens
@@ -457,8 +481,9 @@ def draw_overlay(context, p, buffer_tokens):
         # Calculate dimensions (including icon space and footer)
         max_token_w, max_label_w, max_header_row_w = calculate_column_widths(columns, footer, chord_size, body_size)
 
-        # Account for icon in column width
-        col_w = max(icon_size + max_token_w + gap + max_label_w, max_header_row_w)
+        # Account for icon in column width (using smaller icon_gap)
+        icon_gap = 2  # Minimal gap between icon and chord
+        col_w = max(icon_size + icon_gap + max_token_w + gap + max_label_w, max_header_row_w)
 
         num_cols = len(columns)
         block_w = max(header_w, num_cols * col_w + (num_cols - 1) * col_gap)
@@ -555,27 +580,41 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
 
     # Layout
     gap = int(10 * scale_factor)
-    padding = int(20 * scale_factor)
+    pad_x = int(p.overlay_offset_x * scale_factor)
+    pad_y = int(p.overlay_offset_y * scale_factor)
     
-    # Calculate total width
+    # Calculate content width (smaller gap between icon and chord)
     icon_w = icon_size if icon else 0
-    total_w = icon_w + gap + chord_w + gap + label_w + padding * 2
-    total_h = int(header_size * 1.8)
+    icon_gap = 2 if icon else 0  # Minimal gap between icon and chord
+    content_w = icon_w + chord_w + gap + label_w
 
-    # Center horizontally, position near bottom
-    x = (region_w - total_w) // 2
-    y = int(region_h * 0.15)  # 15% from bottom
+    # Position at the same level as the main overlay header
+    # Calculate position using same logic as main overlay
+    block_h = int(header_size * 1.8)  # Approximate height for positioning
+    _, y = calculate_overlay_position(p, region_w, region_h, content_w, block_h, pad_x, pad_y)
+    
+    # Calculate text center and height for vertical centering
+    text_center_y = y + (header_size / 2)
+    text_height = max(header_size, body_size) * 1.3
+    
+    # Full width background
+    bg_x1 = 0
+    bg_x2 = region_w
+    
+    # Vertically centered around text
+    bg_y1 = text_center_y - (text_height * 0.75)
+    bg_y2 = text_center_y + (text_height * 0.45)
 
-    # Draw semi-transparent background with fade
-    bg_alpha = 0.5 * fade_alpha
+    # Draw semi-transparent background with fade (full width)
+    bg_alpha = 0.35 * fade_alpha
     
     gpu.state.blend_set('ALPHA')
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
     vertices = (
-        (x, y),
-        (x + total_w, y),
-        (x + total_w, y + total_h),
-        (x, y + total_h),
+        (bg_x1, bg_y1),
+        (bg_x2, bg_y1),
+        (bg_x2, bg_y2),
+        (bg_x1, bg_y2),
     )
     indices = ((0, 1, 2), (0, 2, 3))
     batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
@@ -584,9 +623,9 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     batch.draw(shader)
     gpu.state.blend_set('NONE')
 
-    # Draw content
-    text_y = y + (total_h - header_size) // 2
-    current_x = x + padding
+    # Draw content (centered horizontally)
+    text_y = y
+    current_x = (region_w - content_w) // 2
 
     # Draw icon if present
     if icon:
@@ -598,7 +637,7 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
             blf.draw(0, icon)
         except Exception:
             pass
-        current_x += icon_w + gap
+        current_x += icon_w + icon_gap
 
     # Draw chord text
     col_chord = p.overlay_color_chord

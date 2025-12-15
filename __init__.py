@@ -25,9 +25,11 @@ from .ui import CHORDSONG_Preferences, CHORDSONG_PG_Group, CHORDSONG_PG_Mapping,
 from .operators import (
     CHORDSONG_OT_Group_Add,
     CHORDSONG_OT_Group_Cleanup,
+    CHORDSONG_OT_Group_Fold_All,
     CHORDSONG_OT_Group_Remove,
     CHORDSONG_OT_Group_Rename,
     CHORDSONG_OT_Group_Select,
+    CHORDSONG_OT_Group_Unfold_All,
     CHORDSONG_OT_Icon_Select,
     CHORDSONG_OT_Icon_Select_Apply,
     CHORDSONG_OT_Leader,
@@ -41,6 +43,9 @@ from .operators import (
     CHORDSONG_OT_Open_Keymap,
     CHORDSONG_OT_Open_Prefs,
     CHORDSONG_OT_Save_Config,
+    CHORDSONG_OT_Script_Select,
+    CHORDSONG_OT_Script_Select_Apply,
+    cleanup_all_handlers,
 )
 
 _classes = (
@@ -50,9 +55,11 @@ _classes = (
     CHORDSONG_Preferences,
     CHORDSONG_OT_Group_Add,
     CHORDSONG_OT_Group_Cleanup,
+    CHORDSONG_OT_Group_Fold_All,
     CHORDSONG_OT_Group_Remove,
     CHORDSONG_OT_Group_Rename,
     CHORDSONG_OT_Group_Select,
+    CHORDSONG_OT_Group_Unfold_All,
     CHORDSONG_OT_Icon_Select,
     CHORDSONG_OT_Icon_Select_Apply,
     CHORDSONG_OT_Leader,
@@ -66,6 +73,8 @@ _classes = (
     CHORDSONG_OT_Open_Keymap,
     CHORDSONG_OT_Open_Prefs,
     CHORDSONG_OT_Save_Config,
+    CHORDSONG_OT_Script_Select,
+    CHORDSONG_OT_Script_Select_Apply,
 )
 
 _addon_keymaps = []
@@ -138,6 +147,11 @@ def register():
 
 def unregister():
     """Unregister addon classes and keymaps."""
+    # Clean up any active draw handlers/timers first to avoid draw-state conflicts
+    try:
+        cleanup_all_handlers()
+    except Exception:
+        pass
     _unregister_keymaps()
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)

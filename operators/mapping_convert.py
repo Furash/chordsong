@@ -132,13 +132,12 @@ class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
             if kwargs_string:
                 m.kwargs_json = kwargs_string
             
-            # Try to generate a label if empty
-            if not m.label or m.label == "New Chord":
-                # Extract just the operator name part (last segment)
-                parts = operator_name.split('.')
-                if parts:
-                    op_name = parts[-1].replace('_', ' ').title()
-                    m.label = op_name
+            # Generate a label from the operator name (drop prefix, title case)
+            # e.g. "wm.recover_auto_save" -> "Recover Auto Save"
+            parts = operator_name.split('.')
+            if parts:
+                op_name = parts[-1].replace('_', ' ').title()
+                m.label = op_name
             
             self.report({"INFO"}, f"Converted: {operator_name}")
             return {"FINISHED"}

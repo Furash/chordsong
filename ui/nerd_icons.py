@@ -25,6 +25,9 @@ NERD_ICONS = [
     ("Shape", "󰠱"),
     ("Path", "󰴠"),
     ("Curve", "󰫨"),
+
+    # Unreal
+    ("Unreal", "󰦱"),
     
     # File & Folder Operations
     ("File", "󰈔"),

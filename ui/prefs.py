@@ -103,6 +103,11 @@ class CHORDSONG_PG_Group(PropertyGroup):
         description="Order in which groups are displayed",
         default=0,
     )
+    expanded: BoolProperty(
+        name="Expanded",
+        description="Whether this group is expanded in the UI",
+        default=True,
+    )
 
 
 class CHORDSONG_PG_Mapping(PropertyGroup):
@@ -196,6 +201,14 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Config Path",
         description="Optional JSON config file path (used as default for Load/Save)",
         subtype="FILE_PATH",
+        default="",
+        update=_on_prefs_changed,
+    )
+
+    scripts_folder: StringProperty(
+        name="Scripts Folder",
+        description="Folder containing custom Python scripts for quick selection",
+        subtype="DIR_PATH",
         default="",
         update=_on_prefs_changed,
     )
@@ -319,6 +332,12 @@ class CHORDSONG_Preferences(AddonPreferences):
     mappings: CollectionProperty(type=CHORDSONG_PG_Mapping)
     groups: CollectionProperty(type=CHORDSONG_PG_Group)
     nerd_icons: CollectionProperty(type=CHORDSONG_PG_NerdIcon)
+    
+    ungrouped_expanded: BoolProperty(
+        name="Ungrouped Expanded",
+        description="Whether the Ungrouped section is expanded",
+        default=True,
+    )
 
     def ensure_defaults(self):
         """Ensure default config path and mappings are set."""

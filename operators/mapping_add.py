@@ -3,6 +3,7 @@
 # pylint: disable=import-error,broad-exception-caught
 
 import bpy  # type: ignore
+from bpy.props import StringProperty  # type: ignore
 
 from .common import prefs
 
@@ -12,13 +13,19 @@ class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
     bl_label = "Add New Chord"
     bl_options = {"INTERNAL"}
 
+    group: StringProperty(
+        name="Group",
+        description="Group to assign to the new chord",
+        default="",
+    )
+
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
         m = p.mappings.add()
         m.enabled = True
         m.chord = ""
         m.label = "New Chord"
-        m.group = ""
+        m.group = self.group if self.group != "Ungrouped" else ""
         m.operator = ""
         m.call_context = "EXEC_DEFAULT"
         m.kwargs_json = ""
