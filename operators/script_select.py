@@ -16,25 +16,35 @@ def fuzzy_match(query: str, text: str) -> tuple[bool, int]:
     Fuzzy match query against text.
     Returns (matched, score) where lower score is better.
     Score is based on character positions and gaps.
+    Treats underscores as spaces for easier matching.
     """
     if not query:
         return True, 0
     
-    query = query.lower()
-    text = text.lower()
+    # Normalize: lowercase and treat underscores as spaces
+    query = query.lower().replace('_', ' ')
+    text = text.lower().replace('_', ' ')
     
     # Quick substring check for exact matches (best score)
     if query in text:
         return True, text.index(query) * 10
     
     # Fuzzy match: check if all query chars appear in order
+    # Skip spaces in query for better matching (e.g., "my test" matches "mytest" or "my_test")
+    query_chars = [c for c in query if c != ' ']
+    
     query_idx = 0
     text_idx = 0
     last_match_idx = -1
     score = 0
     
-    while query_idx < len(query) and text_idx < len(text):
-        if query[query_idx] == text[text_idx]:
+    while query_idx < len(query_chars) and text_idx < len(text):
+        # Skip spaces in text
+        if text[text_idx] == ' ':
+            text_idx += 1
+            continue
+            
+        if query_chars[query_idx] == text[text_idx]:
             # Calculate gap penalty
             if last_match_idx >= 0:
                 gap = text_idx - last_match_idx - 1
@@ -45,7 +55,7 @@ def fuzzy_match(query: str, text: str) -> tuple[bool, int]:
         text_idx += 1
     
     # If we matched all query characters, it's a match
-    if query_idx == len(query):
+    if query_idx == len(query_chars):
         return True, score
     
     return False, float('inf')

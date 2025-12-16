@@ -23,6 +23,7 @@ import bpy
 
 from .ui import CHORDSONG_Preferences, CHORDSONG_PG_Group, CHORDSONG_PG_Mapping, CHORDSONG_PG_NerdIcon
 from .operators import (
+    CHORDSONG_OT_Context_Menu,
     CHORDSONG_OT_Group_Add,
     CHORDSONG_OT_Group_Cleanup,
     CHORDSONG_OT_Group_Fold_All,
@@ -46,6 +47,8 @@ from .operators import (
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
     cleanup_all_handlers,
+    register_context_menu,
+    unregister_context_menu,
 )
 
 _classes = (
@@ -53,6 +56,7 @@ _classes = (
     CHORDSONG_PG_Group,
     CHORDSONG_PG_Mapping,
     CHORDSONG_Preferences,
+    CHORDSONG_OT_Context_Menu,
     CHORDSONG_OT_Group_Add,
     CHORDSONG_OT_Group_Cleanup,
     CHORDSONG_OT_Group_Fold_All,
@@ -87,8 +91,8 @@ def rebuild_keymaps():
 
 
 def _register_keymaps():
-    # Bind leader key in 3D View to start chord capture.
-    # Users can also change this in Blender Keymap settings under Add-ons.
+    # Bind leader key in multiple editors to start chord capture.
+    # Users can change this in Blender's Keymap editor under Add-ons > Chord Song.
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
     if not kc:
@@ -96,7 +100,13 @@ def _register_keymaps():
 
     leader_key = "SPACE"
 
+    # Register for 3D View
     km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
+    kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
+    _addon_keymaps.append((km, kmi))
+    
+    # Register for Node Editor (covers both Geometry Nodes and Shader Editor)
+    km = kc.keymaps.new(name="Node Editor", space_type="NODE_EDITOR")
     kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
     _addon_keymaps.append((km, kmi))
 
@@ -115,6 +125,7 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
     _register_keymaps()
+    register_context_menu()
     # Initialize default config path early (so operators can use it before opening prefs UI).
     try:
         prefs = bpy.context.preferences.addons[__package__].preferences
@@ -152,6 +163,7 @@ def unregister():
         cleanup_all_handlers()
     except Exception:
         pass
+    unregister_context_menu()
     _unregister_keymaps()
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)

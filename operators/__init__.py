@@ -1,3 +1,8 @@
+from .context_menu import (
+    CHORDSONG_OT_Context_Menu,
+    register_context_menu,
+    unregister_context_menu,
+)
 from .group_add import CHORDSONG_OT_Group_Add
 from .group_cleanup import CHORDSONG_OT_Group_Cleanup
 from .group_fold import CHORDSONG_OT_Group_Fold_All, CHORDSONG_OT_Group_Unfold_All
@@ -19,6 +24,7 @@ from .save_config import CHORDSONG_OT_Save_Config
 from .script_select import CHORDSONG_OT_Script_Select, CHORDSONG_OT_Script_Select_Apply
 
 __all__ = [
+    "CHORDSONG_OT_Context_Menu",
     "CHORDSONG_OT_Group_Add",
     "CHORDSONG_OT_Group_Cleanup",
     "CHORDSONG_OT_Group_Fold_All",
@@ -42,6 +48,8 @@ __all__ = [
     "CHORDSONG_OT_Script_Select",
     "CHORDSONG_OT_Script_Select_Apply",
     "cleanup_all_handlers",
+    "register_context_menu",
+    "unregister_context_menu",
 ]
 
 

@@ -7,13 +7,17 @@ def get_str_attr(obj, attr, default=""):
     return (getattr(obj, attr, default) or default).strip()
 
 
-def normalize_token(event_type: str):
+def normalize_token(event_type: str, shift: bool = False):
     """
     Convert a Blender event.type into a chord token.
     Minimal rules:
-    - Letters become lowercase.
+    - Letters: lowercase by default, uppercase if shift is pressed.
     - Digits remain digits.
     - Ignore pure modifiers and non-keyboard noise.
+    
+    Args:
+        event_type: The Blender event type string
+        shift: Whether shift key is pressed
     """
     if not event_type:
         return None
@@ -22,7 +26,8 @@ def normalize_token(event_type: str):
         return None
 
     if len(event_type) == 1 and event_type.isalpha():
-        return event_type.lower()
+        # Return uppercase if shift is pressed, lowercase otherwise
+        return event_type.upper() if shift else event_type.lower()
 
     if event_type.isdigit():
         return event_type
@@ -34,6 +39,40 @@ def normalize_token(event_type: str):
         "RET": "enter",
         "ESC": "esc",
         "BACK_SPACE": "backspace",
+        # Number keys (main row) - with shift support for symbols
+        "ZERO": ")" if shift else "0",
+        "ONE": "!" if shift else "1",
+        "TWO": "@" if shift else "2",
+        "THREE": "#" if shift else "3",
+        "FOUR": "$" if shift else "4",
+        "FIVE": "%" if shift else "5",
+        "SIX": "^" if shift else "6",
+        "SEVEN": "&" if shift else "7",
+        "EIGHT": "*" if shift else "8",
+        "NINE": "(" if shift else "9",
+        # Numpad keys (prefixed with 'n')
+        "NUMPAD_0": "n0",
+        "NUMPAD_1": "n1",
+        "NUMPAD_2": "n2",
+        "NUMPAD_3": "n3",
+        "NUMPAD_4": "n4",
+        "NUMPAD_5": "n5",
+        "NUMPAD_6": "n6",
+        "NUMPAD_7": "n7",
+        "NUMPAD_8": "n8",
+        "NUMPAD_9": "n9",
+        # Common punctuation (with shift support)
+        "MINUS": "_" if shift else "-",
+        "EQUAL": "+" if shift else "=",
+        "LEFT_BRACKET": "{" if shift else "[",
+        "RIGHT_BRACKET": "}" if shift else "]",
+        "SEMI_COLON": ":" if shift else ";",
+        "QUOTE": '"' if shift else "'",
+        "COMMA": "<" if shift else ",",
+        "PERIOD": ">" if shift else ".",
+        "SLASH": "?" if shift else "/",
+        "BACK_SLASH": "|" if shift else "\\",
+        "GRAVE_ACCENT": "~" if shift else "`",
     }
     return named.get(event_type, None)
 
@@ -115,10 +154,72 @@ def candidates_for_prefix(mappings, buffer_tokens):
 def parse_kwargs(kwargs_json: str) -> dict:
     if not (kwargs_json or "").strip():
         return {}
+    
+    # Try JSON format first
     try:
         v = json.loads(kwargs_json)
+        return v if isinstance(v, dict) else {}
     except (ValueError, TypeError):
+        pass
+    
+    # Try Python-like format: key = value, key2 = value2
+    try:
+        import ast
+        import re
+        
+        # Parse Python-like assignment format
+        result = {}
+        # Split by commas, but respect quoted strings
+        parts = []
+        current = []
+        in_quotes = False
+        for char in kwargs_json:
+            if char == '"' or char == "'":
+                in_quotes = not in_quotes
+            if char == ',' and not in_quotes:
+                parts.append(''.join(current).strip())
+                current = []
+            else:
+                current.append(char)
+        if current:
+            parts.append(''.join(current).strip())
+        
+        # Parse each key = value pair
+        for part in parts:
+            if '=' in part:
+                key, value = part.split('=', 1)
+                key = key.strip()
+                value = value.strip()
+                
+                # Try to evaluate the value
+                try:
+                    result[key] = ast.literal_eval(value)
+                except (ValueError, SyntaxError):
+                    # Keep as string if can't evaluate
+                    result[key] = value.strip('"\'')
+        
+        return result
+    except Exception:
         return {}
-    return v if isinstance(v, dict) else {}
+
+
+def filter_mappings_by_context(mappings, context_type: str):
+    """
+    Filter mappings by editor context.
+    
+    Args:
+        mappings: Collection of mapping objects
+        context_type: One of "VIEW_3D", "GEOMETRY_NODE", "SHADER_EDITOR"
+    
+    Returns:
+        List of mappings matching the context
+    """
+    filtered = []
+    for m in mappings:
+        # Get the context attribute, default to VIEW_3D for backward compatibility
+        mapping_context = getattr(m, "context", "VIEW_3D")
+        if mapping_context == context_type:
+            filtered.append(m)
+    return filtered
 
 

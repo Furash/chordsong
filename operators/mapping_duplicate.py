@@ -34,9 +34,11 @@ class CHORDSONG_OT_Mapping_Duplicate(bpy.types.Operator):
         new_m.label = f"{source.label} (Copy)" if source.label else "New Chord"
         new_m.icon = source.icon
         new_m.group = source.group
+        new_m.context = source.context
         new_m.mapping_type = source.mapping_type
         new_m.operator = source.operator
         new_m.python_file = source.python_file
+        new_m.context_path = source.context_path
         new_m.call_context = source.call_context
         new_m.kwargs_json = source.kwargs_json
 

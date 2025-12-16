@@ -5,7 +5,8 @@
 # pylint: disable=import-error,broad-exception-caught
 
 import time
-from ..core.engine import candidates_for_prefix
+import bpy  # type: ignore
+from ..core.engine import candidates_for_prefix, normalize_token
 
 # Import gpu modules at module level for better performance
 import gpu  # type: ignore
@@ -19,6 +20,29 @@ def get_last_chord_state():
         return leader._last_chord_state  # pylint: disable=protected-access
     except Exception:
         return None
+
+
+def get_leader_key_token():
+    """Get the current leader key token for display."""
+    try:
+        wm = bpy.context.window_manager
+        kc = wm.keyconfigs.addon
+        if not kc:
+            return "space"
+        
+        km = kc.keymaps.get("3D View")
+        if not km:
+            return "space"
+        
+        # Find the leader keymap item
+        for kmi in km.keymap_items:
+            if kmi.idname == "chordsong.leader":
+                # Normalize the key type to a display token
+                return normalize_token(kmi.type, shift=False) or "space"
+        
+        return "space"
+    except Exception:
+        return "space"
 
 
 # Cache for overlay layout to avoid recalculating every frame
@@ -94,7 +118,7 @@ def build_overlay_rows(cands, has_buffer):
                 # Mixed groups or no group, use generic label
                 label = "More..."
             
-            rows.append({"kind": "item", "token": token.upper(), "label": label, "icon": icon})
+            rows.append({"kind": "item", "token": token, "label": label, "icon": icon})
         elif len(group) > 1:
             # Multiple final chords share this prefix, show a summary
             # Check if all items in this group have the same group name
@@ -106,25 +130,26 @@ def build_overlay_rows(cands, has_buffer):
                 # Mixed groups or no group, use first label's first word
                 label = f"{group[0].label.split()[0] if group[0].label else 'More'}..."
             
-            rows.append({"kind": "item", "token": token.upper(), "label": label, "icon": icon})
+            rows.append({"kind": "item", "token": token, "label": label, "icon": icon})
         else:
             # Single final chord, show its label
             c = group[0]
-            rows.append({"kind": "item", "token": (c.next_token or "").upper(), "label": c.label, "icon": c.icon})
+            rows.append({"kind": "item", "token": c.next_token or "", "label": c.label, "icon": c.icon})
 
     # Footer items (always at bottom)
     footer = []
     if not has_buffer:
         # Only show repeat option at root level (no buffer)
+        leader_token = get_leader_key_token()
         last_chord = get_last_chord_state()
-        if last_chord and (last_chord.get("operator") or last_chord.get("python_file")):
+        if last_chord and (last_chord.get("operator") or last_chord.get("python_file") or last_chord.get("context_path")):
             # Show last chord's label and icon
             last_label = last_chord.get("label") or "Last Chord"
             last_icon = last_chord.get("icon") or ""
-            footer.append({"kind": "item", "token": "SPACE", "label": last_label, "icon": last_icon})
+            footer.append({"kind": "item", "token": leader_token, "label": last_label, "icon": last_icon})
         else:
             # No previous chord to repeat
-            footer.append({"kind": "item", "token": "SPACE", "label": "Repeat Last Chord", "icon": ""})
+            footer.append({"kind": "item", "token": leader_token, "label": "Repeat Last Chord", "icon": ""})
     footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})
     if has_buffer:
         footer.append({"kind": "item", "token": "BS", "label": "Back", "icon": ""})
@@ -335,10 +360,11 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         # Add spacing before footer
         footer_y = start_y - (len(columns[0]) * line_h if columns and columns[0] else 0) - chord_size
 
-        # Calculate total footer width
-        icon_gap = 2  # Minimal gap between icon and chord
-        footer_item_width = icon_size + icon_gap + max_token_w + gap + max_label_w
-        total_footer_width = len(footer) * footer_item_width + (len(footer) - 1) * gap
+        # Calculate total footer width (token, then icon, then label)
+        icon_gap = 8  # Gap between token and icon
+        footer_item_width = max_token_w + icon_gap + icon_size + gap + max_label_w
+        footer_spacing = max_token_w  # Extra spacing between footer items
+        total_footer_width = len(footer) * footer_item_width + (len(footer) - 1) * footer_spacing
         
         # Center the footer relative to full viewport width
         footer_x = (region_w - total_footer_width) // 2
@@ -375,10 +401,8 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         # Restore default blending
         gpu.state.blend_set('NONE')
 
-        icon_x = footer_x
-        icon_gap = 2  # Minimal gap between icon and chord
-        token_col_right_x = footer_x + icon_size + icon_gap + max_token_w
-        label_col_x = token_col_right_x + gap
+        icon_gap = 8  # Gap between token and icon (consistent with above)
+        footer_spacing = gap * 2  # Extra spacing between footer items
         
         # Set chord_size once for all footer tokens
         blf.size(0, chord_size)
@@ -388,43 +412,56 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             label_txt = r["label"]
             icon_text = r.get("icon", "")
 
-            # Draw icon if present
+            # Calculate positions for this item: token, then icon, then label
+            token_x = footer_x
+            
+            # Draw token in angle brackets first
+            blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
+            display_token = f"<{token_txt.lower()}>"
+            tw, _ = blf.dimensions(0, display_token)
+            blf.position(0, token_x, footer_y, 0)
+            blf.draw(0, display_token)
+            
+            # Icon comes after token
+            icon_x = token_x + tw + icon_gap
             if icon_text:
                 try:
                     blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3])
                     draw_icon(icon_text, icon_x, footer_y, icon_size)
                 except Exception:
                     pass
-
-            # Draw token in angle brackets
-            blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
-            display_token = f"<{token_txt.lower()}>"
-            tw, _ = blf.dimensions(0, display_token)
-            blf.position(0, token_col_right_x - tw, footer_y, 0)
-            blf.draw(0, display_token)
-
-            # Draw label
+            
+            # Label comes after icon
+            label_x = icon_x + (icon_size if icon_text else 0) + gap
             blf.size(0, body_size)
             blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
-            blf.position(0, label_col_x, footer_y, 0)
+            blf.position(0, label_x, footer_y, 0)
             blf.draw(0, label_txt)
             
             # Reset to chord size for next token
             blf.size(0, chord_size)
 
             # Move to next footer item
-            footer_x += footer_item_width + gap
-            icon_x = footer_x
-            token_col_right_x = footer_x + icon_size + gap // 2 + max_token_w
-            label_col_x = token_col_right_x + gap
+            footer_x += footer_item_width + footer_spacing
 
 
-def draw_overlay(context, p, buffer_tokens):
-    """Main draw callback for the overlay."""
+def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
+    """Main draw callback for the overlay.
+    
+    Args:
+        context: Blender context
+        p: Addon preferences
+        buffer_tokens: Current buffer of chord tokens
+        filtered_mappings: Optional filtered mappings list (defaults to p.mappings)
+    """
     try:
         import blf  # type: ignore
     except Exception:
         return
+
+    # Use filtered mappings if provided, otherwise use all mappings
+    if filtered_mappings is None:
+        filtered_mappings = p.mappings
 
     # Basic metrics
     region_w = context.region.width if context.region else 600
@@ -449,8 +486,8 @@ def draw_overlay(context, p, buffer_tokens):
         pad_x = int(p.overlay_offset_x * scale_factor)
         pad_y = int(p.overlay_offset_y * scale_factor)
 
-        # Compute candidates
-        cands = candidates_for_prefix(p.mappings, buffer_tokens)
+        # Compute candidates from filtered mappings
+        cands = candidates_for_prefix(filtered_mappings, buffer_tokens)
         cands.sort(key=lambda c: (c.group.lower(), c.next_token))
         cands = cands[: p.overlay_max_items]
 

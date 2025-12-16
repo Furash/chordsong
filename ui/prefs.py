@@ -137,12 +137,24 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         default="",
         update=_on_mapping_changed,
     )
+    context: EnumProperty(
+        name="Context",
+        description="Editor context where this chord mapping is active",
+        items=(
+            ("VIEW_3D", "3D View", "Active in 3D View editor"),
+            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor"),
+            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor"),
+        ),
+        default="VIEW_3D",
+        update=_on_mapping_changed,
+    )
     mapping_type: EnumProperty(
         name="Type",
         description="Type of action to execute",
         items=(
             ("OPERATOR", "Operator", "Blender operator ID", "SETTINGS", 0),
             ("PYTHON_FILE", "Script", "Execute a Python script file", "FILE_SCRIPT", 1),
+            ("CONTEXT_TOGGLE", "Toggle", "Toggle a boolean property", "CHECKBOX_HLT", 2),
         ),
         default="OPERATOR",
         update=_on_mapping_changed,
@@ -157,6 +169,12 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         name="Python File",
         description="Path to Python script file to execute",
         subtype="FILE_PATH",
+        default="",
+        update=_on_mapping_changed,
+    )
+    context_path: StringProperty(
+        name="Context Path",
+        description="Path to boolean property to toggle (e.g. 'space_data.overlay.show_face_orientation')",
         default="",
         update=_on_mapping_changed,
     )
@@ -191,10 +209,20 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Tab",
         items=(
             ("MAPPINGS", "Mappings", "Chord mappings"),
-            ("GROUPS", "Groups", "Manage groups"),
             ("UI", "UI", "Overlay/UI customization"),
         ),
         default="MAPPINGS",
+    )
+    
+    mapping_context_tab: EnumProperty(
+        name="Mapping Context Tab",
+        description="Select the editor context for chord mappings",
+        items=(
+            ("VIEW_3D", "3D View", "3D View editor chord mappings"),
+            ("GEOMETRY_NODE", "Geometry Nodes", "Geometry Nodes editor chord mappings"),
+            ("SHADER_EDITOR", "Shader Editor", "Shader Editor chord mappings"),
+        ),
+        default="VIEW_3D",
     )
 
     config_path: StringProperty(
@@ -353,21 +381,22 @@ class CHORDSONG_Preferences(AddonPreferences):
         if self.mappings:
             return
 
-        def add(chord, label, group, operator, kwargs_json=""):
+        def add(chord, label, group, operator, kwargs_json="", context="VIEW_3D"):
             m = self.mappings.add()
             m.chord = chord
             m.label = label
             m.group = group
+            m.context = context
             m.mapping_type = "OPERATOR"
             m.operator = operator
             m.call_context = "EXEC_DEFAULT"
             m.kwargs_json = kwargs_json
             m.enabled = True
 
-        add("g g", "Frame Selected", "View", "view3d.view_selected", '{"use_all_regions": false}')
-        add("g a", "Frame All", "View", "view3d.view_all", "{}")
-        add("s r", "Run Active Script", "Script", "text.run_script", "{}")
-        add("k c", "Open Preferences", "Chord Song", "chordsong.open_prefs", "{}")
+        add("g g", "Frame Selected", "View", "view3d.view_selected", '{"use_all_regions": false}', "VIEW_3D")
+        add("g a", "Frame All", "View", "view3d.view_all", "{}", "VIEW_3D")
+        add("s r", "Run Active Script", "Script", "text.run_script", "{}", "VIEW_3D")
+        add("k c", "Open Preferences", "Chord Song", "chordsong.open_prefs", "{}", "VIEW_3D")
 
         # Sync groups after adding default mappings
         self._sync_groups_from_mappings()

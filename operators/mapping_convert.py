@@ -58,23 +58,23 @@ def extract_operator_and_kwargs(text: str):
     """
     Extract operator name and kwargs from a full function call.
     Example: bpy.ops.mesh.primitive_cube_add(enter_editmode=False, align='WORLD')
-    Returns: (operator_name, kwargs_string)
+    Returns: (operator_name, kwargs_string, kwargs_dict)
     """
     text = text.strip()
     if not text:
-        return None, None
+        return None, None, None
     
     # Match pattern: bpy.ops.module.operator(...)
     # or just module.operator(...)
     match = re.match(r'(?:bpy\.ops\.)?([a-zA-Z_][a-zA-Z0-9_.]*)\((.*)\)$', text, re.DOTALL)
     if not match:
-        return None, None
+        return None, None, None
     
     operator_name = match.group(1)
     args_text = match.group(2).strip()
     
     if not args_text:
-        return operator_name, ""
+        return operator_name, "", {}
     
     # Parse the arguments to extract kwargs using AST
     try:
@@ -84,19 +84,28 @@ def extract_operator_and_kwargs(text: str):
         
         if isinstance(tree.body, ast.Call):
             kwargs_parts = []
+            kwargs_dict = {}
+            
             for keyword in tree.body.keywords:
                 # Format as key = value
                 value_str = _ast_value_to_string(keyword.value)
                 kwargs_parts.append(f"{keyword.arg} = {value_str}")
+                
+                # Store raw value for label generation
+                # Try to extract string values without quotes
+                if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
+                    kwargs_dict[keyword.arg] = keyword.value.value
+                elif isinstance(keyword.value, ast.Str):  # Python < 3.8
+                    kwargs_dict[keyword.arg] = keyword.value.s
             
             kwargs_string = ", ".join(kwargs_parts)
-            return operator_name, kwargs_string
+            return operator_name, kwargs_string, kwargs_dict
     except Exception:
         # Fallback: return args as-is (user can manually fix if needed)
         pass
     
     # Fallback: return args as-is
-    return operator_name, args_text
+    return operator_name, args_text, {}
 
 
 class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
@@ -125,22 +134,95 @@ class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
             self.report({"WARNING"}, "No function call to convert")
             return {"CANCELLED"}
         
-        operator_name, kwargs_string = extract_operator_and_kwargs(full_call)
+        operator_name, kwargs_string, kwargs_dict = extract_operator_and_kwargs(full_call)
         
         if operator_name:
             m.operator = operator_name
             if kwargs_string:
                 m.kwargs_json = kwargs_string
             
-            # Generate a label from the operator name (drop prefix, title case)
-            # e.g. "wm.recover_auto_save" -> "Recover Auto Save"
-            parts = operator_name.split('.')
-            if parts:
-                op_name = parts[-1].replace('_', ' ').title()
-                m.label = op_name
+            # Generate a smart label based on operator type and parameters
+            m.label = self._generate_smart_label(operator_name, kwargs_dict)
+            
+            # Auto-detect context based on operator
+            m.context = self._detect_context_from_operator(operator_name, kwargs_dict)
             
             self.report({"INFO"}, f"Converted: {operator_name}")
             return {"FINISHED"}
         else:
             self.report({"WARNING"}, "Could not parse function call")
             return {"CANCELLED"}
+    
+    def _detect_context_from_operator(self, operator_name: str, kwargs_dict: dict) -> str:
+        """Detect the appropriate editor context based on the operator."""
+        parts = operator_name.split('.')
+        
+        # Node operators
+        if len(parts) >= 1 and parts[0] == 'node':
+            # Check if there's a 'type' parameter that indicates shader vs geometry nodes
+            if 'type' in kwargs_dict:
+                node_type = kwargs_dict['type']
+                if node_type.startswith('ShaderNode'):
+                    return "SHADER_EDITOR"
+                elif node_type.startswith('GeometryNode'):
+                    return "GEOMETRY_NODE"
+                elif node_type.startswith('CompositorNode'):
+                    return "SHADER_EDITOR"  # Compositor uses shader editor context
+            
+            # Default node operations to Geometry Nodes
+            # (user can change if needed)
+            return "GEOMETRY_NODE"
+        
+        # Default to 3D View for all other operators
+        return "VIEW_3D"
+    
+    def _generate_smart_label(self, operator_name: str, kwargs_dict: dict) -> str:
+        """Generate a smart label from operator name and parameters."""
+        parts = operator_name.split('.')
+        
+        # Check if this is a node operator (node.add_node, node.add_search, etc.)
+        if len(parts) >= 2 and parts[0] == 'node':
+            # Look for 'type' parameter in kwargs
+            if 'type' in kwargs_dict:
+                node_type = kwargs_dict['type']
+                
+                # Clean up node type names
+                # Remove common prefixes: ShaderNode, GeometryNode, CompositorNode, etc.
+                for prefix in ['ShaderNode', 'GeometryNode', 'CompositorNode', 'TextureNode']:
+                    if node_type.startswith(prefix):
+                        node_type = node_type[len(prefix):]
+                        break
+                
+                # Convert from CamelCase to Title Case with spaces
+                # e.g., "Blackbody" stays "Blackbody", "MixRGB" becomes "Mix RGB"
+                label = re.sub(r'([a-z])([A-Z])', r'\1 \2', node_type)
+                label = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1 \2', label)  # Handle RGB, HSV, etc.
+                
+                return label
+            
+            # If no type parameter, check for 'node_tree' (for group operations)
+            if 'node_tree' in kwargs_dict:
+                tree_name = kwargs_dict['node_tree']
+                return f"Node: {tree_name}"
+        
+        # Check for mesh primitives
+        if len(parts) >= 2 and parts[0] == 'mesh' and parts[1].startswith('primitive_'):
+            primitive = parts[1].replace('primitive_', '').replace('_', ' ').title()
+            return f"Add {primitive}"
+        
+        # Check for object operations
+        if len(parts) >= 2 and parts[0] == 'object':
+            op_name = parts[1].replace('_', ' ').title()
+            # Special cases
+            if op_name == 'Delete':
+                return 'Delete Object'
+            elif op_name == 'Duplicate':
+                return 'Duplicate Object'
+            return op_name
+        
+        # Default: use the operator name (last part, title case)
+        if parts:
+            op_name = parts[-1].replace('_', ' ').title()
+            return op_name
+        
+        return "Operator"

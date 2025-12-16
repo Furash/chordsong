@@ -2,10 +2,54 @@ import json
 
 # pylint: disable=broad-exception-caught
 
+import bpy  # type: ignore
 from .engine import parse_kwargs, get_str_attr
 
 
 CONFIG_VERSION = 1
+
+
+def _get_leader_key_from_keymap() -> str:
+    """Get the current leader key type from the addon keymap."""
+    try:
+        wm = bpy.context.window_manager
+        kc = wm.keyconfigs.addon
+        if not kc:
+            return "SPACE"
+        
+        km = kc.keymaps.get("3D View")
+        if not km:
+            return "SPACE"
+        
+        # Find the leader keymap item
+        for kmi in km.keymap_items:
+            if kmi.idname == "chordsong.leader":
+                return kmi.type
+        
+        return "SPACE"
+    except Exception:
+        return "SPACE"
+
+
+def _set_leader_key_in_keymap(key_type: str):
+    """Set the leader key type in the addon keymap."""
+    try:
+        wm = bpy.context.window_manager
+        kc = wm.keyconfigs.addon
+        if not kc:
+            return
+        
+        km = kc.keymaps.get("3D View")
+        if not km:
+            return
+        
+        # Find and update the leader keymap item
+        for kmi in km.keymap_items:
+            if kmi.idname == "chordsong.leader":
+                kmi.type = key_type
+                break
+    except Exception:
+        pass
 
 
 def dump_prefs(prefs) -> dict:
@@ -23,11 +67,14 @@ def dump_prefs(prefs) -> dict:
             "label": get_str_attr(m, "label"),
             "icon": get_str_attr(m, "icon"),
             "group": get_str_attr(m, "group"),
+            "context": getattr(m, "context", "VIEW_3D"),
             "mapping_type": mapping_type,
         }
         
         if mapping_type == "PYTHON_FILE":
             mapping_dict["python_file"] = get_str_attr(m, "python_file")
+        elif mapping_type == "CONTEXT_TOGGLE":
+            mapping_dict["context_path"] = get_str_attr(m, "context_path")
         else:
             mapping_dict["operator"] = get_str_attr(m, "operator")
             mapping_dict["call_context"] = getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT"
@@ -47,6 +94,7 @@ def dump_prefs(prefs) -> dict:
     return {
         "version": CONFIG_VERSION,
         "scripts_folder": get_str_attr(prefs, "scripts_folder"),
+        "leader_key": _get_leader_key_from_keymap(),
         "overlay": {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
             "max_items": int(getattr(prefs, "overlay_max_items", 14)),
@@ -93,6 +141,22 @@ def apply_config(prefs, data: dict) -> list[str]:
         scripts_folder = data.get("scripts_folder", "")
         if isinstance(scripts_folder, str):
             prefs.scripts_folder = scripts_folder.strip()
+    
+    # Leader key
+    if "leader_key" in data:
+        leader_key = data.get("leader_key", "SPACE")
+        if isinstance(leader_key, str):
+            # Validate it's a reasonable key type
+            # Common key types that make sense for a leader key
+            valid_keys = {
+                "SPACE", "ACCENT_GRAVE", "QUOTE", "COMMA", "SEMI_COLON",
+                "PERIOD", "SLASH", "BACK_SLASH", "EQUAL", "MINUS",
+                "LEFT_BRACKET", "RIGHT_BRACKET"
+            }
+            if leader_key in valid_keys:
+                _set_leader_key_in_keymap(leader_key)
+            else:
+                warnings.append(f'Unknown leader_key "{leader_key}", keeping current')
 
     # Overlay
     overlay = data.get("overlay", {})
@@ -179,6 +243,7 @@ def apply_config(prefs, data: dict) -> list[str]:
         m.chord = (item.get("chord", "") or "").strip()
         m.icon = (item.get("icon", "") or "").strip()
         m.group = (item.get("group", "") or "").strip()
+        m.context = item.get("context", "VIEW_3D")
         
         # Handle mapping type (default to OPERATOR for backward compatibility)
         mapping_type = item.get("mapping_type", "OPERATOR")
@@ -189,6 +254,13 @@ def apply_config(prefs, data: dict) -> list[str]:
             m.label = (
                 (item.get("label", "") or "").strip()
                 or m.python_file
+                or "(missing label)"
+            )
+        elif mapping_type == "CONTEXT_TOGGLE":
+            m.context_path = (item.get("context_path", "") or "").strip()
+            m.label = (
+                (item.get("label", "") or "").strip()
+                or m.context_path
                 or "(missing label)"
             )
         else:

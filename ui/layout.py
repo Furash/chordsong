@@ -38,48 +38,6 @@ def draw_addon_preferences(prefs, _context, layout):
     r.operator("chordsong.load_autosave", text="Restore Autosave", icon="RECOVER_LAST")
     box.separator()
 
-    if prefs.prefs_tab == "GROUPS":
-        # Groups management tab
-        box = col.box()
-        # header = box.row()
-        # header.alignment = 'CENTER'
-        # header.label(text="GROUPS")
-        # box.separator()
-
-        # Add new group and cleanup buttons
-        row = box.row(align=True)
-        row.operator("chordsong.group_add", text="Add New Group", icon="ADD")
-        row.operator("chordsong.group_cleanup", text="Clean Up Duplicates", icon="BRUSH_DATA")
-        box.separator()
-
-        if not prefs.groups:
-            box.label(text="No groups defined yet")
-            box.label(text="Groups are auto-created from mappings")
-        else:
-            # List all groups
-            for idx, grp in enumerate(prefs.groups):
-                # Count mappings using this group
-                count = sum(1 for m in prefs.mappings if m.group == grp.name)
-
-                row = box.row(align=True)
-                row.scale_x = 0.8
-                # Group name (editable inline)
-                row.prop(grp, "name", text="")
-                row.separator()
-
-                # Mapping count badge
-                sub = row.row(align=True)
-                sub.scale_x = 0.2
-                sub.label(text=f"({count})")
-
-                # Remove button
-                op = row.operator("chordsong.group_remove", text="", icon="X", emboss=True)
-                op.index = idx
-
-                box.separator()
-
-        return
-
     if prefs.prefs_tab == "UI":
         # Overlay settings
         box = col.box()
@@ -121,28 +79,67 @@ def draw_addon_preferences(prefs, _context, layout):
         r.prop(prefs, "overlay_color_icon", text="Icon")
         box.separator()
 
-
         return
 
     # MAPPINGS tab
+    # Keymap section
+    kc = _context.window_manager.keyconfigs.addon
+    if kc:
+        km = kc.keymaps.get("3D View")
+        if km:
+            # Find the leader keymap item
+            kmi = None
+            for item in km.keymap_items:
+                if item.idname == "chordsong.leader":
+                    kmi = item
+                    break
+            
+            if kmi:
+                box = col.box()
+                # Leader Key label (centered)
+                leader_row = box.row()
+                leader_row.alignment = 'LEFT'
+                leader_row.scale_y = 1.2
+                leader_row.label(text="Leader Key:")
+                
+                # Key assignment button (centered)
+                leader_row.scale_y = 1.5
+                leader_row.scale_x = 22
+                leader_row.context_pointer_set("keymap", km)
+                leader_row.prop(kmi, "type", text="", full_event=True)
+                box.separator()
+    
+    # Context sub-tabs
+    row = col.row(align=True)
+    row.prop(prefs, "mapping_context_tab", expand=True)
+    col.separator()
+    
     row = col.row(align=True)
     row.scale_y = 1.5
-    row.operator("chordsong.mapping_add", text="Add New Chord", icon="ADD")
+    op = row.operator("chordsong.mapping_add", text="Add New Chord", icon="ADD")
+    op.context = prefs.mapping_context_tab
+    row.operator("chordsong.group_cleanup", text="", icon="BRUSH_DATA")
     row.operator("chordsong.group_fold_all", text="", icon="TRIA_UP")
     row.operator("chordsong.group_unfold_all", text="", icon="TRIA_DOWN")
 
     # Grouped UI boxes with foldable sections
     from ..core.engine import get_str_attr
 
+    # Filter mappings by selected context tab
+    current_context = prefs.mapping_context_tab
+    
     groups = {}
     for idx, m in enumerate(prefs.mappings):
+        # Filter by context
+        mapping_context = getattr(m, "context", "VIEW_3D")
+        if mapping_context != current_context:
+            continue
+        
         group = get_str_attr(m, "group") or "Ungrouped"
         groups.setdefault(group, []).append((idx, m))
 
-    # Also include groups that exist but have no mappings yet
-    for grp in prefs.groups:
-        if grp.name and grp.name not in groups:
-            groups[grp.name] = []
+    # Note: We only show groups that have mappings in the current context
+    # Empty groups from other contexts are not displayed
 
     for group_name in sorted(groups.keys(), key=lambda s: (s != "Ungrouped", s.lower())):
         items = groups[group_name]
@@ -192,6 +189,21 @@ def draw_addon_preferences(prefs, _context, layout):
         # Add new chord button in header
         op = header.operator("chordsong.mapping_add", text="", icon="ADD")
         op.group = group_name
+        op.context = prefs.mapping_context_tab
+        header.separator()
+        
+        # Delete group button (only for non-Ungrouped groups)
+        if group_name != "Ungrouped":
+            # Find the group index
+            group_idx = None
+            for idx, grp in enumerate(prefs.groups):
+                if grp.name == group_name:
+                    group_idx = idx
+                    break
+            
+            if group_idx is not None:
+                op = header.operator("chordsong.group_remove", text="", icon="TRASH", emboss=False)
+                op.index = group_idx
         
         if not is_expanded:
             continue
@@ -229,12 +241,22 @@ def draw_addon_preferences(prefs, _context, layout):
             op = r.operator("chordsong.mapping_remove", text="", icon="X", emboss=True)
             op.index = idx
 
-            # Second row with type selector and type-specific fields
+            # Second row with context and type selector and type-specific fields
             r2 = box.row(align=True)
+            # Context selector (icon-only)
+            r2.prop_enum(m, "context", "VIEW_3D", icon="VIEW3D", text="")
+            r2.separator()
+            r2.prop_enum(m, "context", "GEOMETRY_NODE", icon="GEOMETRY_NODES", text="")
+            r2.separator()
+            r2.prop_enum(m, "context", "SHADER_EDITOR", icon="NODE_MATERIAL", text="")
+            r2.separator()
+            r2.separator()
             # Icon-only mapping type selector
             r2.prop_enum(m, "mapping_type", "OPERATOR", icon="SETTINGS", text="")
             r2.separator()
             r2.prop_enum(m, "mapping_type", "PYTHON_FILE", icon="FILE_SCRIPT", text="")
+            r2.separator()
+            r2.prop_enum(m, "mapping_type", "CONTEXT_TOGGLE", icon="CHECKBOX_HLT", text="")
             r2.separator()
 
             if m.mapping_type == "PYTHON_FILE":
@@ -243,6 +265,8 @@ def draw_addon_preferences(prefs, _context, layout):
                 # Script selector button
                 op = r2.operator("chordsong.script_select", text="Select Script", icon="FILEBROWSER", emboss=True)
                 op.mapping_index = idx
+            elif m.mapping_type == "CONTEXT_TOGGLE":
+                r2.prop(m, "context_path", text="")
             else:
                 r2.prop(m, "operator", text="")
                 # Small convert button - create subsection with tight scaling
