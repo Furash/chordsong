@@ -401,7 +401,7 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         
         # Restore default blending
         gpu.state.blend_set('NONE')
-
+        
         # Set chord_size once for all footer tokens
         blf.size(0, chord_size)
 

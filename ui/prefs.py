@@ -145,6 +145,7 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
             ("VIEW_3D", "3D View", "Active in 3D View editor"),
             ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor"),
             ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor"),
+            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor"),
         ),
         default="VIEW_3D",
         update=_on_mapping_changed,
@@ -222,6 +223,7 @@ class CHORDSONG_Preferences(AddonPreferences):
             ("VIEW_3D", "3D View", "3D View editor chord mappings"),
             ("GEOMETRY_NODE", "Geometry Nodes", "Geometry Nodes editor chord mappings"),
             ("SHADER_EDITOR", "Shader Editor", "Shader Editor chord mappings"),
+            ("IMAGE_EDITOR", "UV Editor", "UV Editor chord mappings"),
         ),
         default="VIEW_3D",
     )

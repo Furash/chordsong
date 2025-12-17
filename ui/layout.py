@@ -293,6 +293,8 @@ def draw_addon_preferences(prefs, _context, layout):
             r2.separator()
             r2.prop_enum(m, "context", "SHADER_EDITOR", icon="NODE_MATERIAL", text="")
             r2.separator()
+            r2.prop_enum(m, "context", "IMAGE_EDITOR", icon="UV", text="")
+            r2.separator()
             r2.separator()
             # Icon-only mapping type selector
             r2.prop_enum(m, "mapping_type", "OPERATOR", icon="SETTINGS", text="")

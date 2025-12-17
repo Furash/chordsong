@@ -76,12 +76,16 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
     space = context.space_data
     if space and space.type == 'NODE_EDITOR':
         state["space_type"] = bpy.types.SpaceNodeEditor
+    elif space and space.type == 'IMAGE_EDITOR':
+        state["space_type"] = bpy.types.SpaceImageEditor
     else:
         state["space_type"] = bpy.types.SpaceView3D
     
     # Add draw handler
     def draw_callback():
         try:
+            # In a draw handler, Blender provides the correct context.region automatically
+            # Don't use temp_override here as it interferes with the drawing context
             p = prefs(bpy.context)
             still_active = draw_fading_overlay(
                 bpy.context, p, 
@@ -106,8 +110,8 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
         try:
             for window in bpy.context.window_manager.windows:
                 for area in window.screen.areas:
-                    # Tag both 3D View and Node Editor areas
-                    if area.type in {'VIEW_3D', 'NODE_EDITOR'}:
+                    # Tag 3D View, Node Editor, and Image Editor areas
+                    if area.type in {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR'}:
                         area.tag_redraw()
         except Exception:
             # Fallback: try the stored area
@@ -151,8 +155,8 @@ def _cleanup_fading_overlay():
     try:
         for window in bpy.context.window_manager.windows:
             for area in window.screen.areas:
-                # Tag both 3D View and Node Editor areas
-                if area.type in {'VIEW_3D', 'NODE_EDITOR'}:
+                # Tag 3D View, Node Editor, and Image Editor areas
+                if area.type in {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR'}:
                     area.tag_redraw()
     except Exception:
         # Fallback: try the stored area
@@ -198,12 +202,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if space and space.type == 'NODE_EDITOR':
             # For Node Editor (Shader Editor, Geometry Nodes)
             self._space_type = bpy.types.SpaceNodeEditor
+        elif space and space.type == 'IMAGE_EDITOR':
+            self._space_type = bpy.types.SpaceImageEditor
         else:
             # Default to 3D View
             self._space_type = bpy.types.SpaceView3D
 
         self._draw_handle = self._space_type.draw_handler_add(
-            self._draw_callback, (context,), "WINDOW", "POST_PIXEL"
+            self._draw_callback, (), "WINDOW", "POST_PIXEL"
         )
 
     def _remove_draw_handler(self):
@@ -227,12 +233,27 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             except Exception:
                 pass
 
-    def _draw_callback(self, context: bpy.types.Context):
+    def _draw_callback(self):
         """Draw callback for the overlay."""
+        # Use bpy.context directly - it's more reliable for draw handlers
+        context = bpy.context
         p = prefs(context)
         if not p.overlay_enabled:
             return
 
+        # Ensure we have a valid region - use stored region if context doesn't have one
+        if not context.region and self._region and self._area:
+            try:
+                # Use temp_override to set the correct region/area
+                with context.temp_override(region=self._region, area=self._area):
+                    filtered_mappings = filter_mappings_by_context(p.mappings, self._context_type)
+                    buffer_tokens = self._buffer or []
+                    draw_overlay(context, p, buffer_tokens, filtered_mappings)
+                return
+            except Exception:
+                pass
+
+        # Normal case: use context directly
         # Filter mappings by context for overlay display
         filtered_mappings = filter_mappings_by_context(p.mappings, self._context_type)
         
@@ -263,6 +284,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             space_type = space.type
             if space_type == 'VIEW_3D':
                 return "VIEW_3D"
+            elif space_type == 'IMAGE_EDITOR':
+                return "IMAGE_EDITOR"
             elif space_type == 'NODE_EDITOR':
                 # Check if it's Geometry Nodes or Shader Editor
                 if hasattr(space, 'tree_type'):
@@ -393,11 +416,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         if ctx_viewport:
                             with bpy.context.temp_override(**ctx_viewport):
                                 exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
+                                # Show fading overlay on success (inside temp_override for correct space detection)
+                                _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                         else:
                             exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
-                        
-                        # Show fading overlay on success
-                        _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                            # Show fading overlay on success
+                            _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                         
                         # Add to history
                         add_to_history(
@@ -488,13 +512,16 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         if ctx_viewport:
                             with bpy.context.temp_override(**ctx_viewport):
                                 new_value = do_toggle()
+                                # Show fading overlay (inside temp_override for correct space detection)
+                                if new_value is not None:
+                                    status = "ON" if new_value else "OFF"
+                                    _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
                         else:
                             new_value = do_toggle()
-                        
-                        # Show fading overlay
-                        if new_value is not None:
-                            status = "ON" if new_value else "OFF"
-                            _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
+                            # Show fading overlay
+                            if new_value is not None:
+                                status = "ON" if new_value else "OFF"
+                                _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
                         
                         # Add to history
                         add_to_history(
@@ -546,47 +573,42 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     opmod = getattr(bpy.ops, mod_name)
                     opfn = getattr(opmod, fn_name)
 
+                    # Helper to show overlay and add to history
+                    def show_success():
+                        _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                        add_to_history(
+                            chord_tokens=chord_tokens,
+                            label=label,
+                            icon=icon,
+                            mapping_type="OPERATOR",
+                            operator=op,
+                            kwargs=kwargs,
+                            call_context=call_ctx,
+                        )
+                    
                     # Execute operator with captured context override.
                     # Context was captured in modal() method (safe) but used in timer (outside draw).
+                    # Fading overlay is shown inside temp_override for correct space detection.
                     if call_ctx == "INVOKE_DEFAULT":
                         if ctx_viewport:
                             with bpy.context.temp_override(**ctx_viewport):
                                 result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                                if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                                    show_success()
                         else:
                             result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                            if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                                show_success()
                     else:
                         if ctx_viewport:
                             with bpy.context.temp_override(**ctx_viewport):
                                 result_set = opfn('EXEC_DEFAULT', **kwargs)
+                                if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                                    show_success()
                         else:
                             result_set = opfn('EXEC_DEFAULT', **kwargs)
-                    
-                    # Show fading overlay on success
-                    if result_set and 'FINISHED' in result_set:
-                        _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        # Add to history
-                        add_to_history(
-                            chord_tokens=chord_tokens,
-                            label=label,
-                            icon=icon,
-                            mapping_type="OPERATOR",
-                            operator=op,
-                            kwargs=kwargs,
-                            call_context=call_ctx,
-                        )
-                    elif result_set and 'CANCELLED' not in result_set:
-                        # Also show for RUNNING_MODAL or PASS_THROUGH
-                        _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        # Add to history
-                        add_to_history(
-                            chord_tokens=chord_tokens,
-                            label=label,
-                            icon=icon,
-                            mapping_type="OPERATOR",
-                            operator=op,
-                            kwargs=kwargs,
-                            call_context=call_ctx,
-                        )
+                            if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                                show_success()
                     
                 except Exception as e:
                     # Log error for debugging

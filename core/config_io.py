@@ -32,22 +32,23 @@ def _get_leader_key_from_keymap() -> str:
 
 
 def _set_leader_key_in_keymap(key_type: str):
-    """Set the leader key type in the addon keymap."""
+    """Set the leader key type in all addon keymaps."""
     try:
         wm = bpy.context.window_manager
         kc = wm.keyconfigs.addon
         if not kc:
             return
         
-        km = kc.keymaps.get("3D View")
-        if not km:
-            return
-        
-        # Find and update the leader keymap item
-        for kmi in km.keymap_items:
-            if kmi.idname == "chordsong.leader":
-                kmi.type = key_type
-                break
+        # Update leader key in all registered keymaps
+        keymap_names = ["3D View", "Node Editor", "Image Editor"]
+        for km_name in keymap_names:
+            km = kc.keymaps.get(km_name)
+            if km:
+                # Find and update the leader keymap item
+                for kmi in km.keymap_items:
+                    if kmi.idname == "chordsong.leader":
+                        kmi.type = key_type
+                        break
     except Exception:
         pass
 

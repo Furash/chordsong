@@ -217,7 +217,7 @@ def filter_mappings_by_context(mappings, context_type: str):
     
     Args:
         mappings: Collection of mapping objects
-        context_type: One of "VIEW_3D", "GEOMETRY_NODE", "SHADER_EDITOR"
+        context_type: One of "VIEW_3D", "GEOMETRY_NODE", "SHADER_EDITOR", "IMAGE_EDITOR"
     
     Returns:
         List of mappings matching the context

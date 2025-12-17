@@ -26,6 +26,7 @@ class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
             ("VIEW_3D", "3D View", "3D View editor"),
             ("GEOMETRY_NODE", "Geometry Nodes", "Geometry Nodes editor"),
             ("SHADER_EDITOR", "Shader Editor", "Shader Editor"),
+            ("IMAGE_EDITOR", "UV Editor", "UV Editor"),
         ),
         default="VIEW_3D",
     )

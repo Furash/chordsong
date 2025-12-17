@@ -106,15 +106,77 @@ def _register_keymaps():
 
     leader_key = "SPACE"
 
+    def _add_keymap_item(keymap_name, space_type):
+        """Helper to add keymap item, handling existing keymaps."""
+        try:
+            # Try to get existing keymap first
+            km = kc.keymaps.get(keymap_name)
+            if not km:
+                # Create new keymap if it doesn't exist
+                km = kc.keymaps.new(name=keymap_name, space_type=space_type)
+            
+            # Check if keymap item already exists
+            existing_kmi = None
+            for item in km.keymap_items:
+                if item.idname == CHORDSONG_OT_Leader.bl_idname:
+                    existing_kmi = item
+                    break
+            
+            if existing_kmi:
+                # Update existing keymap item
+                existing_kmi.type = leader_key
+                existing_kmi.value = "PRESS"
+                _addon_keymaps.append((km, existing_kmi))
+            else:
+                # Create new keymap item
+                kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
+                _addon_keymaps.append((km, kmi))
+        except Exception as e:
+            # Log error but continue with other keymaps
+            print(f"Chord Song: Failed to register keymap for {keymap_name}: {e}")
+
     # Register for 3D View
-    km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
-    kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
-    _addon_keymaps.append((km, kmi))
+    _add_keymap_item("3D View", "VIEW_3D")
     
     # Register for Node Editor (covers both Geometry Nodes and Shader Editor)
-    km = kc.keymaps.new(name="Node Editor", space_type="NODE_EDITOR")
-    kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
-    _addon_keymaps.append((km, kmi))
+    _add_keymap_item("Node Editor", "NODE_EDITOR")
+    
+    # Register for UV/Image Editor
+    # Try to find or create the Image Editor keymap
+    # First, try to find existing keymap with IMAGE_EDITOR space type
+    image_editor_km = None
+    for km_name in kc.keymaps.keys():
+        km_test = kc.keymaps.get(km_name)
+        if km_test and hasattr(km_test, 'space_type') and km_test.space_type == 'IMAGE_EDITOR':
+            image_editor_km = km_test
+            break
+    
+    if image_editor_km:
+        # Found existing Image Editor keymap, add our item to it
+        existing_kmi = None
+        for item in image_editor_km.keymap_items:
+            if item.idname == CHORDSONG_OT_Leader.bl_idname:
+                existing_kmi = item
+                break
+        
+        if existing_kmi:
+            existing_kmi.type = leader_key
+            existing_kmi.value = "PRESS"
+            _addon_keymaps.append((image_editor_km, existing_kmi))
+        else:
+            kmi = image_editor_km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
+            _addon_keymaps.append((image_editor_km, kmi))
+    else:
+        # No existing keymap found, try to create one
+        # Try different possible names
+        for name in ["Image Editor", "UV/Image Editor"]:
+            try:
+                km = kc.keymaps.new(name=name, space_type="IMAGE_EDITOR")
+                kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
+                _addon_keymaps.append((km, kmi))
+                break
+            except Exception:
+                continue
 
 
 def _unregister_keymaps():

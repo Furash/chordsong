@@ -275,7 +275,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         # Draw footer (matching main overlay style)
         footer_y = current_y - chord_size
-        
+
         # Draw footer background (full width)
         text_center_y = footer_y + (chord_size / 2)
         text_height = max(chord_size, body_size) * 1.3
