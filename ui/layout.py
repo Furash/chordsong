@@ -129,28 +129,28 @@ def draw_addon_preferences(prefs, _context, layout):
             
             if kmi:
                 box = col.box()
-                # Leader Key label
-                leader_row = box.row()
-                leader_row.alignment = 'LEFT'
+                split = box.split(factor=0.5)
+                
+                # Leader Key section
+                leader_col = split.column()
+                leader_row = leader_col.row(align=True)
                 leader_row.scale_y = 1.2
                 leader_row.label(text="Leader Key:")
-                
-                # Key assignment button
                 leader_row.scale_y = 1.5
-                leader_row.scale_x = 22
+                leader_row.scale_x = 1.5
                 leader_row.context_pointer_set("keymap", km)
-                leader_row.prop(kmi, "type", text="", full_event=True)
+                leader_row.prop(kmi, "type", text="", full_event=True, emboss=True)
+                leader_row.separator()
+                
+                # Conflict checker section
+                conflict_col = split.column()
+                conflict_row = conflict_col.row(align=True)
+                conflict_row.scale_y = 1.2
+                conflict_row.label(text="Conflict Checker:")
+                conflict_row.scale_y = 1.5
+                conflict_row.operator("chordsong.check_conflicts", text="Check for Conflicts", icon="ERROR")
+                
                 box.separator()
-            
-            # Conflict checker button
-            box = col.box()
-            conflict_row = box.row()
-            conflict_row.alignment = 'LEFT'
-            conflict_row.scale_y = 1.2
-            conflict_row.label(text="Conflict Checker:")
-            conflict_row.scale_y = 1.5
-            conflict_row.operator("chordsong.check_conflicts", text="Check for Conflicts", icon="ERROR")
-            box.separator()
     
     # Context sub-tabs
     row = col.row(align=True)
@@ -188,8 +188,8 @@ def draw_addon_preferences(prefs, _context, layout):
         items = groups[group_name]
         items.sort(
             key=lambda im: (
-                get_str_attr(im[1], "label").lower(),
                 get_str_attr(im[1], "chord").lower(),
+                get_str_attr(im[1], "label").lower(),
             )
         )
 
