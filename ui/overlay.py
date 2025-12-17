@@ -6,43 +6,12 @@
 
 import time
 import bpy  # type: ignore
-from ..core.engine import candidates_for_prefix, normalize_token
+from ..core.engine import candidates_for_prefix, get_leader_key_token
+from ..utils.render import calculate_scale_factor, calculate_overlay_position
 
 # Import gpu modules at module level for better performance
 import gpu  # type: ignore
 from gpu_extras.batch import batch_for_shader  # type: ignore
-
-
-def get_leader_key_token():
-    """Get the current leader key token for display."""
-    try:
-        wm = bpy.context.window_manager
-        kc = wm.keyconfigs.addon
-        if not kc:
-            return "<Leader>"
-        
-        km = kc.keymaps.get("3D View")
-        if not km:
-            return "<Leader>"
-        
-        # Find the leader keymap item
-        for kmi in km.keymap_items:
-            if kmi.idname == "chordsong.leader":
-                # Normalize the key type to a display token
-                # Check if shift is required for this keymap item
-                shift_state = getattr(kmi, "shift", False)
-                token = normalize_token(kmi.type, shift=shift_state)
-                if token:
-                    return token
-                # Fallback: if normalization fails, try to use the key type directly
-                # (for debugging or unrecognized keys)
-                if kmi.type:
-                    return kmi.type.lower()
-                return "<Leader>"
-        
-        return "<Leader>"
-    except Exception:
-        return "<Leader>"
 
 
 # Cache for overlay layout to avoid recalculating every frame
@@ -60,17 +29,6 @@ def clear_overlay_cache():
     _overlay_cache["layout_data"] = None
 
 
-def calculate_scale_factor(context):
-    """Calculate UI scale factor for fonts and spacing."""
-    try:
-        ui_scale = getattr(context.preferences.view, "ui_scale", 1.0)
-        dpi = context.preferences.system.dpi
-        return ui_scale * (dpi / 72.0)
-    except Exception:
-        try:
-            return context.preferences.system.dpi / 72.0
-        except Exception:
-            return 1.0
 
 
 def get_prefs_hash(p, region_w, region_h):
@@ -219,17 +177,6 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
     return max_token_w, max_label_w, max_header_row_w
 
 
-def calculate_overlay_position(p, region_w, region_h, block_w, block_h, pad_x, pad_y):
-    """Calculate overlay position based on anchor setting."""
-    pos = p.overlay_position
-    if pos == "TOP_RIGHT":
-        return region_w - pad_x - block_w, region_h - pad_y
-    elif pos == "BOTTOM_LEFT":
-        return pad_x, pad_y + block_h
-    elif pos == "BOTTOM_RIGHT":
-        return region_w - pad_x - block_w, pad_y + block_h
-    else:  # TOP_LEFT
-        return pad_x, region_h - pad_y
 
 
 def draw_icon(icon_text, x, y, size):

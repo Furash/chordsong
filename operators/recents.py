@@ -10,6 +10,9 @@ from ..core.history import get_history
 from ..core.engine import normalize_token
 from ..utils.render import (
     DrawHandlerManager,
+    calculate_scale_factor,
+    calculate_overlay_position,
+    capture_viewport_context,
     execute_history_entry_operator,
     execute_history_entry_script,
     execute_history_entry_toggle,
@@ -67,12 +70,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         region_h = context.region.height if context.region else 400
 
         # Calculate scale factor
-        try:
-            ui_scale = getattr(context.preferences.view, "ui_scale", 1.0)
-            dpi = context.preferences.system.dpi
-            scale_factor = ui_scale * (dpi / 72.0)
-        except Exception:
-            scale_factor = 1.0
+        scale_factor = calculate_scale_factor(context)
 
         # Font sizes
         header_size = max(int(p.overlay_font_size_header * scale_factor), 12)
@@ -180,20 +178,8 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         items_per_column = min(column_rows, max_items)
         block_h = int(header_h + (line_h * (items_per_column + 3)))
 
-        # Position at top-left (matching main overlay)
-        pos = p.overlay_position
-        if pos == "TOP_RIGHT":
-            x = region_w - pad_x - block_w
-            y = region_h - pad_y
-        elif pos == "BOTTOM_LEFT":
-            x = pad_x
-            y = pad_y + block_h
-        elif pos == "BOTTOM_RIGHT":
-            x = region_w - pad_x - block_w
-            y = pad_y + block_h
-        else:  # TOP_LEFT
-            x = pad_x
-            y = region_h - pad_y
+        # Position (matching main overlay)
+        x, y = calculate_overlay_position(p, region_w, region_h, block_w, block_h, pad_x, pad_y)
 
         # Draw header background (full width)
         text_center_y = y + (header_size / 2)
@@ -352,11 +338,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         from ..operators.leader import _show_fading_overlay
 
         # Capture viewport context BEFORE finishing modal (when we have valid context)
-        ctx_viewport = {}
-        for key in ("area", "region", "space_data", "window", "screen"):
-            val = getattr(context, key, None)
-            if val is not None:
-                ctx_viewport[key] = val
+        ctx_viewport = capture_viewport_context(context)
 
         # Finish modal before executing
         self._finish(context)
