@@ -7,32 +7,18 @@
 import time
 import bpy  # type: ignore
 
-from ..core.engine import candidates_for_prefix, find_exact_mapping, normalize_token, parse_kwargs, filter_mappings_by_context
+from ..core.engine import (
+    candidates_for_prefix,
+    find_exact_mapping,
+    normalize_token,
+    parse_kwargs,
+    filter_mappings_by_context,
+    get_leader_key_type,
+)
 from ..core.history import add_to_history
 from ..ui.overlay import draw_overlay, draw_fading_overlay
+from ..utils.render import capture_viewport_context
 from .common import prefs
-
-
-def _get_leader_key_type():
-    """Get the current leader key type from the addon keymap."""
-    try:
-        wm = bpy.context.window_manager
-        kc = wm.keyconfigs.addon
-        if not kc:
-            return "SPACE"
-        
-        km = kc.keymaps.get("3D View")
-        if not km:
-            return "SPACE"
-        
-        # Find the leader keymap item
-        for kmi in km.keymap_items:
-            if kmi.idname == "chordsong.leader":
-                return kmi.type
-        
-        return "SPACE"
-    except Exception:
-        return "SPACE"
 
 
 # Global state for fading overlay
@@ -354,7 +340,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         # Check for <leader><leader>
         # If buffer is empty and user presses the leader key again, show recents
-        leader_key = _get_leader_key_type()
+        leader_key = get_leader_key_type()
         if not self._buffer and event.type == leader_key:
             # Open recents instead of repeat
             self._finish(context)
@@ -391,11 +377,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     return {"CANCELLED"}
                 
                 # Capture viewport context BEFORE finishing modal (when we have valid context)
-                ctx_viewport = {}
-                for key in ("area", "region", "space_data", "window", "screen"):
-                    val = getattr(context, key, None)
-                    if val is not None:
-                        ctx_viewport[key] = val
+                ctx_viewport = capture_viewport_context(context)
                 
                 # Finish modal before executing script
                 self._finish(context)
@@ -458,11 +440,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     return {"CANCELLED"}
                 
                 # Capture viewport context BEFORE finishing modal
-                ctx_viewport = {}
-                for key in ("area", "region", "space_data", "window", "screen"):
-                    val = getattr(context, key, None)
-                    if val is not None:
-                        ctx_viewport[key] = val
+                ctx_viewport = capture_viewport_context(context)
                 
                 self._finish(context)
                 
@@ -554,11 +532,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             # Capture viewport context BEFORE finishing modal (when we have valid context).
             # This is safe because we're in modal() method, not in a draw handler.
             # We'll use these captured values INSIDE the timer (when we're outside draw phase).
-            ctx_viewport = {}
-            for key in ("area", "region", "space_data", "window", "screen"):
-                val = getattr(context, key, None)
-                if val is not None:
-                    ctx_viewport[key] = val
+            ctx_viewport = capture_viewport_context(context)
 
             # Finish the modal operator FIRST to ensure clean state before calling other operators.
             # This prevents blocking issues when opening preferences or other UI operations.

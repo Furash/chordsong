@@ -7,6 +7,73 @@
 import bpy  # type: ignore
 
 
+# Keys to capture from context for viewport operations
+VIEWPORT_CONTEXT_KEYS = ("area", "region", "space_data", "window", "screen")
+
+
+def capture_viewport_context(context) -> dict:
+    """Capture viewport context for use in deferred operations.
+    
+    Args:
+        context: Blender context object
+        
+    Returns:
+        Dictionary of captured context values
+    """
+    ctx_viewport = {}
+    for key in VIEWPORT_CONTEXT_KEYS:
+        val = getattr(context, key, None)
+        if val is not None:
+            ctx_viewport[key] = val
+    return ctx_viewport
+
+
+def calculate_scale_factor(context) -> float:
+    """Calculate UI scale factor for fonts and spacing.
+    
+    Args:
+        context: Blender context object
+        
+    Returns:
+        Scale factor as a float
+    """
+    try:
+        ui_scale = getattr(context.preferences.view, "ui_scale", 1.0)
+        dpi = context.preferences.system.dpi
+        return ui_scale * (dpi / 72.0)
+    except Exception:
+        try:
+            return context.preferences.system.dpi / 72.0
+        except Exception:
+            return 1.0
+
+
+def calculate_overlay_position(prefs, region_w, region_h, block_w, block_h, pad_x, pad_y):
+    """Calculate overlay position based on anchor setting.
+    
+    Args:
+        prefs: Addon preferences with overlay_position
+        region_w: Region width
+        region_h: Region height
+        block_w: Block width
+        block_h: Block height
+        pad_x: Horizontal padding
+        pad_y: Vertical padding
+        
+    Returns:
+        Tuple of (x, y) coordinates
+    """
+    pos = prefs.overlay_position
+    if pos == "TOP_RIGHT":
+        return region_w - pad_x - block_w, region_h - pad_y
+    elif pos == "BOTTOM_LEFT":
+        return pad_x, pad_y + block_h
+    elif pos == "BOTTOM_RIGHT":
+        return region_w - pad_x - block_w, pad_y + block_h
+    else:  # TOP_LEFT
+        return pad_x, region_h - pad_y
+
+
 class DrawHandlerManager:
     """Manages draw handlers for modal operators."""
     
@@ -81,11 +148,7 @@ def execute_history_entry_operator(context, entry):
         call_ctx = entry.call_context or "EXEC_DEFAULT"
         
         # Capture viewport context
-        ctx_viewport = {}
-        for key in ("area", "region", "space_data", "window", "screen"):
-            val = getattr(context, key, None)
-            if val is not None:
-                ctx_viewport[key] = val
+        ctx_viewport = capture_viewport_context(context)
         
         if call_ctx == "INVOKE_DEFAULT":
             if ctx_viewport:
@@ -127,11 +190,7 @@ def execute_history_entry_script(context, entry):
             return False, error_msg
         
         # Capture viewport context
-        ctx_viewport = {}
-        for key in ("area", "region", "space_data", "window", "screen"):
-            val = getattr(context, key, None)
-            if val is not None:
-                ctx_viewport[key] = val
+        ctx_viewport = capture_viewport_context(context)
         
         with open(entry.python_file, 'r', encoding='utf-8') as f:
             script_text = f.read()
@@ -160,11 +219,7 @@ def execute_history_entry_toggle(context, entry):
     """
     try:
         # Capture viewport context
-        ctx_viewport = {}
-        for key in ("area", "region", "space_data", "window", "screen"):
-            val = getattr(context, key, None)
-            if val is not None:
-                ctx_viewport[key] = val
+        ctx_viewport = capture_viewport_context(context)
         
         def do_toggle():
             parts = entry.context_path.split('.')

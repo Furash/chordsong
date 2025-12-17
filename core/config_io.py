@@ -3,54 +3,10 @@ import json
 # pylint: disable=broad-exception-caught
 
 import bpy  # type: ignore
-from .engine import parse_kwargs, get_str_attr
+from .engine import parse_kwargs, get_str_attr, get_leader_key_type, set_leader_key_in_keymap
 
 
 CONFIG_VERSION = 1
-
-
-def _get_leader_key_from_keymap() -> str:
-    """Get the current leader key type from the addon keymap."""
-    try:
-        wm = bpy.context.window_manager
-        kc = wm.keyconfigs.addon
-        if not kc:
-            return "SPACE"
-        
-        km = kc.keymaps.get("3D View")
-        if not km:
-            return "SPACE"
-        
-        # Find the leader keymap item
-        for kmi in km.keymap_items:
-            if kmi.idname == "chordsong.leader":
-                return kmi.type
-        
-        return "SPACE"
-    except Exception:
-        return "SPACE"
-
-
-def _set_leader_key_in_keymap(key_type: str):
-    """Set the leader key type in all addon keymaps."""
-    try:
-        wm = bpy.context.window_manager
-        kc = wm.keyconfigs.addon
-        if not kc:
-            return
-        
-        # Update leader key in all registered keymaps
-        keymap_names = ["3D View", "Node Editor", "Image Editor"]
-        for km_name in keymap_names:
-            km = kc.keymaps.get(km_name)
-            if km:
-                # Find and update the leader keymap item
-                for kmi in km.keymap_items:
-                    if kmi.idname == "chordsong.leader":
-                        kmi.type = key_type
-                        break
-    except Exception:
-        pass
 
 
 def dump_prefs(prefs) -> dict:
@@ -95,7 +51,7 @@ def dump_prefs(prefs) -> dict:
     return {
         "version": CONFIG_VERSION,
         "scripts_folder": get_str_attr(prefs, "scripts_folder"),
-        "leader_key": _get_leader_key_from_keymap(),
+        "leader_key": get_leader_key_type(),
         "overlay": {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
             "max_items": int(getattr(prefs, "overlay_max_items", 14)),
@@ -162,7 +118,7 @@ def apply_config(prefs, data: dict) -> list[str]:
                 "LEFT_BRACKET", "RIGHT_BRACKET"
             }
             if leader_key in valid_keys:
-                _set_leader_key_in_keymap(leader_key)
+                set_leader_key_in_keymap(leader_key)
             else:
                 warnings.append(f'Unknown leader_key "{leader_key}", keeping current')
 
