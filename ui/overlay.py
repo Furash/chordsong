@@ -19,21 +19,30 @@ def get_leader_key_token():
         wm = bpy.context.window_manager
         kc = wm.keyconfigs.addon
         if not kc:
-            return "space"
+            return "<Leader>"
         
         km = kc.keymaps.get("3D View")
         if not km:
-            return "space"
+            return "<Leader>"
         
         # Find the leader keymap item
         for kmi in km.keymap_items:
             if kmi.idname == "chordsong.leader":
                 # Normalize the key type to a display token
-                return normalize_token(kmi.type, shift=False) or "space"
+                # Check if shift is required for this keymap item
+                shift_state = getattr(kmi, "shift", False)
+                token = normalize_token(kmi.type, shift=shift_state)
+                if token:
+                    return token
+                # Fallback: if normalization fails, try to use the key type directly
+                # (for debugging or unrecognized keys)
+                if kmi.type:
+                    return kmi.type.lower()
+                return "<Leader>"
         
-        return "space"
+        return "<Leader>"
     except Exception:
-        return "space"
+        return "<Leader>"
 
 
 # Cache for overlay layout to avoid recalculating every frame
@@ -75,6 +84,12 @@ def get_prefs_hash(p, region_w, region_h):
         p.overlay_offset_x,
         p.overlay_offset_y,
         p.overlay_position,
+        p.overlay_gap,
+        p.overlay_column_gap,
+        p.overlay_line_height,
+        p.overlay_footer_gap,
+        p.overlay_footer_token_gap,
+        p.overlay_footer_label_gap,
         region_w,
         region_h,
     )
@@ -234,6 +249,9 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                    max_token_w, gap, col_w, col_gap, line_h, icon_size, block_w, max_label_w, region_w, header_w):
     """Render the overlay at the calculated position."""
     import blf  # type: ignore
+    
+    # Calculate scale factor for footer gap
+    scale_factor = calculate_scale_factor(_context)
 
     # Colors
     col_header = p.overlay_color_header
@@ -291,11 +309,10 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         cy = start_y
 
         # Icon, token, label layout
-        # Minimal gap between icon and chord
+        # Use consistent gap between all elements
         icon_x = cx
-        icon_gap = -16  # Minimal gap between icon and chord
-        token_col_right_x = cx + icon_size + icon_gap + max_token_w
-        label_col_x = token_col_right_x + gap
+        token_col_left_x = cx + icon_size + gap
+        label_col_x = token_col_left_x + gap * 2
 
         for r in col_rows:
             if r["kind"] == "header":
@@ -321,13 +338,12 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                 except Exception:
                     pass
 
-            # Draw token (right-aligned)
+            # Draw token (left-aligned after icon)
             if current_size != chord_size:
                 blf.size(0, chord_size)
                 current_size = chord_size
             blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
-            tw, _ = blf.dimensions(0, token_txt)
-            blf.position(0, token_col_right_x - tw, cy, 0)
+            blf.position(0, token_col_left_x, cy, 0)
             blf.draw(0, token_txt)
 
             # Draw label
@@ -345,10 +361,11 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         footer_y = start_y - (len(columns[0]) * line_h if columns and columns[0] else 0) - chord_size
 
         # Calculate total footer width (token, then icon, then label)
-        icon_gap = 8  # Gap between token and icon
-        footer_item_width = max_token_w + icon_gap + icon_size + gap + max_label_w
-        footer_spacing = max_token_w  # Extra spacing between footer items
-        total_footer_width = len(footer) * footer_item_width + (len(footer) - 1) * footer_spacing
+        footer_token_gap = int(p.overlay_footer_token_gap * scale_factor)  # Gap between token and icon/label
+        footer_label_gap = int(p.overlay_footer_label_gap * scale_factor)  # Gap between icon and label
+        footer_item_width = max_token_w + footer_token_gap + icon_size + footer_label_gap + max_label_w
+        footer_gap = int(p.overlay_footer_gap * scale_factor)  # Gap between footer items
+        total_footer_width = len(footer) * footer_item_width + (len(footer) - 1) * footer_gap
         
         # Center the footer relative to full viewport width
         footer_x = (region_w - total_footer_width) // 2
@@ -385,9 +402,6 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         # Restore default blending
         gpu.state.blend_set('NONE')
 
-        icon_gap = 8  # Gap between token and icon (consistent with above)
-        footer_spacing = gap * 2  # Extra spacing between footer items
-        
         # Set chord_size once for all footer tokens
         blf.size(0, chord_size)
 
@@ -396,18 +410,23 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             label_txt = r["label"]
             icon_text = r.get("icon", "")
 
+            # Update token for "Recent Commands" to use current leader key
+            if label_txt == "Recent Commands" and "+" in token_txt:
+                leader_token = get_leader_key_token()
+                token_txt = f"{leader_token}+{leader_token}"
+
             # Calculate positions for this item: token, then icon, then label
             token_x = footer_x
             
-            # Draw token in angle brackets first
+            # Draw token in angle brackets first (uppercase to match footer style)
             blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
-            display_token = f"<{token_txt.lower()}>"
+            display_token = f"<{token_txt.upper()}>"
             tw, _ = blf.dimensions(0, display_token)
             blf.position(0, token_x, footer_y, 0)
             blf.draw(0, display_token)
             
             # Icon comes after token
-            icon_x = token_x + tw + icon_gap
+            icon_x = token_x + tw + footer_token_gap
             if icon_text:
                 try:
                     blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3])
@@ -415,8 +434,8 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                 except Exception:
                     pass
             
-            # Label comes after icon
-            label_x = icon_x + (icon_size if icon_text else 0) + gap
+            # Label comes after icon (or token if no icon)
+            label_x = icon_x + (icon_size if icon_text else 0) + (footer_label_gap if icon_text else footer_token_gap)
             blf.size(0, body_size)
             blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
             blf.position(0, label_x, footer_y, 0)
@@ -426,7 +445,7 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             blf.size(0, chord_size)
 
             # Move to next footer item
-            footer_x += footer_item_width + footer_spacing
+            footer_x += footer_item_width + footer_gap
 
 
 def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
@@ -489,10 +508,10 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         blf.size(0, header_size)
         header_w, header_h = blf.dimensions(0, header)
 
-        # Scale spacing
-        gap = int(10 * scale_factor)
-        col_gap = int(30 * scale_factor)
-        line_h = int(body_size * 1.5)
+        # Scale spacing (using preferences)
+        gap = int(p.overlay_gap * scale_factor)
+        col_gap = int(p.overlay_column_gap * scale_factor)
+        line_h = int(body_size * p.overlay_line_height)
 
         # Build rows and footer
         rows, footer = build_overlay_rows(cands, bool(buffer_tokens))
@@ -502,9 +521,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         # Calculate dimensions (including icon space and footer)
         max_token_w, max_label_w, max_header_row_w = calculate_column_widths(columns, footer, chord_size, body_size)
 
-        # Account for icon in column width (using smaller icon_gap)
-        icon_gap = 2  # Minimal gap between icon and chord
-        col_w = max(icon_size + icon_gap + max_token_w + gap + max_label_w, max_header_row_w)
+        # Account for icon in column width (using consistent gap)
+        col_w = max(icon_size + gap + max_token_w + gap + max_label_w, max_header_row_w)
 
         num_cols = len(columns)
         block_w = max(header_w, num_cols * col_w + (num_cols - 1) * col_gap)
@@ -599,15 +617,14 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     blf.size(0, body_size)
     label_w, _ = blf.dimensions(0, label)
 
-    # Layout
-    gap = int(10 * scale_factor)
+    # Layout (using preferences)
+    gap = int(p.overlay_gap * scale_factor)
     pad_x = int(p.overlay_offset_x * scale_factor)
     pad_y = int(p.overlay_offset_y * scale_factor)
     
-    # Calculate content width (smaller gap between icon and chord)
+    # Calculate content width
     icon_w = icon_size if icon else 0
-    icon_gap = 2 if icon else 0  # Minimal gap between icon and chord
-    content_w = icon_w + chord_w + gap + label_w
+    content_w = icon_w + gap + chord_w + gap + label_w
 
     # Position at the same level as the main overlay header
     # Calculate position using same logic as main overlay
@@ -658,7 +675,7 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
             blf.draw(0, icon)
         except Exception:
             pass
-        current_x += icon_w + icon_gap
+        current_x += icon_w + gap
 
     # Draw chord text
     col_chord = p.overlay_color_chord

@@ -106,6 +106,13 @@ def dump_prefs(prefs) -> dict:
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
             "color_header": list(getattr(prefs, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))),
             "color_icon": list(getattr(prefs, "overlay_color_icon", (0.8, 0.8, 0.8, 0.7))),
+            "color_recents_hotkey": list(getattr(prefs, "overlay_color_recents_hotkey", (0.65, 0.8, 1.0, 1.0))),
+            "gap": int(getattr(prefs, "overlay_gap", 10)),
+            "column_gap": int(getattr(prefs, "overlay_column_gap", 30)),
+            "line_height": float(getattr(prefs, "overlay_line_height", 1.5)),
+            "footer_gap": int(getattr(prefs, "overlay_footer_gap", 20)),
+            "footer_token_gap": int(getattr(prefs, "overlay_footer_token_gap", 10)),
+            "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
             "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
@@ -172,9 +179,26 @@ def apply_config(prefs, data: dict) -> list[str]:
             "font_size_header": "overlay_font_size_header",
             "font_size_chord": "overlay_font_size_chord",
             "font_size_body": "overlay_font_size_body",
+            "gap": "overlay_gap",
+            "column_gap": "overlay_column_gap",
+            "footer_gap": "overlay_footer_gap",
+            "footer_token_gap": "overlay_footer_token_gap",
+            "footer_label_gap": "overlay_footer_label_gap",
             "offset_x": "overlay_offset_x",
             "offset_y": "overlay_offset_y",
         }
+        
+        # Float properties
+        float_props = {
+            "line_height": "overlay_line_height",
+        }
+        
+        for key, attr in float_props.items():
+            if key in overlay:
+                try:
+                    setattr(prefs, attr, float(overlay[key]))
+                except Exception:
+                    warnings.append(f"Invalid overlay.{key}, keeping current")
         
         for key, attr in int_props.items():
             if key in overlay:
@@ -189,6 +213,7 @@ def apply_config(prefs, data: dict) -> list[str]:
             "color_label": "overlay_color_label",
             "color_header": "overlay_color_header",
             "color_icon": "overlay_color_icon",
+            "color_recents_hotkey": "overlay_color_recents_hotkey",
         }
         
         for key, attr in color_props.items():

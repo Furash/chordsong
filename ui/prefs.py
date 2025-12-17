@@ -12,6 +12,7 @@ from bpy.props import (
     BoolProperty,
     CollectionProperty,
     EnumProperty,
+    FloatProperty,
     FloatVectorProperty,
     IntProperty,
     StringProperty,
@@ -329,6 +330,16 @@ class CHORDSONG_Preferences(AddonPreferences):
         default=(0.80, 0.80, 0.80, 0.70),
         update=_on_prefs_changed,
     )
+    overlay_color_recents_hotkey: FloatVectorProperty(
+        name="Recents hotkey color",
+        description="Color for hotkey numbers/letters in the Recents list",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(0.65, 0.80, 1.00, 1.00),
+        update=_on_prefs_changed,
+    )
 
     overlay_position: EnumProperty(
         name="Position",
@@ -354,6 +365,55 @@ class CHORDSONG_Preferences(AddonPreferences):
         default=14,
         min=0,
         max=2000,
+        update=_on_prefs_changed,
+    )
+    
+    overlay_gap: IntProperty(
+        name="Element Gap",
+        description="Gap between icon, chord, and label elements",
+        default=10,
+        min=-50,
+        max=100,
+        update=_on_prefs_changed,
+    )
+    overlay_column_gap: IntProperty(
+        name="Column Gap",
+        description="Gap between columns",
+        default=30,
+        min=-100,
+        max=200,
+        update=_on_prefs_changed,
+    )
+    overlay_line_height: FloatProperty(
+        name="Line Height",
+        description="Line height multiplier (relative to body font size)",
+        default=1.5,
+        min=1.0,
+        max=3.0,
+        update=_on_prefs_changed,
+    )
+    overlay_footer_gap: IntProperty(
+        name="Footer Gap",
+        description="Gap between footer items",
+        default=20,
+        min=-50,
+        max=200,
+        update=_on_prefs_changed,
+    )
+    overlay_footer_token_gap: IntProperty(
+        name="Footer Token Gap",
+        description="Gap between token and icon/label in footer",
+        default=10,
+        min=-50,
+        max=100,
+        update=_on_prefs_changed,
+    )
+    overlay_footer_label_gap: IntProperty(
+        name="Footer Label Gap",
+        description="Gap between icon and label in footer",
+        default=10,
+        min=-50,
+        max=100,
         update=_on_prefs_changed,
     )
 

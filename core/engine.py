@@ -72,7 +72,8 @@ def normalize_token(event_type: str, shift: bool = False):
         "PERIOD": ">" if shift else ".",
         "SLASH": "?" if shift else "/",
         "BACK_SLASH": "|" if shift else "\\",
-        "GRAVE_ACCENT": "~" if shift else "`",
+        "GRAVE_ACCENT": "~" if shift else "grave",
+        "ACCENT_GRAVE": "~" if shift else "grave",  # Blender uses ACCENT_GRAVE
     }
     return named.get(event_type, None)
 

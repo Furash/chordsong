@@ -17,6 +17,19 @@ from ..utils.render import (
 from .common import prefs
 
 
+def _create_context_wrapper(ctx_viewport):
+    """Create a context wrapper with captured viewport context."""
+    class ContextWrapper:
+        def __init__(self, ctx_viewport):
+            self._ctx_viewport = ctx_viewport
+        def __getattr__(self, name):
+            if name in self._ctx_viewport:
+                return self._ctx_viewport[name]
+            return getattr(bpy.context, name)
+    
+    return ContextWrapper(ctx_viewport) if ctx_viewport else bpy.context
+
+
 class CHORDSONG_OT_Recents(bpy.types.Operator):
     """Show recent chord invocations and execute selected one"""
 
@@ -72,6 +85,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         col_chord = p.overlay_color_chord
         col_label = p.overlay_color_label
         col_icon = p.overlay_color_icon
+        col_recents_hotkey = p.overlay_color_recents_hotkey
 
         # Helper to convert index to hotkey (1-9, a-z, A-Z, !-, -=+, punctuation)
         def index_to_hotkey(idx):
@@ -122,9 +136,9 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         blf.size(0, header_size)
         header_w, header_h = blf.dimensions(0, header)
 
-        # Calculate layout
-        gap = int(10 * scale_factor)
-        line_h = int(body_size * 1.5)
+        # Calculate layout (using preferences)
+        gap = int(p.overlay_gap * scale_factor)
+        line_h = int(body_size * p.overlay_line_height)
         pad_x = int(p.overlay_offset_x * scale_factor)
         pad_y = int(p.overlay_offset_y * scale_factor)
 
@@ -231,23 +245,23 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             # Draw hotkey (1-9, a-z)
             hotkey_text = index_to_hotkey(i)
             blf.size(0, chord_size)
-            blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
+            blf.color(0, col_recents_hotkey[0], col_recents_hotkey[1], col_recents_hotkey[2], col_recents_hotkey[3])
             blf.position(0, hotkey_col_x, current_y, 0)
             blf.draw(0, hotkey_text)
 
-            # Draw icon if present
+            # Draw icon if present (50% alpha)
             if entry.icon:
                 try:
-                    blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3])
+                    blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3] * 0.25)
                     blf.position(0, icon_col_x, current_y, 0)
                     blf.draw(0, entry.icon)
                 except Exception:
                     pass
 
-            # Draw chord
-            chord_text = "+".join(entry.chord_tokens)
+            # Draw chord (50% alpha)
+            chord_text = " ".join(entry.chord_tokens)
             blf.size(0, chord_size)
-            blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
+            blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * 0.25)
             blf.position(0, chord_col_x, current_y, 0)
             blf.draw(0, chord_text)
 
@@ -259,19 +273,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
             current_y -= line_h
 
-        # Draw footer
+        # Draw footer (matching main overlay style)
         footer_y = current_y - chord_size
-        footer_items = ["<ESC> Close"]
-
-        # Calculate footer width and center it
-        blf.size(0, body_size)
-        footer_text = "  ".join(footer_items)
-        footer_w, _ = blf.dimensions(0, footer_text)
-        footer_x = (region_w - footer_w) // 2
-
+        
         # Draw footer background (full width)
-        text_center_y = footer_y + (body_size / 2)
-        text_height = body_size * 1.3
+        text_center_y = footer_y + (chord_size / 2)
+        text_height = max(chord_size, body_size) * 1.3
         bg_y1 = text_center_y - (text_height * 0.75)
         bg_y2 = text_center_y + (text_height * 0.45)
 
@@ -288,10 +295,34 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         batch.draw(shader)
         gpu.state.blend_set('NONE')
 
-        # Draw footer text
-        blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
+        # Draw footer items (token in chord color, label in label color)
+        footer_token = "ESC"
+        footer_label = "Close"
+        
+        # Measure token and label
+        blf.size(0, chord_size)
+        token_text = f"<{footer_token}>"
+        token_w, _ = blf.dimensions(0, token_text)
+        
+        blf.size(0, body_size)
+        label_w, _ = blf.dimensions(0, footer_label)
+        
+        # Calculate total width and center
+        gap = int(p.overlay_gap * scale_factor)
+        total_w = token_w + gap + label_w
+        footer_x = (region_w - total_w) // 2
+        
+        # Draw token (chord color)
+        blf.size(0, chord_size)
+        blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
         blf.position(0, footer_x, footer_y, 0)
-        blf.draw(0, footer_text)
+        blf.draw(0, token_text)
+        
+        # Draw label (label color)
+        blf.size(0, body_size)
+        blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
+        blf.position(0, footer_x + token_w + gap, footer_y, 0)
+        blf.draw(0, footer_label)
 
     def invoke(self, context: bpy.types.Context, _event: bpy.types.Event):
         """Start recents modal operation."""
@@ -320,13 +351,21 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         """Execute a history entry."""
         from ..operators.leader import _show_fading_overlay
 
+        # Capture viewport context BEFORE finishing modal (when we have valid context)
+        ctx_viewport = {}
+        for key in ("area", "region", "space_data", "window", "screen"):
+            val = getattr(context, key, None)
+            if val is not None:
+                ctx_viewport[key] = val
+
         # Finish modal before executing
         self._finish(context)
 
         # Execute based on mapping type
         if entry.mapping_type == "OPERATOR":
             def execute_operator_delayed():
-                success, _ = execute_history_entry_operator(bpy.context, entry)
+                ctx_wrapper = _create_context_wrapper(ctx_viewport)
+                success, _ = execute_history_entry_operator(ctx_wrapper, entry)
                 if success:
                     _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
                 return None
@@ -335,7 +374,8 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         elif entry.mapping_type == "PYTHON_FILE":
             def execute_script_delayed():
-                success, _ = execute_history_entry_script(bpy.context, entry)
+                ctx_wrapper = _create_context_wrapper(ctx_viewport)
+                success, _ = execute_history_entry_script(ctx_wrapper, entry)
                 if success:
                     _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
                 return None
@@ -344,7 +384,8 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         elif entry.mapping_type == "CONTEXT_TOGGLE":
             def execute_toggle_delayed():
-                success, new_value = execute_history_entry_toggle(bpy.context, entry)
+                ctx_wrapper = _create_context_wrapper(ctx_viewport)
+                success, new_value = execute_history_entry_toggle(ctx_wrapper, entry)
                 if success and new_value is not None:
                     status = "ON" if new_value else "OFF"
                     _show_fading_overlay(bpy.context, entry.chord_tokens, f"{entry.label} ({status})", entry.icon)

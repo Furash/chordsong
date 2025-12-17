@@ -59,6 +59,22 @@ def draw_addon_preferences(prefs, _context, layout):
         r.prop(prefs, "overlay_font_size_body")
         box.separator()
 
+        # Layout settings
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_gap", text="Element Gap")
+        r.separator()
+        r.prop(prefs, "overlay_column_gap", text="Column Gap")
+        r.separator()
+        r.prop(prefs, "overlay_line_height", text="Line Height")
+        box.separator()
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_footer_gap", text="Footer Item Gap")
+        r.separator()
+        r.prop(prefs, "overlay_footer_token_gap", text="Footer Token Gap")
+        r.separator()
+        r.prop(prefs, "overlay_footer_label_gap", text="Footer Label Gap")
+        box.separator()
+
         # Position settings
         r = box.row(align=True)
         r.prop(prefs, "overlay_position", text="")
@@ -69,14 +85,31 @@ def draw_addon_preferences(prefs, _context, layout):
         box.separator()
 
         # Color settings
-        r = box.row(align=True)
-        r.prop(prefs, "overlay_color_chord", text="Chord")
-        r.separator()
-        r.prop(prefs, "overlay_color_label", text="Label")
-        r.separator()
-        r.prop(prefs, "overlay_color_header", text="Header")
-        r.separator()
-        r.prop(prefs, "overlay_color_icon", text="Icon")
+        split = box.split(factor=0.11)
+        col1 = split.column()
+        col2 = split.column()
+        col3 = split.column()
+        col4 = split.column()
+        col5 = split.column()
+        
+        # First column - labels
+        col1.label(text="Chord:")
+        col1.label(text="Label:")
+        col1.label(text="Icon:")
+        col1.label(text="Header:")
+        col1.label(text="Recents Hotkey:")
+        
+        # Second column - color pickers
+        col2.prop(prefs, "overlay_color_chord", text="")
+        col2.prop(prefs, "overlay_color_label", text="")
+        col2.prop(prefs, "overlay_color_icon", text="")
+        col2.prop(prefs, "overlay_color_header", text="")
+        col2.prop(prefs, "overlay_color_recents_hotkey", text="")
+        
+        col3.separator()
+        col4.separator()
+        col5.separator()
+
         box.separator()
 
         return
