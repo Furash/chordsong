@@ -94,8 +94,12 @@ class DrawHandlerManager:
         # Determine which space type to use
         space = context.space_data
         if space and space.type == 'NODE_EDITOR':
+            # For Node Editor (Shader Editor, Geometry Nodes)
             self._space_type = bpy.types.SpaceNodeEditor
+        elif space and space.type == 'IMAGE_EDITOR':
+            self._space_type = bpy.types.SpaceImageEditor
         else:
+            # Default to 3D View
             self._space_type = bpy.types.SpaceView3D
         
         self._draw_handle = self._space_type.draw_handler_add(
