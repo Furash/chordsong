@@ -13,15 +13,6 @@ import gpu  # type: ignore
 from gpu_extras.batch import batch_for_shader  # type: ignore
 
 
-def get_last_chord_state():
-    """Get the last chord state from the leader module."""
-    try:
-        from ..operators import leader
-        return leader._last_chord_state  # pylint: disable=protected-access
-    except Exception:
-        return None
-
-
 def get_leader_key_token():
     """Get the current leader key token for display."""
     try:
@@ -89,7 +80,7 @@ def get_prefs_hash(p, region_w, region_h):
     )
 
 
-def build_overlay_rows(cands, has_buffer):
+def build_overlay_rows(cands, has_buffer, mappings=None):
     """Build display rows from candidates, footer returned separately."""
     # Group candidates by next token to detect multi-chord prefixes
     token_groups = {}
@@ -139,17 +130,10 @@ def build_overlay_rows(cands, has_buffer):
     # Footer items (always at bottom)
     footer = []
     if not has_buffer:
-        # Only show repeat option at root level (no buffer)
+        # Only show recents at root level (no buffer)
         leader_token = get_leader_key_token()
-        last_chord = get_last_chord_state()
-        if last_chord and (last_chord.get("operator") or last_chord.get("python_file") or last_chord.get("context_path")):
-            # Show last chord's label and icon
-            last_label = last_chord.get("label") or "Last Chord"
-            last_icon = last_chord.get("icon") or ""
-            footer.append({"kind": "item", "token": leader_token, "label": last_label, "icon": last_icon})
-        else:
-            # No previous chord to repeat
-            footer.append({"kind": "item", "token": leader_token, "label": "Repeat Last Chord", "icon": ""})
+        footer.append({"kind": "item", "token": f"{leader_token}+{leader_token}", "label": "Recent Commands", "icon": ""})
+    
     footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})
     if has_buffer:
         footer.append({"kind": "item", "token": "BS", "label": "Back", "icon": ""})

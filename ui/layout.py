@@ -96,18 +96,28 @@ def draw_addon_preferences(prefs, _context, layout):
             
             if kmi:
                 box = col.box()
-                # Leader Key label (centered)
+                # Leader Key label
                 leader_row = box.row()
                 leader_row.alignment = 'LEFT'
                 leader_row.scale_y = 1.2
                 leader_row.label(text="Leader Key:")
                 
-                # Key assignment button (centered)
+                # Key assignment button
                 leader_row.scale_y = 1.5
                 leader_row.scale_x = 22
                 leader_row.context_pointer_set("keymap", km)
                 leader_row.prop(kmi, "type", text="", full_event=True)
                 box.separator()
+            
+            # Conflict checker button
+            box = col.box()
+            conflict_row = box.row()
+            conflict_row.alignment = 'LEFT'
+            conflict_row.scale_y = 1.2
+            conflict_row.label(text="Conflict Checker:")
+            conflict_row.scale_y = 1.5
+            conflict_row.operator("chordsong.check_conflicts", text="Check for Conflicts", icon="ERROR")
+            box.separator()
     
     # Context sub-tabs
     row = col.row(align=True)

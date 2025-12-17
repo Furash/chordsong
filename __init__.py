@@ -7,10 +7,10 @@ Vim-like <Leader> chord launcher with which-key style overlay.
 bl_info = {
     "name": "Chord Song",
     "author": "Cyrill Vitkovskiy",
-    "version": (0, 1, 0),
+    "version": (1, 0, 0),
     "blender": (5, 0, 0),
     "location": "Preferences > Add-ons > Chord Song",
-    "description": "Vim-like <Leader> chord launcher with which-key style overlay",
+    "description": "Vim-like <Leader> key implementation for Blender",
     "category": "Interface",
 }
 
@@ -23,6 +23,8 @@ import bpy
 
 from .ui import CHORDSONG_Preferences, CHORDSONG_PG_Group, CHORDSONG_PG_Mapping, CHORDSONG_PG_NerdIcon
 from .operators import (
+    CHORDSONG_OT_ApplyConflictFix,
+    CHORDSONG_OT_CheckConflicts,
     CHORDSONG_OT_Context_Menu,
     CHORDSONG_OT_Group_Add,
     CHORDSONG_OT_Group_Cleanup,
@@ -43,6 +45,7 @@ from .operators import (
     CHORDSONG_OT_Mapping_Remove,
     CHORDSONG_OT_Open_Keymap,
     CHORDSONG_OT_Open_Prefs,
+    CHORDSONG_OT_Recents,
     CHORDSONG_OT_Save_Config,
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
@@ -56,6 +59,8 @@ _classes = (
     CHORDSONG_PG_Group,
     CHORDSONG_PG_Mapping,
     CHORDSONG_Preferences,
+    CHORDSONG_OT_ApplyConflictFix,
+    CHORDSONG_OT_CheckConflicts,
     CHORDSONG_OT_Context_Menu,
     CHORDSONG_OT_Group_Add,
     CHORDSONG_OT_Group_Cleanup,
@@ -76,6 +81,7 @@ _classes = (
     CHORDSONG_OT_Mapping_Remove,
     CHORDSONG_OT_Open_Keymap,
     CHORDSONG_OT_Open_Prefs,
+    CHORDSONG_OT_Recents,
     CHORDSONG_OT_Save_Config,
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,

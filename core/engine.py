@@ -129,6 +129,13 @@ def candidates_for_prefix(mappings, buffer_tokens):
     for m in mappings:
         if not getattr(m, "enabled", True):
             continue
+        
+        # Skip chordsong.recents operator - it's only shown in footer
+        if getattr(m, "mapping_type", "") == "OPERATOR":
+            operator = get_str_attr(m, "operator")
+            if operator == "chordsong.recents":
+                continue
+        
         tokens = split_chord(get_str_attr(m, "chord"))
         if not tokens:
             continue

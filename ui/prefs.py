@@ -251,7 +251,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Overlay max items",
         default=14,
         min=1,
-        max=60,
+        max=100,
         update=_on_prefs_changed,
     )
     overlay_column_rows: IntProperty(

@@ -1,3 +1,4 @@
+from .check_conflicts import CHORDSONG_OT_CheckConflicts, CHORDSONG_OT_ApplyConflictFix
 from .context_menu import (
     CHORDSONG_OT_Context_Menu,
     register_context_menu,
@@ -20,10 +21,13 @@ from .mapping_duplicate import CHORDSONG_OT_Mapping_Duplicate
 from .mapping_remove import CHORDSONG_OT_Mapping_Remove
 from .open_keymap import CHORDSONG_OT_Open_Keymap
 from .open_prefs import CHORDSONG_OT_Open_Prefs
+from .recents import CHORDSONG_OT_Recents
 from .save_config import CHORDSONG_OT_Save_Config
 from .script_select import CHORDSONG_OT_Script_Select, CHORDSONG_OT_Script_Select_Apply
 
 __all__ = [
+    "CHORDSONG_OT_ApplyConflictFix",
+    "CHORDSONG_OT_CheckConflicts",
     "CHORDSONG_OT_Context_Menu",
     "CHORDSONG_OT_Group_Add",
     "CHORDSONG_OT_Group_Cleanup",
@@ -44,6 +48,7 @@ __all__ = [
     "CHORDSONG_OT_Mapping_Remove",
     "CHORDSONG_OT_Open_Keymap",
     "CHORDSONG_OT_Open_Prefs",
+    "CHORDSONG_OT_Recents",
     "CHORDSONG_OT_Save_Config",
     "CHORDSONG_OT_Script_Select",
     "CHORDSONG_OT_Script_Select_Apply",

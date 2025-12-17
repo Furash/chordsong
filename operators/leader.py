@@ -8,6 +8,7 @@ import time
 import bpy  # type: ignore
 
 from ..core.engine import candidates_for_prefix, find_exact_mapping, normalize_token, parse_kwargs, filter_mappings_by_context
+from ..core.history import add_to_history
 from ..ui.overlay import draw_overlay, draw_fading_overlay
 from .common import prefs
 
@@ -46,18 +47,7 @@ _fading_overlay_state = {
     "space_type": None,  # Store the space type for proper cleanup
 }
 
-# Global state for last executed chord (for repeat functionality)
-_last_chord_state = {
-    "mapping_type": None,
-    "operator": None,
-    "kwargs": None,
-    "call_context": None,
-    "python_file": None,
-    "context_path": None,
-    "label": None,
-    "icon": None,
-    "chord_tokens": None,
-}
+# Note: Last chord tracking removed - now handled by history system (core/history.py)
 
 
 def _show_fading_overlay(context, chord_tokens, label, icon):
@@ -176,16 +166,7 @@ def _cleanup_fading_overlay():
 def cleanup_all_handlers():
     """Clean up all draw handlers and timers. Called on addon unregister."""
     _cleanup_fading_overlay()
-    # Reset last chord state
-    _last_chord_state["mapping_type"] = None
-    _last_chord_state["operator"] = None
-    _last_chord_state["kwargs"] = None
-    _last_chord_state["call_context"] = None
-    _last_chord_state["python_file"] = None
-    _last_chord_state["context_path"] = None
-    _last_chord_state["label"] = None
-    _last_chord_state["icon"] = None
-    _last_chord_state["chord_tokens"] = None
+    # Note: Last chord tracking removed - now handled by history system
 
 
 class CHORDSONG_OT_Leader(bpy.types.Operator):
@@ -348,183 +329,17 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if tok is None:
             return {"RUNNING_MODAL"}
 
-        # Check for <leader><leader> (repeat last chord)
-        # If buffer is empty and user presses the leader key again, repeat last
+        # Check for <leader><leader>
+        # If buffer is empty and user presses the leader key again, show recents
         leader_key = _get_leader_key_type()
         if not self._buffer and event.type == leader_key:
-            # Get the normalized token for the leader key
-            leader_token = normalize_token(leader_key, shift=False) or "space"
-            
-            last = _last_chord_state
-            if last["mapping_type"] == "PYTHON_FILE" and last["python_file"]:
-                # Repeat last Python script
-                python_file = last["python_file"]
-                label = last["label"] or "(repeat)"
-                icon = last["icon"] or ""
-                chord_tokens = [leader_token, leader_token]
-                
-                # Capture viewport context before finishing
-                ctx_viewport = {}
-                for key in ("area", "region", "space_data", "window", "screen"):
-                    val = getattr(context, key, None)
-                    if val is not None:
-                        ctx_viewport[key] = val
-                
-                self._finish(context)
-                
-                def execute_script_repeat_delayed():
-                    try:
-                        import os
-                        if not os.path.exists(python_file):
-                            print(f"Chord Song: Script file not found: {python_file}")
-                            return None
-                        
-                        with open(python_file, 'r', encoding='utf-8') as f:
-                            script_text = f.read()
-                        
-                        # Execute with captured context
-                        if ctx_viewport:
-                            with bpy.context.temp_override(**ctx_viewport):
-                                exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
-                        else:
-                            exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
-                        
-                        _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        
-                    except Exception as e:
-                        import traceback
-                        print(f"Chord Song: Failed to repeat script {python_file}: {e}")
-                        traceback.print_exc()
-                    return None
-                
-                bpy.app.timers.register(execute_script_repeat_delayed, first_interval=0.01)
-                return {"FINISHED"}
-                
-            elif last["operator"]:
-                # Repeat the last operator chord
-                op = last["operator"]
-                kwargs = last["kwargs"] or {}
-                call_ctx = last["call_context"] or "EXEC_DEFAULT"
-                label = last["label"] or "(repeat)"
-                icon = last["icon"] or ""
-                chord_tokens = [leader_token, leader_token]
-
-                # Capture viewport context before finishing (safe in modal method)
-                ctx_viewport = {}
-                for key in ("area", "region", "space_data", "window", "screen"):
-                    val = getattr(context, key, None)
-                    if val is not None:
-                        ctx_viewport[key] = val
-
-                self._finish(context)
-
-                def execute_repeat_delayed():
-                    result_set = set()
-                    try:
-                        mod_name, fn_name = op.split(".", 1)
-                        opmod = getattr(bpy.ops, mod_name)
-                        opfn = getattr(opmod, fn_name)
-
-                        # Execute with captured context (captured in modal, used in timer)
-                        if call_ctx == "INVOKE_DEFAULT":
-                            if ctx_viewport:
-                                with bpy.context.temp_override(**ctx_viewport):
-                                    result_set = opfn('INVOKE_DEFAULT', **kwargs)
-                            else:
-                                result_set = opfn('INVOKE_DEFAULT', **kwargs)
-                        else:
-                            if ctx_viewport:
-                                with bpy.context.temp_override(**ctx_viewport):
-                                    result_set = opfn('EXEC_DEFAULT', **kwargs)
-                            else:
-                                result_set = opfn('EXEC_DEFAULT', **kwargs)
-
-                        if result_set and 'FINISHED' in result_set:
-                            _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        elif result_set and 'CANCELLED' not in result_set:
-                            _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-
-                    except Exception as e:
-                        import traceback
-                        print(f"Chord Song: Failed to repeat operator {op}: {e}")
-                        traceback.print_exc()
-                    return None
-
-                bpy.app.timers.register(execute_repeat_delayed, first_interval=0.01)
-                return {"FINISHED"}
-                
-            elif last["mapping_type"] == "CONTEXT_TOGGLE" and last["context_path"]:
-                # Repeat last context toggle
-                context_path = last["context_path"]
-                label = last["label"] or "(repeat)"
-                icon = last["icon"] or ""
-                chord_tokens = [leader_token, leader_token]
-                
-                # Capture viewport context before finishing
-                ctx_viewport = {}
-                for key in ("area", "region", "space_data", "window", "screen"):
-                    val = getattr(context, key, None)
-                    if val is not None:
-                        ctx_viewport[key] = val
-                
-                self._finish(context)
-                
-                def execute_toggle_repeat_delayed():
-                    try:
-                        # Define the toggle function to execute with proper context
-                        def do_toggle():
-                            # Navigate to the property
-                            parts = context_path.split('.')
-                            obj = bpy.context
-                            for i, part in enumerate(parts[:-1]):
-                                next_obj = getattr(obj, part, None)
-                                if next_obj is None:
-                                    current_path = ".".join(parts[:i+1])
-                                    print(f"Chord Song: Could not find '{part}' in path '{context_path}'")
-                                    print(f"  -> Failed at: {current_path}")
-                                    return None
-                                obj = next_obj
-                            
-                            prop_name = parts[-1]
-                            if not hasattr(obj, prop_name):
-                                print(f"Chord Song: Could not find property '{prop_name}' in path '{context_path}'")
-                                print(f"  -> Object type: {type(obj).__name__}")
-                                return None
-                            
-                            current_value = getattr(obj, prop_name)
-                            if not isinstance(current_value, bool):
-                                print(f"Chord Song: Property '{context_path}' is not a boolean (got {type(current_value).__name__})")
-                                return None
-                            
-                            # Toggle it
-                            setattr(obj, prop_name, not current_value)
-                            return not current_value
-                        
-                        # Execute with context override if available
-                        if ctx_viewport:
-                            with bpy.context.temp_override(**ctx_viewport):
-                                new_value = do_toggle()
-                        else:
-                            new_value = do_toggle()
-                        
-                        # Show fading overlay
-                        if new_value is not None:
-                            status = "ON" if new_value else "OFF"
-                            _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
-                        
-                    except Exception as e:
-                        import traceback
-                        print(f"Chord Song: Failed to repeat toggle '{context_path}': {e}")
-                        traceback.print_exc()
-                    return None
-                
-                bpy.app.timers.register(execute_toggle_repeat_delayed, first_interval=0.01)
-                return {"FINISHED"}
-                
-            else:
-                self.report({"WARNING"}, "No previous chord to repeat")
-                self._finish(context)
-                return {"CANCELLED"}
+            # Open recents instead of repeat
+            self._finish(context)
+            try:
+                bpy.ops.chordsong.recents('INVOKE_DEFAULT')
+            except Exception as e:
+                print(f"Chord Song: Failed to open recents: {e}")
+            return {"FINISHED"}
 
         self._buffer.append(tok)
         self._scroll_offset = 0  # Reset scroll when adding to buffer
@@ -584,15 +399,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         # Show fading overlay on success
                         _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                         
-                        # Store as last chord for repeat functionality
-                        _last_chord_state["mapping_type"] = "PYTHON_FILE"
-                        _last_chord_state["python_file"] = python_file
-                        _last_chord_state["operator"] = None
-                        _last_chord_state["kwargs"] = None
-                        _last_chord_state["call_context"] = None
-                        _last_chord_state["label"] = label
-                        _last_chord_state["icon"] = icon
-                        _last_chord_state["chord_tokens"] = chord_tokens
+                        # Add to history
+                        add_to_history(
+                            chord_tokens=chord_tokens,
+                            label=label,
+                            icon=icon,
+                            mapping_type="PYTHON_FILE",
+                            python_file=python_file,
+                        )
                         
                     except Exception as e:
                         import traceback
@@ -682,16 +496,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             status = "ON" if new_value else "OFF"
                             _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
                         
-                        # Store as last chord for repeat functionality
-                        _last_chord_state["mapping_type"] = "CONTEXT_TOGGLE"
-                        _last_chord_state["context_path"] = context_path
-                        _last_chord_state["operator"] = None
-                        _last_chord_state["kwargs"] = None
-                        _last_chord_state["call_context"] = None
-                        _last_chord_state["python_file"] = None
-                        _last_chord_state["label"] = label
-                        _last_chord_state["icon"] = icon
-                        _last_chord_state["chord_tokens"] = chord_tokens
+                        # Add to history
+                        add_to_history(
+                            chord_tokens=chord_tokens,
+                            label=label,
+                            icon=icon,
+                            mapping_type="CONTEXT_TOGGLE",
+                            context_path=context_path,
+                        )
                         
                     except Exception as e:
                         import traceback
@@ -752,27 +564,29 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     # Show fading overlay on success
                     if result_set and 'FINISHED' in result_set:
                         _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        # Store as last chord for repeat functionality
-                        _last_chord_state["mapping_type"] = "OPERATOR"
-                        _last_chord_state["operator"] = op
-                        _last_chord_state["kwargs"] = kwargs
-                        _last_chord_state["call_context"] = call_ctx
-                        _last_chord_state["python_file"] = None
-                        _last_chord_state["label"] = label
-                        _last_chord_state["icon"] = icon
-                        _last_chord_state["chord_tokens"] = chord_tokens
+                        # Add to history
+                        add_to_history(
+                            chord_tokens=chord_tokens,
+                            label=label,
+                            icon=icon,
+                            mapping_type="OPERATOR",
+                            operator=op,
+                            kwargs=kwargs,
+                            call_context=call_ctx,
+                        )
                     elif result_set and 'CANCELLED' not in result_set:
                         # Also show for RUNNING_MODAL or PASS_THROUGH
                         _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        # Store as last chord for repeat functionality
-                        _last_chord_state["mapping_type"] = "OPERATOR"
-                        _last_chord_state["operator"] = op
-                        _last_chord_state["kwargs"] = kwargs
-                        _last_chord_state["call_context"] = call_ctx
-                        _last_chord_state["python_file"] = None
-                        _last_chord_state["label"] = label
-                        _last_chord_state["icon"] = icon
-                        _last_chord_state["chord_tokens"] = chord_tokens
+                        # Add to history
+                        add_to_history(
+                            chord_tokens=chord_tokens,
+                            label=label,
+                            icon=icon,
+                            mapping_type="OPERATOR",
+                            operator=op,
+                            kwargs=kwargs,
+                            call_context=call_ctx,
+                        )
                     
                 except Exception as e:
                     # Log error for debugging
