@@ -9,7 +9,6 @@ from bpy.props import StringProperty
 
 from ..common import prefs
 
-
 class CHORDSONG_OT_Group_Add(bpy.types.Operator):
     """Add a new group."""
 

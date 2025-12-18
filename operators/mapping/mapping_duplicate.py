@@ -7,7 +7,6 @@ from bpy.props import IntProperty  # type: ignore
 
 from ..common import prefs
 
-
 class CHORDSONG_OT_Mapping_Duplicate(bpy.types.Operator):
     bl_idname = "chordsong.mapping_duplicate"
     bl_label = "Duplicate Chord"

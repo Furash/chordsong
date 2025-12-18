@@ -41,7 +41,7 @@ def draw_addon_preferences(prefs, _context, layout):
     if prefs.prefs_tab == "UI":
         # Overlay settings
         box = col.box()
-        
+
         # Toggles row
         r = box.row(align=True)
         r.prop(prefs, "overlay_enabled", toggle=True)
@@ -51,27 +51,25 @@ def draw_addon_preferences(prefs, _context, layout):
         r.prop(prefs, "overlay_show_header", toggle=True, text="Header")
         r.separator()
         r.prop(prefs, "overlay_show_footer", toggle=True, text="Footer")
-        
+
         # Counts
         r = box.row(align=True)
         r.prop(prefs, "overlay_max_items")
         r.separator()
         r.prop(prefs, "overlay_column_rows")
 
-        
         # Font sizes
         r = box.row(align=True)
         r.prop(prefs, "overlay_font_size_header", text="Header Size")
         r.prop(prefs, "overlay_font_size_footer", text="Footer Size")
 
         box.separator()
-        
+
         r = box.row(align=True)
         r.prop(prefs, "overlay_font_size_chord")
         r.prop(prefs, "overlay_font_size_body")
         r.prop(prefs, "overlay_font_size_fading")
 
-        
         # Layout settings
         r = box.row(align=True)
         r.prop(prefs, "overlay_gap", text="Element Gap")
@@ -100,7 +98,7 @@ def draw_addon_preferences(prefs, _context, layout):
         col3 = split.column()
         col4 = split.column()
         col5 = split.column()
-        
+
         # First column - labels
         col1.label(text="Chord:")
         col1.label(text="Label:")
@@ -110,7 +108,7 @@ def draw_addon_preferences(prefs, _context, layout):
         col1.label(text="List Background:")
         col1.label(text="Header Background:")
         col1.label(text="Footer Background:")
-        
+
         # Second column - color pickers
         col2.prop(prefs, "overlay_color_chord", text="")
         col2.prop(prefs, "overlay_color_label", text="")
@@ -120,7 +118,7 @@ def draw_addon_preferences(prefs, _context, layout):
         col2.prop(prefs, "overlay_list_background", text="")
         col2.prop(prefs, "overlay_header_background", text="")
         col2.prop(prefs, "overlay_footer_background", text="")
-        
+
         col3.separator()
         col4.separator()
         col5.separator()
@@ -131,7 +129,7 @@ def draw_addon_preferences(prefs, _context, layout):
         row = box_test.row()
         row.operator("chordsong.test_main_overlay", text="Test Main Overlay", icon="PLAY")
         row.operator("chordsong.test_fading_overlay", text="Test Fading Overlay", icon="PLAY")
-        
+
         box.separator()
 
         return
@@ -148,11 +146,11 @@ def draw_addon_preferences(prefs, _context, layout):
                 if item.idname == "chordsong.leader":
                     kmi = item
                     break
-            
+
             if kmi:
                 box = col.box()
                 split = box.split(factor=0.5)
-                
+
                 # Leader Key section
                 leader_col = split.column()
                 leader_row = leader_col.row(align=True)
@@ -163,7 +161,7 @@ def draw_addon_preferences(prefs, _context, layout):
                 leader_row.context_pointer_set("keymap", km)
                 leader_row.prop(kmi, "type", text="", full_event=True, emboss=True)
                 leader_row.separator()
-                
+
                 # Conflict checker section
                 conflict_col = split.column()
                 conflict_row = conflict_col.row(align=True)
@@ -171,14 +169,14 @@ def draw_addon_preferences(prefs, _context, layout):
                 conflict_row.label(text="Conflict Checker:")
                 conflict_row.scale_y = 1.5
                 conflict_row.operator("chordsong.check_conflicts", text="Check for Conflicts", icon="ERROR")
-                
+
                 box.separator()
-    
+
     # Context sub-tabs
     row = col.row(align=True)
     row.prop(prefs, "mapping_context_tab", expand=True)
     col.separator()
-    
+
     row = col.row(align=True)
     row.scale_y = 1.5
     op = row.operator("chordsong.mapping_add", text="Add New Chord", icon="ADD")
@@ -192,14 +190,14 @@ def draw_addon_preferences(prefs, _context, layout):
 
     # Filter mappings by selected context tab
     current_context = prefs.mapping_context_tab
-    
+
     groups = {}
     for idx, m in enumerate(prefs.mappings):
         # Filter by context
         mapping_context = getattr(m, "context", "VIEW_3D")
         if mapping_context != current_context:
             continue
-        
+
         group = get_str_attr(m, "group") or "Ungrouped"
         groups.setdefault(group, []).append((idx, m))
 
@@ -239,7 +237,7 @@ def draw_addon_preferences(prefs, _context, layout):
                 expand_prop = None
 
         box = col.box()
-        
+
         # Foldable header row
         header = box.row(align=True)
         if expand_data and expand_prop:
@@ -250,13 +248,13 @@ def draw_addon_preferences(prefs, _context, layout):
                 emboss=False,
             )
         header.label(text=f"{group_name}")
-        
+
         # Add new chord button in header
         op = header.operator("chordsong.mapping_add", text="", icon="ADD")
         op.group = group_name
         op.context = prefs.mapping_context_tab
         header.separator()
-        
+
         # Delete group button (only for non-Ungrouped groups)
         if group_name != "Ungrouped":
             # Find the group index
@@ -265,11 +263,11 @@ def draw_addon_preferences(prefs, _context, layout):
                 if grp.name == group_name:
                     group_idx = idx
                     break
-            
+
             if group_idx is not None:
                 op = header.operator("chordsong.group_remove", text="", icon="TRASH", emboss=False)
                 op.index = group_idx
-        
+
         if not is_expanded:
             continue
 
@@ -288,12 +286,12 @@ def draw_addon_preferences(prefs, _context, layout):
 
             # Group selection with searchable dropdown
             r.prop_search(m, "group", prefs, "groups", icon="FILE_FOLDER", text="")
-            
+
             # Button to create new group
             op = r.operator("chordsong.group_add", text="", icon="ADD", emboss=True)
             op.name = "New Group"
             r.separator()
-            
+
             # Icon display and selection button (compact)
             icon_sub = r.row(align=True)
             icon_sub.scale_x = 0.75

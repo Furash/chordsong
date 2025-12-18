@@ -6,7 +6,6 @@ import bpy  # type: ignore
 
 from ..common import prefs
 
-
 class CHORDSONG_OT_Group_Fold_All(bpy.types.Operator):
     bl_idname = "chordsong.group_fold_all"
     bl_label = "Collapse All Groups"
@@ -19,7 +18,6 @@ class CHORDSONG_OT_Group_Fold_All(bpy.types.Operator):
         for grp in p.groups:
             grp.expanded = False
         return {"FINISHED"}
-
 
 class CHORDSONG_OT_Group_Unfold_All(bpy.types.Operator):
     bl_idname = "chordsong.group_unfold_all"

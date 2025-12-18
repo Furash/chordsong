@@ -12,5 +12,3 @@ __all__ = [
     "CHORDSONG_PG_Mapping",
     "CHORDSONG_PG_NerdIcon",
 ]
-
-

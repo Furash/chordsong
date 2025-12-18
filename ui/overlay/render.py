@@ -7,7 +7,6 @@ from ...core.engine import candidates_for_prefix, get_leader_key_token
 from .cache import _overlay_cache, get_prefs_hash
 from .layout import build_overlay_rows, wrap_into_columns, calculate_column_widths
 
-
 def draw_icon(icon_text, x, y, size):
     """Draw a Nerd Fonts icon/emoji at the specified position."""
     if not icon_text:
@@ -19,7 +18,6 @@ def draw_icon(icon_text, x, y, size):
     blf.size(0, size)
     blf.position(0, x, y, 0)
     blf.draw(0, icon_text)
-
 
 def draw_rect(x1, y1, x2, y2, color):
     """Draw a filled rectangle with the given color."""
@@ -41,7 +39,6 @@ def draw_rect(x1, y1, x2, y2, color):
     batch.draw(shader)
     gpu.state.blend_set('NONE')
 
-
 def draw_overlay_header(p, region_w, y, header_text, header_size, body_size, chord_size, header_w):
     """Draw the overlay header background and text."""
     import blf # type: ignore
@@ -49,14 +46,14 @@ def draw_overlay_header(p, region_w, y, header_text, header_size, body_size, cho
     # Calculate metrics
     text_center_y = y + (header_size / 2)
     text_height = max(header_size, body_size) * 1.3
-    
+
     # Vertically centered around text
     bg_y1 = text_center_y - (text_height * 0.75)
     bg_y2 = text_center_y + (text_height * 0.45)
 
     # Draw background
     draw_rect(0, bg_y1, region_w, bg_y2, p.overlay_header_background)
-    
+
     # Draw text
     col_header = p.overlay_color_header
     header_x = (region_w - header_w) // 2
@@ -64,16 +61,14 @@ def draw_overlay_header(p, region_w, y, header_text, header_size, body_size, cho
     blf.color(0, col_header[0], col_header[1], col_header[2], col_header[3])
     blf.position(0, header_x, y, 0)
     blf.draw(0, header_text)
-    
+
     # Return new Y position for content and bg_y1 for list background connection
     new_y = y - int(header_size / 2 + text_height * 0.75 + chord_size)
     return new_y, bg_y1
 
-
 def draw_list_background(p, region_w, top_y, bottom_y):
     """Draw the background for the list area."""
     draw_rect(0, bottom_y, region_w, top_y, p.overlay_list_background)
-
 
 def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_size, scale_factor, icon_size, max_token_w, max_label_w):
     """Draw the overlay footer background and items."""
@@ -86,10 +81,10 @@ def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_si
     # Calculate metrics
     text_center_y = footer_y + (chord_size / 2)
     text_height = max(chord_size, body_size) * 1.3
-    
+
     bg_y1 = text_center_y - (text_height * 0.75)
     bg_y2 = text_center_y + (text_height * 0.45)
-    
+
     # Draw background
     draw_rect(0, bg_y1, region_w, bg_y2, p.overlay_footer_background)
 
@@ -99,9 +94,9 @@ def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_si
     footer_item_width = max_token_w + footer_token_gap + icon_size + footer_label_gap + max_label_w
     footer_gap = int(p.overlay_footer_gap * scale_factor)
     total_footer_width = len(footer_items) * footer_item_width + (len(footer_items) - 1) * footer_gap
-    
+
     footer_x = (region_w - total_footer_width) // 2
-    
+
     blf.size(0, chord_size)
 
     for r in footer_items:
@@ -115,14 +110,14 @@ def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_si
             token_txt = f"{leader_token}+{leader_token}"
 
         token_x = footer_x
-        
+
         # Draw token
         blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
         display_token = f"<{token_txt.upper()}>"
         tw, _ = blf.dimensions(0, display_token)
         blf.position(0, token_x, footer_y, 0)
         blf.draw(0, display_token)
-        
+
         # Draw icon
         icon_x = token_x + tw + footer_token_gap
         if icon_text:
@@ -131,25 +126,24 @@ def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_si
                 draw_icon(icon_text, icon_x, footer_y, icon_size)
             except Exception:
                 pass
-        
+
         # Draw label
         label_x = icon_x + (icon_size if icon_text else 0) + (footer_label_gap if icon_text else footer_token_gap)
         blf.size(0, body_size)
         blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
         blf.position(0, label_x, footer_y, 0)
         blf.draw(0, label_txt)
-        
+
         blf.size(0, chord_size)
         footer_x += footer_item_width + footer_gap
-        
-    return bg_y2 # Return top of footer bg (for list bg connection)
 
+    return bg_y2 # Return top of footer bg (for list bg connection)
 
 def render_overlay(_context, p, columns, footer, x, y, header, header_size, chord_size, body_size,
                    column_metrics, footer_metrics, gap, col_gap, line_h, icon_size, block_w, block_h, region_w, header_w, header_h):
     """Render the overlay at the calculated position."""
     import blf  # type: ignore
-    
+
     scale_factor = calculate_scale_factor(_context)
     col_chord = p.overlay_color_chord
     col_label = p.overlay_color_label
@@ -166,13 +160,13 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
 
     # 2. Calculate Footer Position & List Bg Bottom
     start_y = current_y
-    
+
     num_rows = max(len(c) for c in columns) if columns else 0
     list_content_height = num_rows * line_h
-    
+
     if footer and p.overlay_show_footer:
         footer_y = start_y - (len(columns[0]) * line_h if columns and columns[0] else 0) - chord_size
-        
+
         # Calculate scale factor for footer text size
         footer_text_size_base = getattr(p, "overlay_font_size_footer", 12)
         footer_text_size = max(int(footer_text_size_base * scale_factor), 10)
@@ -184,22 +178,22 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
     else:
         # Move bottom up by roughly one line height + some padding adjustment
         footer_bg_top = start_y - list_content_height + line_h * 0.5
-    
+
     # 3. Draw List Background
     draw_list_background(p, region_w, header_bg_bottom, footer_bg_top)
 
     # 4. Draw Columns
     current_size = chord_size # Init
-    
+
     current_x_offset = 0
 
     for col_idx, col_rows in enumerate(columns):
         if col_idx >= len(column_metrics):
              break
-             
+
         metrics = column_metrics[col_idx]
         col_total_w = metrics["total_w"]
-        
+
         cx = x + current_x_offset
         cy = start_y
 
@@ -251,13 +245,12 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             blf.position(0, label_x, cy, 0)
             blf.draw(0, label_txt)
             cy -= line_h
-            
-        current_x_offset += col_total_w + col_gap
 
+        current_x_offset += col_total_w + col_gap
 
 def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
     """Main draw callback for the overlay.
-    
+
     Args:
         context: Blender context
         p: Addon preferences
@@ -283,7 +276,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
     # Check cache validity
     buffer_key = tuple(buffer_tokens) if buffer_tokens else ()
     prefs_hash = get_prefs_hash(p, region_w, region_h)
-    
+
     cache_valid = (
         _overlay_cache["buffer_tokens"] == buffer_key and
         _overlay_cache["prefs_hash"] == prefs_hash and
@@ -341,23 +334,23 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
             total_cols_w += width
 
         num_cols = len(col_metrics)
-        
+
         # Calculate block width
         effective_header_w = header_w if p.overlay_show_header else 0
         cols_gap_total = (num_cols - 1) * col_gap if num_cols > 1 else 0
         block_w = max(effective_header_w, total_cols_w + cols_gap_total)
-        
+
         max_rows_in_any = min(max_rows, max(len(c) for c in columns) if columns else 0)
 
         # Add extra space for footer
         footer_rows = 1 if (footer and p.overlay_show_footer) else 0
-        
+
         # Calculate block height
         if p.overlay_show_header:
             block_h = int(header_h + (line_h * (max_rows_in_any + footer_rows + 2)))
         else:
             block_h = int(line_h * (max_rows_in_any + footer_rows + 1.5))
-            
+
         # Calculate position
         x, y = calculate_overlay_position(p, region_w, region_h, block_w, block_h, pad_x, pad_y)
 
@@ -412,7 +405,6 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         layout["header_h"],
     )
 
-
 def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_duration=1.5):
     """Draw a fading overlay showing the executed chord."""
     # Check if fading overlay is enabled
@@ -437,11 +429,11 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     region_h = context.region.height if context.region else 400
 
     scale_factor = calculate_scale_factor(context)
-    
+
     # Font sizes - Use fading specific size for main text
     fading_size_base = getattr(p, "overlay_font_size_fading", 24)
     header_size = max(int(fading_size_base * scale_factor), 12)
-    
+
     # Scale label (body) proportionally to fading size (e.g. 70%)
     body_size = max(int(header_size * 0.7), 10)
     icon_size = header_size
@@ -449,7 +441,7 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     # Measure text dimensions
     blf.size(0, header_size)
     chord_w, _ = blf.dimensions(0, chord_text)
-    
+
     blf.size(0, body_size)
     label_w, _ = blf.dimensions(0, label)
 
@@ -457,7 +449,7 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     gap = int(p.overlay_gap * scale_factor)
     pad_x = int(p.overlay_offset_x * scale_factor)
     pad_y = int(p.overlay_offset_y * scale_factor)
-    
+
     # Calculate content width
     icon_w = icon_size if icon else 0
     content_w = icon_w + gap + chord_w + gap + label_w
@@ -466,34 +458,34 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     # Calculate position using same logic as main overlay
     block_h = int(header_size * 1.8)  # Approximate height for positioning
     _, y = calculate_overlay_position(p, region_w, region_h, content_w, block_h, pad_x, pad_y)
-    
+
     # User requested position "between footer and header", i.e., in the body area.
     # For Top alignment, this means pushing it down below the header area.
     # For Bottom alignment, the calculate_position with a small height naturally puts it at the bottom (body area),
     # so we don't need to offset (and doing so would push it off screen).
     is_top_aligned = "TOP" in p.overlay_position or "CENTER_TOP" in p.overlay_position
-    
+
     if getattr(p, "overlay_show_header", True) and is_top_aligned:
          # Roughly header metrics from draw_overlay_header: text_height * 0.75 + padding
          header_clearance = int(max(header_size, body_size) * 1.8)
          y -= header_clearance
-    
+
     # Calculate text center and height for vertical centering
     # Revert to original relative calculation so background matches text baseline (y)
-    text_center_y = y + (header_size / 2) 
+    text_center_y = y + (header_size / 2)
     text_height = max(header_size, body_size) * 1.3
-    
+
     # Full width background
     bg_x1 = 0
     bg_x2 = region_w
-    
+
     # Vertically centered around text
     bg_y1 = text_center_y - (text_height * 0.75)
     bg_y2 = text_center_y + (text_height * 0.45)
 
     # Draw semi-transparent background with fade (full width)
     bg_alpha = 0.35 * fade_alpha
-    
+
     gpu.state.blend_set('ALPHA')
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
     vertices = (

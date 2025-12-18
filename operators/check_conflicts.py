@@ -11,38 +11,36 @@ import bpy  # type: ignore
 from .common import prefs, schedule_autosave_safe
 from ..core.engine import split_chord, get_str_attr
 
-
 def _check_chord_conflicts(new_key: tuple, chords_to_check: list) -> bool:
     """Check if new_key conflicts with any chord in the list.
-    
+
     Returns True if conflict exists (exact match, prefix, or blocked).
     """
     for existing in chords_to_check:
         existing_key = tuple(split_chord(existing))
-        
+
         # Exact match
         if new_key == existing_key:
             return True
-        
+
         # New chord is prefix of existing
         if len(new_key) < len(existing_key) and existing_key[:len(new_key)] == new_key:
             return True
-        
+
         # Existing is prefix of new chord
         if len(existing_key) < len(new_key) and new_key[:len(existing_key)] == existing_key:
             return True
-    
-    return False
 
+    return False
 
 def _schedule_recheck():
     """Schedule a re-run of the conflict checker."""
     if CHORDSONG_OT_CheckConflicts._recheck_pending:
         return
-    
+
     CHORDSONG_OT_CheckConflicts._recheck_pending = True
     prefs_ctx = CHORDSONG_OT_CheckConflicts._prefs_context
-    
+
     def recheck():
         CHORDSONG_OT_CheckConflicts._recheck_pending = False
         if prefs_ctx:
@@ -55,21 +53,20 @@ def _schedule_recheck():
         else:
             bpy.ops.chordsong.check_conflicts('INVOKE_DEFAULT')
         return None
-    
-    bpy.app.timers.register(recheck, first_interval=1.5)
 
+    bpy.app.timers.register(recheck, first_interval=1.5)
 
 class CHORDSONG_OT_ApplyConflictFix(bpy.types.Operator):
     """Apply suggested fix for chord conflict"""
-    
+
     bl_idname = "chordsong.apply_conflict_fix"
     bl_label = "Apply Fix"
     bl_options = {"REGISTER", "UNDO"}
-    
+
     conflict_index: bpy.props.IntProperty(default=-1)
     conflict_type: bpy.props.StringProperty(default="PREFIX")
     duplicate_strategy: bpy.props.StringProperty(default="ADD")
-    
+
     def execute(self, context: bpy.types.Context):
         """Apply the fix."""
         # pylint: disable=protected-access
@@ -93,21 +90,20 @@ class CHORDSONG_OT_ApplyConflictFix(bpy.types.Operator):
             if self.conflict_index < len(conflicts["duplicates"]):
                 dup = conflicts["duplicates"][self.conflict_index]
                 fixes_key = f"suggested_fixes_{self.duplicate_strategy.lower()}"
-                
+
                 if fixes_key in dup:
                     fixed = 0
                     for i, mapping in enumerate(dup["mappings"]):
                         if i < len(dup[fixes_key]):
                             mapping.chord = dup[fixes_key][i]
                             fixed += 1
-                    
+
                     if fixed > 0:
                         schedule_autosave_safe(p, delay_s=5.0)
                         self.report({"INFO"}, f"Fixed {fixed} duplicate(s)")
                         _schedule_recheck()
-        
-        return {"FINISHED"}
 
+        return {"FINISHED"}
 
 class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
     """Check for chord mapping conflicts (prefixes and duplicates)"""
@@ -123,10 +119,10 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
     def invoke(self, context: bpy.types.Context, event):  # pylint: disable=unused-argument
         """Show dialog with conflicts."""
         p = prefs(context)
-        
+
         self._conflicts = self._find_conflicts(p.mappings)
         CHORDSONG_OT_CheckConflicts._conflicts = self._conflicts
-        
+
         # Store preferences context for re-running
         prefs_context = {}
         if hasattr(context, "area") and context.area and context.area.type == "PREFERENCES":
@@ -135,15 +131,15 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 if val:
                     prefs_context[key] = val
         CHORDSONG_OT_CheckConflicts._prefs_context = prefs_context or None
-        
+
         if not self._conflicts["prefix_conflicts"] and not self._conflicts["duplicates"]:
             self.report({"INFO"}, "No chord conflicts found! ✓")
             CHORDSONG_OT_CheckConflicts._conflicts = None
             return {"FINISHED"}
-        
+
         self._print_to_console()
         return context.window_manager.invoke_props_dialog(self, width=600)
-    
+
     def execute(self, context: bpy.types.Context):  # pylint: disable=unused-argument
         """Close dialog."""
         return {"FINISHED"}
@@ -151,10 +147,10 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
     def draw(self, context: bpy.types.Context):  # pylint: disable=unused-argument
         """Draw the conflict report in a dialog."""
         layout = self.layout
-        
+
         if not self._conflicts:
             return
-        
+
         total = len(self._conflicts["prefix_conflicts"]) + len(self._conflicts["duplicates"])
 
         # Header
@@ -162,13 +158,13 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
         row = box.row()
         row.alert = True
         row.label(text=f"Found {total} Conflict(s)", icon="ERROR")
-        
+
         # Prefix conflicts
         if self._conflicts["prefix_conflicts"]:
             layout.separator()
             box = layout.box()
             box.row().label(text=f"PREFIX CONFLICTS ({len(self._conflicts['prefix_conflicts'])})", icon="DISCLOSURE_TRI_DOWN")
-            
+
             for idx, conflict in enumerate(self._conflicts["prefix_conflicts"]):
                 cbox = box.box()
                 cbox.row().label(text=f"Prefix: {conflict['prefix_chord']}")
@@ -182,13 +178,13 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 op = cbox.row().operator("chordsong.apply_conflict_fix", text="Apply Fix", icon="CHECKMARK")
                 op.conflict_index = idx
                 op.conflict_type = "PREFIX"
-        
+
         # Duplicate chords
         if self._conflicts["duplicates"]:
             layout.separator()
             box = layout.box()
             box.row().label(text=f"DUPLICATE CHORDS ({len(self._conflicts['duplicates'])})", icon="DISCLOSURE_TRI_DOWN")
-            
+
             for idx, dup in enumerate(self._conflicts["duplicates"]):
                 dbox = box.box()
                 dbox.row().label(text=f"Chord: {dup['chord']}")
@@ -197,9 +193,9 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 dbox.row().label(text=f"Found {dup['count']} times:")
                 for label in dup['labels']:
                     dbox.row().label(text=f"  → {label}", icon="BLANK1")
-                
+
                 dbox.separator(factor=0.5)
-                
+
                 # Strategy buttons
                 for strategy, label_text in [("add", "Add symbol"), ("change_last", "Change last")]:
                     fixes_key = f"suggested_fixes_{strategy}"
@@ -213,18 +209,18 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                         op.conflict_type = "DUPLICATE"
                         op.duplicate_strategy = strategy.upper()
                         dbox.separator(factor=0.3)
-    
+
     def _print_to_console(self):
         """Print detailed report to console."""
         if not self._conflicts:
             return
-        
+
         total = len(self._conflicts["prefix_conflicts"]) + len(self._conflicts["duplicates"])
-        
+
         print("\n" + "="*60)
         print("CHORD CONFLICT REPORT")
         print("="*60)
-        
+
         if self._conflicts["prefix_conflicts"]:
             print(f"\n⚠ PREFIX CONFLICTS ({len(self._conflicts['prefix_conflicts'])})")
             print("-"*60)
@@ -232,7 +228,7 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 print(f"\n  Prefix: '{c['prefix_chord']}' → {c['prefix_label']}")
                 print(f"  Blocks: '{c['full_chord']}' → {c['full_label']}")
                 print(f"  Context: {c['context']}")
-        
+
         if self._conflicts["duplicates"]:
             print(f"\n⚠ DUPLICATE CHORDS ({len(self._conflicts['duplicates'])})")
             print("-"*60)
@@ -241,14 +237,14 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 print(f"  Found {d['count']} times:")
                 for label in d['labels']:
                     print(f"    → {label}")
-        
+
         print("\n" + "="*60)
         print(f"Total conflicts found: {total}")
         print("="*60 + "\n")
-    
+
     def _generate_chord(self, base_chord, all_chords, exclude_chord=None, exclude_symbols=None, change_last=False):
         """Unified chord generation function.
-        
+
         Args:
             base_chord: The base chord to modify
             all_chords: List of existing chord strings to check against
@@ -259,39 +255,39 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
         base_tokens = split_chord(base_chord)
         if not base_tokens:
             return None
-        
+
         exclude_symbols = exclude_symbols or []
-        
+
         # Build list of chords to check against (exclude base chord when extending)
         base_key = tuple(base_tokens)
         if change_last:
             chords_to_check = all_chords
         else:
             chords_to_check = [c for c in all_chords if tuple(split_chord(c)) != base_key]
-        
+
         # Try all letters (lowercase then uppercase)
         all_letters = string.ascii_lowercase + string.ascii_uppercase
-        
+
         for letter in all_letters:
             if letter in exclude_symbols:
                 continue
-            
+
             if change_last:
                 if base_tokens[-1] == letter:
                     continue
                 new_tokens = base_tokens[:-1] + [letter]
             else:
                 new_tokens = base_tokens + [letter]
-            
+
             new_chord = " ".join(new_tokens)
             new_key = tuple(new_tokens)
-            
+
             if exclude_chord and new_chord == exclude_chord:
                 continue
-            
+
             if not _check_chord_conflicts(new_key, chords_to_check):
                 return new_chord
-        
+
         # Fallback: try numbers if adding
         if not change_last:
             for num in "0123456789":
@@ -300,18 +296,18 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                     new_key = tuple(base_tokens + [num])
                     if not _check_chord_conflicts(new_key, chords_to_check):
                         return new_chord
-        
+
         # Last resort
         if change_last:
             fallback = "a" if base_tokens[-1] != "a" else "b"
             return " ".join(base_tokens[:-1] + [fallback])
         else:
             return " ".join(base_tokens + ["x"])
-    
+
     def _find_conflicts(self, mappings):
         """Find all chord conflicts."""
         conflicts = {"prefix_conflicts": [], "duplicates": []}
-        
+
         # Organize mappings by context
         by_context = {}
         for m in mappings:
@@ -319,33 +315,33 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 continue
             ctx = getattr(m, "context", "VIEW_3D")
             by_context.setdefault(ctx, []).append(m)
-        
+
         for ctx, ctx_mappings in by_context.items():
             chord_map = {}
             all_chords = []
-            
+
             for m in ctx_mappings:
                 chord_str = get_str_attr(m, "chord")
                 tokens = split_chord(chord_str)
                 if not tokens:
                     continue
-                
+
                 all_chords.append(chord_str)
                 chord_key = tuple(tokens)
                 chord_map.setdefault(chord_key, []).append(m)
-            
+
             # Check for duplicates
             for chord_key, mappings_list in chord_map.items():
                 if len(mappings_list) > 1:
                     base_chord = " ".join(chord_key)
-                    
+
                     # Generate fixes for both strategies
                     fixes = {"add": [], "change_last": []}
-                    
+
                     for strategy in fixes:
                         temp_chords = list(all_chords)
                         used_symbols = []
-                        
+
                         for _ in mappings_list:
                             fix = self._generate_chord(
                                 base_chord, temp_chords,
@@ -354,14 +350,14 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                             )
                             fixes[strategy].append(fix)
                             temp_chords.append(fix)
-                            
+
                             # Track used symbol
                             fix_tokens = split_chord(fix)
                             if strategy == "change_last":
                                 used_symbols.append(fix_tokens[-1])
                             elif len(fix_tokens) > len(chord_key):
                                 used_symbols.append(fix_tokens[-1])
-                    
+
                     conflicts["duplicates"].append({
                         "chord": base_chord,
                         "context": ctx,
@@ -371,7 +367,7 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                         "suggested_fixes_add": fixes["add"],
                         "suggested_fixes_change_last": fixes["change_last"]
                     })
-            
+
             # Check for prefix conflicts
             chord_keys = list(chord_map.keys())
             for i, chord1 in enumerate(chord_keys):
@@ -383,10 +379,10 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                         prefix_key, full_key = chord2, chord1
                     else:
                         continue
-                    
+
                     prefix_chord = " ".join(prefix_key)
                     full_chord = " ".join(full_key)
-                    
+
                     conflicts["prefix_conflicts"].append({
                         "prefix_chord": prefix_chord,
                         "prefix_label": get_str_attr(chord_map[prefix_key][0], "label"),
@@ -396,5 +392,5 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                         "prefix_mapping": chord_map[prefix_key][0],
                         "suggested_fix": self._generate_chord(prefix_chord, all_chords, exclude_chord=full_chord)
                     })
-        
+
         return conflicts

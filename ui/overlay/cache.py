@@ -7,13 +7,11 @@ _overlay_cache = {
     "layout_data": None,
 }
 
-
 def clear_overlay_cache():
     """Clear the overlay cache. Call when mappings are updated."""
     _overlay_cache["buffer_tokens"] = None
     _overlay_cache["prefs_hash"] = None
     _overlay_cache["layout_data"] = None
-
 
 def get_prefs_hash(p, region_w, region_h):
     """Get a hash of preferences that affect overlay layout."""

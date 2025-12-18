@@ -9,7 +9,6 @@ from bpy.props import IntProperty, StringProperty
 
 from ..common import prefs
 
-
 class CHORDSONG_OT_Group_Rename(bpy.types.Operator):
     """Rename a group and update all mappings using it."""
 

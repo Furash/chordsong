@@ -21,11 +21,9 @@ from bpy.props import (
 from .layout import draw_addon_preferences
 from .nerd_icons import NERD_ICONS
 
-
 def _addon_root_pkg() -> str:
     # This module lives under "chordsong.ui", but AddonPreferences bl_idname must be "chordsong".
     return __package__.split(".", maxsplit=1)[0]
-
 
 def default_config_path() -> str:
     """
@@ -38,7 +36,6 @@ def default_config_path() -> str:
         return os.path.join(presets_dir, "chordsong", "chordsong.json")
     return ""
 
-
 def _autosave_now(prefs):
     # Best effort debounced autosave, used by property update callbacks.
     try:
@@ -48,7 +45,6 @@ def _autosave_now(prefs):
     except Exception:
         pass
 
-
 def _on_prefs_changed(self, _context):
     # Called when a preferences value changes.
     try:
@@ -56,7 +52,6 @@ def _on_prefs_changed(self, _context):
         _autosave_now(self)
     except Exception:
         pass
-
 
 def _on_mapping_changed(_self, context):
     # Called when a mapping item changes; fetch prefs via context.
@@ -67,7 +62,6 @@ def _on_mapping_changed(_self, context):
     except Exception:
         pass
 
-
 def _on_group_changed(_self, context):
     # Called when a group item changes; fetch prefs via context.
     try:
@@ -75,7 +69,6 @@ def _on_group_changed(_self, context):
         _autosave_now(prefs)
     except Exception:
         pass
-
 
 class CHORDSONG_PG_NerdIcon(PropertyGroup):
     """Nerd Font icon definition for searchable dropdown."""
@@ -89,7 +82,6 @@ class CHORDSONG_PG_NerdIcon(PropertyGroup):
         description="The actual Nerd Font icon character",
         default="",
     )
-
 
 class CHORDSONG_PG_Group(PropertyGroup):
     """Group property for organizing chord mappings."""
@@ -109,7 +101,6 @@ class CHORDSONG_PG_Group(PropertyGroup):
         description="Whether this group is expanded in the UI",
         default=False,
     )
-
 
 class CHORDSONG_PG_Mapping(PropertyGroup):
     """Mapping property group for chord-to-action mappings."""
@@ -201,7 +192,6 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     )
     enabled: BoolProperty(name="Enabled", default=True, update=_on_mapping_changed)
 
-
 class CHORDSONG_Preferences(AddonPreferences):
     """Chord Song addon preferences."""
 
@@ -215,7 +205,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         ),
         default="MAPPINGS",
     )
-    
+
     mapping_context_tab: EnumProperty(
         name="Mapping Context Tab",
         description="Select the editor context for chord mappings",
@@ -435,7 +425,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         max=2000,
         update=_on_prefs_changed,
     )
-    
+
     overlay_gap: IntProperty(
         name="Element Gap",
         description="Gap between icon, chord, and label elements",
@@ -488,7 +478,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     mappings: CollectionProperty(type=CHORDSONG_PG_Mapping)
     groups: CollectionProperty(type=CHORDSONG_PG_Group)
     nerd_icons: CollectionProperty(type=CHORDSONG_PG_NerdIcon)
-    
+
     ungrouped_expanded: BoolProperty(
         name="Ungrouped Expanded",
         description="Whether the Ungrouped section is expanded",

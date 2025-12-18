@@ -9,7 +9,6 @@ from bpy.props import IntProperty, StringProperty
 
 from .common import prefs
 
-
 class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
     """Select an icon from Nerd Fonts library."""
 
@@ -46,11 +45,11 @@ class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
         grid = layout.grid_flow(row_major=True, columns=4, even_columns=True, even_rows=True, align=True)
 
         search_lower = self.search_filter.lower()
-        
+
         # Create sorted list of (original_index, icon_item) tuples
         icon_list = [(idx, icon_item) for idx, icon_item in enumerate(p.nerd_icons)]
         icon_list.sort(key=lambda x: x[1].name.lower())
-        
+
         for idx, icon_item in icon_list:
             # Filter by search
             if search_lower and search_lower not in icon_item.name.lower():
@@ -65,7 +64,7 @@ class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
             )
             op.icon_index = idx
             op.mapping_index = self.mapping_index
-            
+
             # Show icon character below (will be gibberish but shows something)
             sub = col.row()
             sub.scale_y = 0.8
@@ -75,7 +74,6 @@ class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
     def execute(self, context):
         """Execute is called when dialog is confirmed, but we handle selection in apply operator."""
         return {"FINISHED"}
-
 
 class CHORDSONG_OT_Icon_Select_Apply(bpy.types.Operator):
     """Apply selected icon to mapping."""

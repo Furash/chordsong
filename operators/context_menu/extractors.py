@@ -2,19 +2,18 @@
 import re
 import bpy  # type: ignore
 
-
 def parse_operator_from_text(text):
     """Parse operator ID from text like 'bpy.ops.uv.weld()' or 'bpy.ops.uv.weld(...)'.
-    
+
     Args:
         text: Text string that may contain an operator call
-        
+
     Returns:
         Operator ID string (e.g., 'uv.weld') or None if not found
     """
     if not text:
         return None
-    
+
     # Pattern to match bpy.ops.module.operator_name(...)
     # Examples:
     # - bpy.ops.uv.weld()
@@ -26,15 +25,14 @@ def parse_operator_from_text(text):
         module = match.group(1)
         operator = match.group(2)
         return f"{module}.{operator}"
-    
-    return None
 
+    return None
 
 def extract_from_info_panel(context):
     """Try to extract operator from Info panel text or clipboard."""
     space = context.space_data
     area = context.area
-    
+
     is_info_panel = False
     if area and hasattr(area, 'type'):
         if area.type in ('INFO', 'CONSOLE'):
@@ -42,9 +40,9 @@ def extract_from_info_panel(context):
     elif space and hasattr(space, 'type'):
         if space.type in ('INFO', 'CONSOLE'):
             is_info_panel = True
-    
+
     operator = None
-    
+
     if is_info_panel:
         # Method 1: Try to get selected report text by copying it
         try:
@@ -65,7 +63,7 @@ def extract_from_info_panel(context):
                     pass
         except Exception:
             pass
-        
+
         # Method 2: Try to access reports directly from Info area
         if not operator and area and area.type == 'INFO':
             try:
@@ -78,7 +76,7 @@ def extract_from_info_panel(context):
                                 break
             except Exception:
                 pass
-        
+
         # Method 3: Check Info panel history (console history)
         if not operator and space and hasattr(space, 'history'):
             history = space.history
@@ -92,7 +90,7 @@ def extract_from_info_panel(context):
                         operator = parse_operator_from_text(entry)
                         if operator:
                             break
-    
+
     # Method 4: Try to get text from clipboard
     if not operator:
         try:
@@ -101,7 +99,7 @@ def extract_from_info_panel(context):
                 operator = parse_operator_from_text(clipboard)
         except Exception:
             pass
-            
+
     return operator
 
 def extract_from_button_pointer(button_pointer):
@@ -117,7 +115,7 @@ def extract_from_button_pointer(button_pointer):
         operator = parse_operator_from_text(button_pointer.body)
     elif isinstance(button_pointer, str):
         operator = parse_operator_from_text(button_pointer)
-    
+
     if operator:
         return operator, None
 
@@ -161,50 +159,48 @@ def extract_from_button_pointer(button_pointer):
 
     return operator, button_operator
 
-
 def extract_context_path(button_prop, button_pointer):
     """Attempt to construct a context path for a property."""
     path_parts = []
     prop_name = button_prop.identifier
-    
+
     if hasattr(button_pointer, "rna_type"):
         rna_type_name = button_pointer.rna_type.identifier
-        
+
         # Detect View3DOverlay (overlay properties in 3D viewport)
         if "View3DOverlay" in rna_type_name:
             path_parts = ["space_data", "overlay", prop_name]
-        
+
         # Detect View3DShading (shading properties)
         elif "View3DShading" in rna_type_name:
             path_parts = ["space_data", "shading", prop_name]
-        
+
         # Detect SpaceView3D (space properties)
         elif "SpaceView3D" in rna_type_name:
             path_parts = ["space_data", prop_name]
-        
+
         # Detect Scene
         elif "Scene" in rna_type_name:
             path_parts = ["scene", prop_name]
-        
+
         # Detect World
         elif "World" in rna_type_name:
             path_parts = ["world", prop_name]
-        
+
         # Detect ToolSettings
         elif "ToolSettings" in rna_type_name:
             path_parts = ["tool_settings", prop_name]
-        
+
         # Detect RenderSettings
         elif "RenderSettings" in rna_type_name:
             path_parts = ["scene", "render", prop_name]
-        
+
         else:
             path_parts = [prop_name]
     else:
         path_parts = [prop_name]
-    
-    return ".".join(path_parts)
 
+    return ".".join(path_parts)
 
 def detect_editor_context(context, operator=None):
     """Auto-detect editor context based on current editor or operator prefix."""
@@ -232,5 +228,5 @@ def detect_editor_context(context, operator=None):
                 return "GEOMETRY_NODE"
         elif space.type == 'IMAGE_EDITOR':
             return "IMAGE_EDITOR"
-            
+
     return "VIEW_3D"

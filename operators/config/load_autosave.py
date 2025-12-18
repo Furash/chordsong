@@ -10,7 +10,6 @@ from ...core.autosave import autosave_path
 from ...core.config_io import apply_config, loads_json
 from ..common import prefs
 
-
 class CHORDSONG_OT_Load_Autosave(bpy.types.Operator):
     bl_idname = "chordsong.load_autosave"
     bl_label = "Restore Autosave"
@@ -37,5 +36,3 @@ class CHORDSONG_OT_Load_Autosave(bpy.types.Operator):
             return {"CANCELLED"}
         finally:
             p._chordsong_suspend_autosave = False
-
-

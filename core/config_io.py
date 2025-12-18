@@ -5,9 +5,7 @@ import json
 import bpy  # type: ignore
 from .engine import parse_kwargs, get_str_attr, get_leader_key_type, set_leader_key_in_keymap
 
-
 CONFIG_VERSION = 1
-
 
 def dump_prefs(prefs) -> dict:
     """Serialize addon preferences to a JSON-serializable dict."""
@@ -27,7 +25,7 @@ def dump_prefs(prefs) -> dict:
             "context": getattr(m, "context", "VIEW_3D"),
             "mapping_type": mapping_type,
         }
-        
+
         if mapping_type == "PYTHON_FILE":
             mapping_dict["python_file"] = get_str_attr(m, "python_file")
         elif mapping_type == "CONTEXT_TOGGLE":
@@ -37,7 +35,7 @@ def dump_prefs(prefs) -> dict:
             mapping_dict["call_context"] = getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT"
             # Config format (v1): always a real JSON object.
             mapping_dict["kwargs"] = kwargs_obj
-        
+
         mappings.append(mapping_dict)
 
     # Serialize groups
@@ -86,14 +84,12 @@ def dump_prefs(prefs) -> dict:
         "mappings": mappings,
     }
 
-
 def _enum_items_as_set(prefs, prop_name: str) -> set:
     try:
         p = prefs.bl_rna.properties[prop_name]
         return {item.identifier for item in p.enum_items}
     except Exception:
         return set()
-
 
 def apply_config(prefs, data: dict) -> list[str]:
     """
@@ -113,7 +109,7 @@ def apply_config(prefs, data: dict) -> list[str]:
         scripts_folder = data.get("scripts_folder", "")
         if isinstance(scripts_folder, str):
             prefs.scripts_folder = scripts_folder.strip()
-    
+
     # Leader key
     if "leader_key" in data:
         leader_key = data.get("leader_key", "SPACE")
@@ -143,7 +139,7 @@ def apply_config(prefs, data: dict) -> list[str]:
         for key, attr in bool_props.items():
             if key in overlay:
                 setattr(prefs, attr, bool(overlay[key]))
-        
+
         # Integer properties - use a loop to reduce duplication
         int_props = {
             "max_items": "overlay_max_items",
@@ -161,26 +157,26 @@ def apply_config(prefs, data: dict) -> list[str]:
             "offset_x": "overlay_offset_x",
             "offset_y": "overlay_offset_y",
         }
-        
+
         # Float properties
         float_props = {
             "line_height": "overlay_line_height",
         }
-        
+
         for key, attr in float_props.items():
             if key in overlay:
                 try:
                     setattr(prefs, attr, float(overlay[key]))
                 except Exception:
                     warnings.append(f"Invalid overlay.{key}, keeping current")
-        
+
         for key, attr in int_props.items():
             if key in overlay:
                 try:
                     setattr(prefs, attr, int(overlay[key]))
                 except Exception:
                     warnings.append(f"Invalid overlay.{key}, keeping current")
-        
+
         # Color properties - use a loop
         color_props = {
             "color_chord": "overlay_color_chord",
@@ -192,7 +188,7 @@ def apply_config(prefs, data: dict) -> list[str]:
             "color_header_background": "overlay_header_background",
             "color_footer_background": "overlay_footer_background",
         }
-        
+
         for key, attr in color_props.items():
             if key in overlay:
                 v = overlay[key]
@@ -203,7 +199,7 @@ def apply_config(prefs, data: dict) -> list[str]:
                         warnings.append(f"Invalid overlay.{key}, keeping current")
                 else:
                     warnings.append(f"Invalid overlay.{key}, keeping current")
-        
+
         # Position enum
         pos = overlay.get("position", None)
         if isinstance(pos, str):
@@ -246,11 +242,11 @@ def apply_config(prefs, data: dict) -> list[str]:
         m.icon = (item.get("icon", "") or "").strip()
         m.group = (item.get("group", "") or "").strip()
         m.context = item.get("context", "VIEW_3D")
-        
+
         # Handle mapping type (default to OPERATOR for backward compatibility)
         mapping_type = item.get("mapping_type", "OPERATOR")
         m.mapping_type = mapping_type
-        
+
         if mapping_type == "PYTHON_FILE":
             m.python_file = (item.get("python_file", "") or "").strip()
             m.label = (
@@ -301,18 +297,15 @@ def apply_config(prefs, data: dict) -> list[str]:
             group_name = (getattr(m, "group", "") or "").strip()
             if group_name:
                 unique_groups.add(group_name)
-        
+
         for group_name in sorted(unique_groups):
             grp = prefs.groups.add()
             grp.name = group_name
 
     return warnings
 
-
 def loads_json(text: str) -> dict:
     v = json.loads(text)
     if not isinstance(v, dict):
         raise ValueError("Config root must be a JSON object")
     return v
-
-

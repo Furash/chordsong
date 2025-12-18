@@ -21,7 +21,6 @@ from ..utils.render import capture_viewport_context
 from .common import prefs
 from .test_overlay import disable_test_overlays
 
-
 # Global state for fading overlay
 _fading_overlay_state = {
     "active": False,
@@ -34,13 +33,10 @@ _fading_overlay_state = {
     "space_type": None,  # Store the space type for proper cleanup
 }
 
-# Note: Last chord tracking removed - now handled by history system (core/history.py)
-
-
 def _show_fading_overlay(context, chord_tokens, label, icon):
     """Start showing a fading overlay for the executed chord."""
     state = _fading_overlay_state
-    
+
     # Clean up any existing overlay
     if state["draw_handle"] is not None:
         try:
@@ -50,7 +46,7 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
                 bpy.types.SpaceView3D.draw_handler_remove(state["draw_handle"], "WINDOW")
         except Exception:
             pass
-    
+
     # Set up new fading overlay
     state["active"] = True
     state["chord_text"] = " ".join(chord_tokens)
@@ -58,7 +54,7 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
     state["icon"] = icon
     state["start_time"] = time.time()
     state["area"] = context.area
-    
+
     # Determine which space type to use for the draw handler
     space = context.space_data
     if space and space.type == 'NODE_EDITOR':
@@ -67,7 +63,7 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
         state["space_type"] = bpy.types.SpaceImageEditor
     else:
         state["space_type"] = bpy.types.SpaceView3D
-    
+
     # Add draw handler
     def draw_callback():
         try:
@@ -75,23 +71,23 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
             # Don't use temp_override here as it interferes with the drawing context
             p = prefs(bpy.context)
             still_active = draw_fading_overlay(
-                bpy.context, p, 
-                state["chord_text"], 
-                state["label"], 
-                state["icon"], 
+                bpy.context, p,
+                state["chord_text"],
+                state["label"],
+                state["icon"],
                 state["start_time"]
             )
-            
+
             if not still_active:
                 # Time to remove the overlay
                 _cleanup_fading_overlay()
         except Exception:
             _cleanup_fading_overlay()
-    
+
     state["draw_handle"] = state["space_type"].draw_handler_add(
         draw_callback, (), "WINDOW", "POST_PIXEL"
     )
-    
+
     # Helper function to tag all relevant areas for redraw
     def tag_all_views():
         try:
@@ -107,26 +103,25 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
                     state["area"].tag_redraw()
                 except Exception:
                     pass
-    
+
     # Immediately tag for redraw
     tag_all_views()
-    
+
     # Set up a timer to periodically redraw while fading
     def redraw_timer():
         if state["active"]:
             tag_all_views()
             return 0.03  # Redraw every 30ms for smooth fade
         return None
-    
+
     # Register timer with immediate first redraw
     bpy.app.timers.register(redraw_timer, first_interval=0.0)
-
 
 def _cleanup_fading_overlay():
     """Clean up the fading overlay."""
     state = _fading_overlay_state
     state["active"] = False
-    
+
     if state["draw_handle"] is not None:
         try:
             if state["space_type"]:
@@ -137,7 +132,7 @@ def _cleanup_fading_overlay():
             pass
         state["draw_handle"] = None
         state["space_type"] = None
-    
+
     # Tag all relevant areas for redraw to clear the overlay
     try:
         for window in bpy.context.window_manager.windows:
@@ -153,13 +148,10 @@ def _cleanup_fading_overlay():
             except Exception:
                 pass
 
-
 def cleanup_all_handlers():
     """Clean up all draw handlers and timers. Called on addon unregister."""
     _cleanup_fading_overlay()
     disable_test_overlays()
-    # Note: Last chord tracking removed - now handled by history system
-
 
 class CHORDSONG_OT_Leader(bpy.types.Operator):
     """Start chord capture (leader)"""
@@ -244,7 +236,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Normal case: use context directly
         # Filter mappings by context for overlay display
         filtered_mappings = filter_mappings_by_context(p.mappings, self._context_type)
-        
+
         # Use the buffer tokens for overlay rendering with filtered mappings
         buffer_tokens = self._buffer or []
         draw_overlay(context, p, buffer_tokens, filtered_mappings)
@@ -258,7 +250,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         self._buffer = []
         self._scroll_offset = 0
-        
+
         # Detect the current editor context
         self._context_type = self._detect_context(context)
 
@@ -266,7 +258,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         context.window_manager.modal_handler_add(self)
         self._tag_redraw()
         return {"RUNNING_MODAL"}
-    
+
     def _detect_context(self, context: bpy.types.Context) -> str:
         """Detect the current editor context."""
         space = context.space_data
@@ -337,7 +329,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         # Check if shift is pressed
         shift_pressed = event.shift
-        
+
         tok = normalize_token(event.type, shift=shift_pressed)
         if tok is None:
             return {"RUNNING_MODAL"}
@@ -364,14 +356,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         m = find_exact_mapping(filtered_mappings, self._buffer)
         if m:
             mapping_type = getattr(m, "mapping_type", "OPERATOR")
-            
+
             # Get label and icon for fading overlay
             label = getattr(m, "label", "") or "(no label)"
             icon = getattr(m, "icon", "") or ""
-            
+
             # Capture the buffer before finishing
             chord_tokens = list(self._buffer)
-            
+
             # Handle Python script execution
             if mapping_type == "PYTHON_FILE":
                 python_file = (getattr(m, "python_file", "") or "").strip()
@@ -379,13 +371,13 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     self.report({"WARNING"}, f'Chord "{" ".join(self._buffer)}" has no script file')
                     self._finish(context)
                     return {"CANCELLED"}
-                
+
                 # Capture viewport context BEFORE finishing modal (when we have valid context)
                 ctx_viewport = capture_viewport_context(context)
-                
+
                 # Finish modal before executing script
                 self._finish(context)
-                
+
                 # Execute Python script
                 def execute_script_delayed():
                     try:
@@ -393,15 +385,15 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         if not os.path.exists(python_file):
                             print(f"Chord Song: Script file not found: {python_file}")
                             return None
-                        
+
                         # Read and execute the script
                         with open(python_file, 'r', encoding='utf-8') as f:
                             script_text = f.read()
-                        
+
                         # Validate context before using it (may be invalid after undo)
                         from ..utils.render import validate_viewport_context
                         valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-                        
+
                         # Execute in Blender's context with captured viewport context
                         # Wrap temp_override in try/except as context may become invalid between validation and use.
                         if valid_ctx:
@@ -419,7 +411,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
                             # Show fading overlay on success
                             _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        
+
                         # Add to history
                         add_to_history(
                             chord_tokens=chord_tokens,
@@ -429,16 +421,16 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             python_file=python_file,
                             execution_context=ctx_viewport,
                         )
-                        
+
                     except Exception as e:
                         import traceback
                         print(f"Chord Song: Failed to execute script {python_file}: {e}")
                         traceback.print_exc()
                     return None
-                
+
                 bpy.app.timers.register(execute_script_delayed, first_interval=0.01)
                 return {"FINISHED"}
-            
+
             # Handle context toggle execution
             if mapping_type == "CONTEXT_TOGGLE":
                 context_path = (getattr(m, "context_path", "") or "").strip()
@@ -447,19 +439,19 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     print(f"Chord Song: Toggle mapping '{' '.join(self._buffer)}' is missing context_path property")
                     self._finish(context)
                     return {"CANCELLED"}
-                
+
                 # Validate that the context path has at least one part
                 if '.' not in context_path:
                     self.report({"ERROR"}, f'Invalid context path "{context_path}" - must include context (e.g., "space_data.overlay.show_stats")')
                     print(f"Chord Song: Invalid context path '{context_path}' for chord '{' '.join(self._buffer)}'")
                     self._finish(context)
                     return {"CANCELLED"}
-                
+
                 # Capture viewport context BEFORE finishing modal
                 ctx_viewport = capture_viewport_context(context)
-                
+
                 self._finish(context)
-                
+
                 def execute_toggle_delayed():
                     try:
                         # Define the toggle function to execute with proper context
@@ -468,44 +460,38 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             # e.g., "space_data.overlay.show_stats"
                             parts = context_path.split('.')
                             obj = bpy.context
-                            
+
                             # Navigate to the parent object
                             for i, part in enumerate(parts[:-1]):
                                 next_obj = getattr(obj, part, None)
                                 if next_obj is None:
                                     current_path = ".".join(parts[:i+1])
-                                    print(f"Chord Song: Could not find '{part}' in path '{context_path}'")
-                                    print(f"  -> Failed at: {current_path}")
-                                    print(f"  -> Available on context: {[attr for attr in dir(obj) if not attr.startswith('_')][:10]}...")
                                     return None
                                 obj = next_obj
-                            
+
                             # Get the property name
                             prop_name = parts[-1]
-                            
+
                             # Toggle the boolean value
                             if not hasattr(obj, prop_name):
-                                print(f"Chord Song: Could not find property '{prop_name}' in path '{context_path}'")
-                                print(f"  -> Object type: {type(obj).__name__}")
-                                print(f"  -> Available properties: {[attr for attr in dir(obj) if not attr.startswith('_')][:10]}...")
                                 return None
-                            
+
                             current_value = getattr(obj, prop_name)
-                            
+
                             if not isinstance(current_value, bool):
                                 print(f"Chord Song: Property '{context_path}' is not a boolean (got {type(current_value).__name__})")
                                 return None
-                            
+
                             # Toggle it
                             setattr(obj, prop_name, not current_value)
-                            
+
                             # Return the new state for the overlay message
                             return not current_value
-                        
+
                         # Validate context before using it (may be invalid after undo)
                         from ..utils.render import validate_viewport_context
                         valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-                        
+
                         # Execute with context override if available
                         # Wrap temp_override in try/except as context may become invalid between validation and use.
                         if valid_ctx:
@@ -529,7 +515,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             if new_value is not None:
                                 status = "ON" if new_value else "OFF"
                                 _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
-                        
+
                         # Add to history
                         add_to_history(
                             chord_tokens=chord_tokens,
@@ -539,16 +525,16 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             context_path=context_path,
                             execution_context=ctx_viewport,
                         )
-                        
+
                     except Exception as e:
                         import traceback
                         print(f"Chord Song: Failed to toggle context '{context_path}': {e}")
                         traceback.print_exc()
                     return None
-                
+
                 bpy.app.timers.register(execute_toggle_delayed, first_interval=0.01)
                 return {"FINISHED"}
-            
+
             # Handle operator execution
             op = (m.operator or "").strip()
             if not op:
@@ -590,11 +576,11 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             call_context=call_ctx,
                             execution_context=ctx_viewport,
                         )
-                    
+
                     # Validate context before using it (may be invalid after undo)
                     from ..utils.render import validate_viewport_context
                     valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-                    
+
                     # Execute operator with captured context override.
                     # Context was captured in modal() method (safe) but used in timer (outside draw).
                     # Fading overlay is shown inside temp_override for correct space detection.
@@ -631,7 +617,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             result_set = opfn('EXEC_DEFAULT', **kwargs)
                             if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
                                 show_success()
-                    
+
                 except Exception as e:
                     # Log error for debugging
                     import traceback
@@ -652,5 +638,3 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self.report({"WARNING"}, f'Unknown chord: "{" ".join(self._buffer)}"')
         self._finish(context)
         return {"CANCELLED"}
-
-

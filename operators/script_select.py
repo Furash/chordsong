@@ -10,7 +10,6 @@ from bpy.props import IntProperty, StringProperty
 
 from .common import prefs
 
-
 def fuzzy_match(query: str, text: str) -> tuple[bool, int]:
     """
     Fuzzy match query against text.
@@ -20,30 +19,30 @@ def fuzzy_match(query: str, text: str) -> tuple[bool, int]:
     """
     if not query:
         return True, 0
-    
+
     # Normalize: lowercase and treat underscores as spaces
     query = query.lower().replace('_', ' ')
     text = text.lower().replace('_', ' ')
-    
+
     # Quick substring check for exact matches (best score)
     if query in text:
         return True, text.index(query) * 10
-    
+
     # Fuzzy match: check if all query chars appear in order
     # Skip spaces in query for better matching (e.g., "my test" matches "mytest" or "my_test")
     query_chars = [c for c in query if c != ' ']
-    
+
     query_idx = 0
     text_idx = 0
     last_match_idx = -1
     score = 0
-    
+
     while query_idx < len(query_chars) and text_idx < len(text):
         # Skip spaces in text
         if text[text_idx] == ' ':
             text_idx += 1
             continue
-            
+
         if query_chars[query_idx] == text[text_idx]:
             # Calculate gap penalty
             if last_match_idx >= 0:
@@ -53,13 +52,12 @@ def fuzzy_match(query: str, text: str) -> tuple[bool, int]:
             last_match_idx = text_idx
             query_idx += 1
         text_idx += 1
-    
+
     # If we matched all query characters, it's a match
     if query_idx == len(query_chars):
         return True, score
-    
-    return False, float('inf')
 
+    return False, float('inf')
 
 class CHORDSONG_OT_Script_Select(bpy.types.Operator):
     """Select a Python script from the configured scripts folder."""
@@ -108,7 +106,7 @@ class CHORDSONG_OT_Script_Select(bpy.types.Operator):
                     full_path = os.path.join(scripts_folder, filename)
                     if os.path.isfile(full_path):
                         files.append((filename, full_path))
-            
+
             # Fuzzy filter and sort by match score
             if self.search_filter:
                 matched_files = []
@@ -122,18 +120,18 @@ class CHORDSONG_OT_Script_Select(bpy.types.Operator):
             else:
                 # No search filter - sort alphabetically
                 files.sort(key=lambda x: x[0].lower())
-            
+
             if not files:
                 if self.search_filter:
                     layout.label(text=f"No scripts found matching '{self.search_filter}'", icon="INFO")
                 else:
                     layout.label(text="No Python scripts found in folder", icon="INFO")
                 return
-            
+
             # Display scripts in a scrollable box
             box = layout.box()
             col = box.column(align=True)
-            
+
             for filename, full_path in files:
                 row = col.row(align=True)
                 op = row.operator(
@@ -144,14 +142,13 @@ class CHORDSONG_OT_Script_Select(bpy.types.Operator):
                 )
                 op.script_path = full_path
                 op.mapping_index = self.mapping_index
-                
+
         except Exception as e:
             layout.label(text=f"Error reading scripts folder: {str(e)}", icon="ERROR")
 
     def execute(self, context):
         """Execute is called when dialog is confirmed, but we handle selection in apply operator."""
         return {"FINISHED"}
-
 
 class CHORDSONG_OT_Script_Select_Apply(bpy.types.Operator):
     """Apply selected script to mapping."""
@@ -178,12 +175,12 @@ class CHORDSONG_OT_Script_Select_Apply(bpy.types.Operator):
         # Apply the script path
         mapping = p.mappings[self.mapping_index]
         mapping.python_file = self.script_path
-        
+
         # Set the label to the script name (without .py extension)
         script_name = os.path.basename(self.script_path)
         if script_name.endswith(".py"):
             script_name = script_name[:-3]
-        
+
         # Only set label if it's empty or generic
         if not mapping.label or mapping.label in ("New Chord", "(missing label)"):
             mapping.label = script_name
@@ -198,4 +195,3 @@ class CHORDSONG_OT_Script_Select_Apply(bpy.types.Operator):
                     area.tag_redraw()
 
         return {"FINISHED"}
-

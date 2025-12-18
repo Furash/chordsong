@@ -93,12 +93,10 @@ _classes = (
 
 _addon_keymaps = []
 
-
 def rebuild_keymaps():
     """Recreate add-on keymaps."""
     _unregister_keymaps()
     _register_keymaps()
-
 
 def _register_keymaps():
     # Bind leader key in multiple editors to start chord capture.
@@ -118,14 +116,14 @@ def _register_keymaps():
             if not km:
                 # Create new keymap if it doesn't exist
                 km = kc.keymaps.new(name=keymap_name, space_type=space_type)
-            
+
             # Check if keymap item already exists
             existing_kmi = None
             for item in km.keymap_items:
                 if item.idname == CHORDSONG_OT_Leader.bl_idname:
                     existing_kmi = item
                     break
-            
+
             if existing_kmi:
                 # Update existing keymap item
                 existing_kmi.type = leader_key
@@ -141,20 +139,19 @@ def _register_keymaps():
 
     # Register for 3D View
     _add_keymap_item("3D View", "VIEW_3D")
-    
+
     # Register for Node Editor (covers both Geometry Nodes and Shader Editor)
     _add_keymap_item("Node Editor", "NODE_EDITOR")
-    
+
     # Register for UV/Image Editor
-    # Try to find or create the Image Editor keymap
-    # First, try to find existing keymap with IMAGE_EDITOR space type
+    # Try to find existing keymap with IMAGE_EDITOR space type, or create one.
     image_editor_km = None
     for km_name in kc.keymaps.keys():
         km_test = kc.keymaps.get(km_name)
         if km_test and hasattr(km_test, 'space_type') and km_test.space_type == 'IMAGE_EDITOR':
             image_editor_km = km_test
             break
-    
+
     if image_editor_km:
         # Found existing Image Editor keymap, add our item to it
         existing_kmi = None
@@ -162,7 +159,7 @@ def _register_keymaps():
             if item.idname == CHORDSONG_OT_Leader.bl_idname:
                 existing_kmi = item
                 break
-        
+
         if existing_kmi:
             existing_kmi.type = leader_key
             existing_kmi.value = "PRESS"
@@ -182,7 +179,6 @@ def _register_keymaps():
             except Exception:
                 continue
 
-
 def _unregister_keymaps():
     for km, kmi in _addon_keymaps:
         try:
@@ -190,7 +186,6 @@ def _unregister_keymaps():
         except Exception:
             pass
     _addon_keymaps.clear()
-
 
 def register():
     """Register addon classes and keymaps."""
@@ -226,7 +221,6 @@ def register():
             pass
     except Exception:
         pass
-
 
 def unregister():
     """Unregister addon classes and keymaps."""

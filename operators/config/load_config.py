@@ -11,7 +11,6 @@ from bpy.props import StringProperty  # type: ignore
 from ...core.config_io import apply_config, loads_json
 from ..common import prefs
 
-
 class CHORDSONG_OT_Load_Config(bpy.types.Operator, ImportHelper):
     bl_idname = "chordsong.load_config"
     bl_label = "Load User Config"
@@ -45,5 +44,3 @@ class CHORDSONG_OT_Load_Config(bpy.types.Operator, ImportHelper):
             return {"CANCELLED"}
         finally:
             p._chordsong_suspend_autosave = False
-
-

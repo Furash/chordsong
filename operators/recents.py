@@ -19,7 +19,6 @@ from ..utils.render import (
 )
 from .common import prefs
 
-
 def _create_context_wrapper(ctx_viewport):
     """Create a context wrapper with captured viewport context."""
     class ContextWrapper:
@@ -29,9 +28,8 @@ def _create_context_wrapper(ctx_viewport):
             if name in self._ctx_viewport:
                 return self._ctx_viewport[name]
             return getattr(bpy.context, name)
-    
-    return ContextWrapper(ctx_viewport) if ctx_viewport else bpy.context
 
+    return ContextWrapper(ctx_viewport) if ctx_viewport else bpy.context
 
 class CHORDSONG_OT_Recents(bpy.types.Operator):
     """Show recent chord invocations and execute selected one"""
@@ -64,7 +62,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             draw_overlay_footer,
             draw_icon
         )
-        
+
         try:
             import blf  # type: ignore
             import gpu  # type: ignore
@@ -115,7 +113,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 punctuation = "`~,.<>:;'\"[]{}"
                 punct_idx = idx - 74
                 return punctuation[punct_idx] if punct_idx < len(punctuation) else "?"
-        
+
         # Build header
         num_entries = len(entries)
         if num_entries == 0:
@@ -154,7 +152,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # Calculate column layout
         column_rows = p.overlay_column_rows
         num_columns = (max_items + column_rows - 1) // column_rows  # Ceiling division
-        
+
         # Calculate column widths
         blf.size(0, chord_size)
         max_hotkey_w = 0.0
@@ -194,27 +192,27 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # 2. Draw Footer & List Background
         # Calculate from current_y (bottom of header) not y (top of header)
         footer_y = current_y - (items_per_column * line_h) - chord_size
-        
+
         # Determine footer visibility and position
         footer_bg_top = footer_y + chord_size # Default if no footer
-        
+
         if p.overlay_show_footer:
             footer_items = [
                 {"token": "ESC", "label": "Close", "icon": ""}
             ]
-            
+
             # Use prefs for footer text size
             footer_text_size_base = getattr(p, "overlay_font_size_footer", 12)
             footer_text_size = max(int(footer_text_size_base * scale_factor), 10)
-            
+
             # We need mock max_token_w/max_label_w for footer spacing calculation
             blf.size(0, footer_text_size)
-            f_token_w, _ = blf.dimensions(0, "<ESC>") 
+            f_token_w, _ = blf.dimensions(0, "<ESC>")
             blf.size(0, body_size)
             f_label_w, _ = blf.dimensions(0, "Close")
-            
+
             footer_bg_top = draw_overlay_footer(
-                p, region_w, footer_y, footer_items, footer_text_size, footer_text_size, scale_factor, 
+                p, region_w, footer_y, footer_items, footer_text_size, footer_text_size, scale_factor,
                 icon_size, f_token_w, f_label_w
             )
         else:
@@ -231,24 +229,24 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # start_y calculation in recents was originally:
         # y -= int(header_size / 2 + text_height * 0.75 + chord_size)
         # which matches draw_overlay_header return value
-        
+
         current_y = current_y
         current_column = 0
         column_x = x
-        
+
         for i, entry in enumerate(visible_entries):
             # Check if we need to start a new column
             if i > 0 and i % column_rows == 0:
                 current_column += 1
                 column_x = x + current_column * (col_w + col_spacing)
                 current_y = y - int(header_size / 2 + (max(header_size, body_size) * 1.3) * 0.75 + chord_size) # Reset to top of column
-            
+
             # Column positions
             hotkey_col_x = column_x
             icon_col_x = column_x + max_hotkey_w + gap
             chord_col_x = icon_col_x + icon_size + gap
             label_col_x = chord_col_x + max_chord_w + gap
-            
+
             # Draw hotkey (1-9, a-z)
             hotkey_text = index_to_hotkey(i)
             blf.size(0, chord_size)
@@ -287,7 +285,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         self._buffer = []
         self._draw_manager = DrawHandlerManager()
         self._draw_manager.ensure_handler(context, self._draw_callback, p)
-        
+
         context.window_manager.modal_handler_add(self)
         self._draw_manager.tag_redraw()
         return {"RUNNING_MODAL"}
@@ -386,7 +384,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                         return {"CANCELLED"}
             except ValueError:
                 pass
-        
+
         # Handle lowercase letter keys (a-z for items 10-35)
         if tok and len(tok) == 1 and tok.isalpha() and tok.islower():
             # a=10th item (index 9), b=11th (index 10), etc.
@@ -399,7 +397,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 self.report({"WARNING"}, f"No history entry at position '{tok}'")
                 self._finish(context)
                 return {"CANCELLED"}
-        
+
         # Handle uppercase letter keys (A-Z for items 36-61)
         if tok and len(tok) == 1 and tok.isalpha() and tok.isupper():
             # A=36th item (index 35), B=37th (index 36), etc.
@@ -412,7 +410,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 self.report({"WARNING"}, f"No history entry at position '{tok}'")
                 self._finish(context)
                 return {"CANCELLED"}
-        
+
         # Handle shifted number keys (!@#$%^&*() for items 62-71)
         if tok and tok in "!@#$%^&*()":
             shifted_map = {"!": 0, "@": 1, "#": 2, "$": 3, "%": 4, "^": 5, "&": 6, "*": 7, "(": 8, ")": 9}
@@ -426,7 +424,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                     self.report({"WARNING"}, f"No history entry at position '{tok}'")
                     self._finish(context)
                     return {"CANCELLED"}
-        
+
         # Handle extra keys (-=+ for items 72-74)
         if tok and tok in "-=+":
             extra_map = {"-": 71, "=": 72, "+": 73}
@@ -440,7 +438,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                     self.report({"WARNING"}, f"No history entry at position '{tok}'")
                     self._finish(context)
                     return {"CANCELLED"}
-        
+
         # Handle punctuation keys (`~,.<>:;'"[]{} for items 75-88)
         if tok and tok in "`~,.<>:;'\"[]{}":
             punct_map = {
@@ -459,6 +457,6 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                     self.report({"WARNING"}, f"No history entry at position '{tok}'")
                     self._finish(context)
                     return {"CANCELLED"}
-        
+
         # Unknown key, ignore
         return {"RUNNING_MODAL"}

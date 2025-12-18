@@ -15,7 +15,7 @@ NERD_ICONS = [
     ("Torus", ""),
     ("Cone", "󱥌"),
     ("Pyramid", "󱥒"),
-    
+
     # Mesh & Geometry
     ("Mesh", "󰕠"),
     ("Vertices", "󰕡"),
@@ -28,7 +28,7 @@ NERD_ICONS = [
 
     # Unreal
     ("Unreal", "󰦱"),
-    
+
     # File & Folder Operations
     ("File", "󰈔"),
     ("File Open", "󰷏"),
@@ -43,7 +43,7 @@ NERD_ICONS = [
     ("Upload", "󰕒"),
     ("Archive", "󰀼"),
     ("Package", "󰏗"),
-    
+
     # Git & Version Control
     ("Git", "󰊢"),
     ("GitHub", ""),
@@ -54,7 +54,7 @@ NERD_ICONS = [
     ("Push", "󰶣"),
     ("Diff", ""),
     ("History", "󰋚"),
-    
+
     # Camera & View
     ("Camera", "󰄀"),
     ("Camera Alt", ""),
@@ -65,7 +65,7 @@ NERD_ICONS = [
     ("Zoom In", ""),
     ("Zoom Out", ""),
     ("Crosshair", ""),
-    
+
     # Transform & Edit
     ("Move", "󰜷"),
     ("Arrows", "󰘁"),
@@ -76,7 +76,7 @@ NERD_ICONS = [
     ("Cursor", "󰇀"),
     ("Select", "󰒅"),
     ("Deselect", "󱟁"),
-    
+
     # Edit Tools
     ("Edit", "󰤌"),
     ("Pencil", "󰏫"),
@@ -90,7 +90,7 @@ NERD_ICONS = [
     ("Copy", "󰆏"),
     ("Paste", "󰆒"),
     ("Puzzle", "󰐱"),
-    
+
     # Materials & Shading
     ("Material", ""),
     ("Shader", "󰌁"),
@@ -101,14 +101,14 @@ NERD_ICONS = [
     ("Image", "󰥶"),
     ("Layers", ""),
     ("Eyedropper", ""),
-    
+
     # Lighting
     ("Light", "󰛨"),
     ("Sun", "󰖙"),
     ("Spotlight", "󰓉"),
     ("Flash", "󱐋"),
     ("Brightness", "󰃟"),
-    
+
     # Animation & Timeline
     ("Animation", "󰐎"),
     ("Keyframe", "󰐕"),
@@ -121,11 +121,11 @@ NERD_ICONS = [
     ("Skip Back", "󰒮"),
     ("Fast Forward", "󰒫"),
     ("Rewind", "󰑟"),
-    
+
     # Rendering
     ("Render", "󰹑"),
     ("Film", "󰕧"),
-    
+
     # Modifiers & Effects
     ("Modifier", ""),
     ("Array", "󱗼"),
@@ -135,7 +135,7 @@ NERD_ICONS = [
     ("Bevel", "󰘇"),
     ("Wave", "󰥛"),
     ("Sparkle", ""),
-    
+
     # Physics & Simulation
     ("Physics", ""),
     ("Particle", "󰙥"),
@@ -145,7 +145,7 @@ NERD_ICONS = [
     ("Smoke", ""),
     ("Cloud", ""),
     ("Wind", "󰖝"),
-    
+
     # Constraints & Rigging
     ("Link", "󰌷"),
     ("Chain", ""),
@@ -154,7 +154,7 @@ NERD_ICONS = [
     ("Anchor", ""),
     ("Lock", "󰌾"),
     ("Unlock", ""),
-    
+
     # UI & Navigation
     ("Menu", "󰮫"),
     ("Hamburger", "󰚅"),
@@ -167,7 +167,7 @@ NERD_ICONS = [
     ("Sliders", ""),
     ("Wrench", ""),
     ("Tool", "󱌣"),
-    
+
     # Actions
     ("Add", ""),
     ("Plus", "󰐕"),
@@ -179,7 +179,7 @@ NERD_ICONS = [
     ("X", "󰅖"),
     ("Check", ""),
     ("Checkmark", "󰄬"),
-    
+
     # Arrows & Navigation
     ("Arrow Up", "󰁝"),
     ("Arrow Down", "󰁅"),
@@ -189,7 +189,7 @@ NERD_ICONS = [
     ("Redo", "󰑎"),
     ("Refresh", "󰑓"),
     ("Sync", "󰓦"),
-    
+
     # Information & Status
     ("Info", "󰋽"),
     ("Help", "󰋖"),
@@ -201,7 +201,7 @@ NERD_ICONS = [
     ("Star", "󰓎"),
     ("Bookmark", "󰃀"),
     ("Tag", "󰓹"),
-    
+
     # Development
     ("Code", ""),
     ("Terminal", ""),
@@ -210,7 +210,7 @@ NERD_ICONS = [
     ("Script", "󰯂"),
     ("Bug", "󰃤"),
     ("Debug", "󰃤"),
-    
+
     # Miscellaneous
     ("Pin", "󰐃"),
     ("Magnet", ""),

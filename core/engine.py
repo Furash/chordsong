@@ -1,11 +1,9 @@
 import json
 from dataclasses import dataclass
 
-
 def get_str_attr(obj, attr, default=""):
     """Get string attribute with fallback and strip whitespace."""
     return (getattr(obj, attr, default) or default).strip()
-
 
 def normalize_token(event_type: str, shift: bool = False):
     """
@@ -14,7 +12,7 @@ def normalize_token(event_type: str, shift: bool = False):
     - Letters: lowercase by default, uppercase if shift is pressed.
     - Digits remain digits.
     - Ignore pure modifiers and non-keyboard noise.
-    
+
     Args:
         event_type: The Blender event type string
         shift: Whether shift key is pressed
@@ -77,10 +75,8 @@ def normalize_token(event_type: str, shift: bool = False):
     }
     return named.get(event_type, None)
 
-
 def split_chord(chord: str):
     return [t for t in (chord or "").strip().split() if t]
-
 
 @dataclass(frozen=True)
 class Candidate:
@@ -89,7 +85,6 @@ class Candidate:
     group: str
     icon: str = ""
     is_final: bool = False  # True if this is the last token in the chord
-
 
 def build_match_sets(mappings):
     """
@@ -109,7 +104,6 @@ def build_match_sets(mappings):
             prefixes.add(chord_tokens[:i])
     return exact, prefixes
 
-
 def find_exact_mapping(mappings, buffer_tokens):
     bt = tuple(buffer_tokens)
     for m in mappings:
@@ -118,7 +112,6 @@ def find_exact_mapping(mappings, buffer_tokens):
         if tuple(split_chord(get_str_attr(m, "chord"))) == bt:
             return m
     return None
-
 
 def candidates_for_prefix(mappings, buffer_tokens):
     """
@@ -130,13 +123,13 @@ def candidates_for_prefix(mappings, buffer_tokens):
     for m in mappings:
         if not getattr(m, "enabled", True):
             continue
-        
+
         # Skip chordsong.recents operator - it's only shown in footer
         if getattr(m, "mapping_type", "") == "OPERATOR":
             operator = get_str_attr(m, "operator")
             if operator == "chordsong.recents":
                 continue
-        
+
         tokens = split_chord(get_str_attr(m, "chord"))
         if not tokens:
             continue
@@ -158,23 +151,22 @@ def candidates_for_prefix(mappings, buffer_tokens):
             out[nxt] = Candidate(nxt, label, group, icon, is_final)
     return list(out.values())
 
-
 def parse_kwargs(kwargs_json: str) -> dict:
     if not (kwargs_json or "").strip():
         return {}
-    
+
     # Try JSON format first
     try:
         v = json.loads(kwargs_json)
         return v if isinstance(v, dict) else {}
     except (ValueError, TypeError):
         pass
-    
+
     # Try Python-like format: key = value, key2 = value2
     try:
         import ast
         import re
-        
+
         # Parse Python-like assignment format
         result = {}
         # Split by commas, but respect quoted strings
@@ -191,34 +183,33 @@ def parse_kwargs(kwargs_json: str) -> dict:
                 current.append(char)
         if current:
             parts.append(''.join(current).strip())
-        
+
         # Parse each key = value pair
         for part in parts:
             if '=' in part:
                 key, value = part.split('=', 1)
                 key = key.strip()
                 value = value.strip()
-                
+
                 # Try to evaluate the value
                 try:
                     result[key] = ast.literal_eval(value)
                 except (ValueError, SyntaxError):
                     # Keep as string if can't evaluate
                     result[key] = value.strip('"\'')
-        
+
         return result
     except Exception:
         return {}
 
-
 def filter_mappings_by_context(mappings, context_type: str):
     """
     Filter mappings by editor context.
-    
+
     Args:
         mappings: Collection of mapping objects
         context_type: One of "VIEW_3D", "GEOMETRY_NODE", "SHADER_EDITOR", "IMAGE_EDITOR"
-    
+
     Returns:
         List of mappings matching the context
     """
@@ -230,10 +221,9 @@ def filter_mappings_by_context(mappings, context_type: str):
             filtered.append(m)
     return filtered
 
-
 def get_leader_key_type() -> str:
     """Get the current leader key type from the addon keymap.
-    
+
     Returns:
         The Blender key type string (e.g., "SPACE", "ACCENT_GRAVE")
     """
@@ -243,24 +233,23 @@ def get_leader_key_type() -> str:
         kc = wm.keyconfigs.addon
         if not kc:
             return "SPACE"
-        
+
         km = kc.keymaps.get("3D View")
         if not km:
             return "SPACE"
-        
+
         # Find the leader keymap item
         for kmi in km.keymap_items:
             if kmi.idname == "chordsong.leader":
                 return kmi.type
-        
+
         return "SPACE"
     except Exception:
         return "SPACE"
 
-
 def get_leader_key_token() -> str:
     """Get the current leader key as a display token.
-    
+
     Returns:
         A human-readable token string for display (e.g., "space", "grave")
     """
@@ -270,11 +259,11 @@ def get_leader_key_token() -> str:
         kc = wm.keyconfigs.addon
         if not kc:
             return "<Leader>"
-        
+
         km = kc.keymaps.get("3D View")
         if not km:
             return "<Leader>"
-        
+
         # Find the leader keymap item
         for kmi in km.keymap_items:
             if kmi.idname == "chordsong.leader":
@@ -287,15 +276,14 @@ def get_leader_key_token() -> str:
                 if kmi.type:
                     return kmi.type.lower()
                 return "<Leader>"
-        
+
         return "<Leader>"
     except Exception:
         return "<Leader>"
 
-
 def set_leader_key_in_keymap(key_type: str):
     """Set the leader key type in all addon keymaps.
-    
+
     Args:
         key_type: Blender key type string (e.g., "SPACE", "ACCENT_GRAVE")
     """
@@ -305,7 +293,7 @@ def set_leader_key_in_keymap(key_type: str):
         kc = wm.keyconfigs.addon
         if not kc:
             return
-        
+
         # Update leader key in all registered keymaps
         keymap_names = ["3D View", "Node Editor", "Image Editor"]
         for km_name in keymap_names:
@@ -317,5 +305,3 @@ def set_leader_key_in_keymap(key_type: str):
                         break
     except Exception:
         pass
-
-

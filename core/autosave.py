@@ -11,16 +11,13 @@ from .config_io import dump_prefs
 # Debounced autosave: schedule a single write after N seconds since the last change.
 _DEFAULT_DELAY_S = 3.0
 
-
 @dataclass
 class _AutosaveState:
     """Module state for debounced autosave."""
     pending_prefs: Any = None
     pending_delay_s: float = _DEFAULT_DELAY_S
 
-
 _state = _AutosaveState()
-
 
 def autosave_path(config_path: str) -> str:
     """
@@ -33,7 +30,6 @@ def autosave_path(config_path: str) -> str:
     if not ext:
         return config_path + ".autosave"
     return base + ".autosave" + ext
-
 
 def write_autosave(prefs) -> str:
     """
@@ -57,7 +53,6 @@ def write_autosave(prefs) -> str:
 
     return path
 
-
 def _timer_cb():
     """
     Blender app timer callback. Runs once, writes autosave, then stops.
@@ -74,7 +69,6 @@ def _timer_cb():
         # Best effort autosave; never crash Blender.
         return None
     return None
-
 
 def schedule_autosave(prefs, delay_s: float | None = None):
     """
@@ -99,5 +93,3 @@ def schedule_autosave(prefs, delay_s: float | None = None):
     except Exception:
         # If timers aren't available, do nothing.
         return
-
-

@@ -6,7 +6,6 @@ import bpy  # type: ignore
 
 from ..common import prefs
 
-
 class CHORDSONG_OT_Load_Default(bpy.types.Operator):
     bl_idname = "chordsong.load_default"
     bl_label = "Load Default Chord Song Config"

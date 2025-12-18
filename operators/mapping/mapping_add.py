@@ -7,7 +7,6 @@ from bpy.props import StringProperty, EnumProperty  # type: ignore
 
 from ..common import prefs
 
-
 class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
     bl_idname = "chordsong.mapping_add"
     bl_label = "Add New Chord"
@@ -18,7 +17,7 @@ class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
         description="Group to assign to the new chord",
         default="",
     )
-    
+
     context: EnumProperty(
         name="Context",
         description="Editor context for the new chord",
@@ -53,5 +52,3 @@ class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
         schedule_autosave_safe(p, delay_s=5.0)
 
         return {"FINISHED"}
-
-

@@ -8,7 +8,6 @@ import bpy
 
 from ..common import prefs
 
-
 class CHORDSONG_OT_Group_Cleanup(bpy.types.Operator):
     """Clean up duplicate groups and sync with mappings."""
 

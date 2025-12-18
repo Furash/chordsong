@@ -6,28 +6,25 @@
 
 import bpy  # type: ignore
 
-
 # Keys to capture from context for viewport operations
 VIEWPORT_CONTEXT_KEYS = ("area", "region", "space_data", "window", "screen")
-
 
 class ContextWrapper:
     """Wrapper to access dictionary keys as attributes, falling back to bpy.context."""
     def __init__(self, ctx_dict):
         self._ctx = ctx_dict
-    
+
     def __getattr__(self, name):
         if name in self._ctx:
             return self._ctx[name]
         return getattr(bpy.context, name)
 
-
 def capture_viewport_context(context) -> dict:
     """Capture viewport context for use in deferred operations.
-    
+
     Args:
         context: Blender context object
-        
+
     Returns:
         Dictionary of captured context values
     """
@@ -38,24 +35,23 @@ def capture_viewport_context(context) -> dict:
             ctx_viewport[key] = val
     return ctx_viewport
 
-
 def validate_viewport_context(ctx_viewport) -> dict:
     """Validate that captured viewport context is still valid.
-    
+
     After undo or other operations, context objects (area, region, etc.) can become
     invalid. This function checks if they're still valid by testing property access.
     We don't check membership in parent collections because after undo, objects may
     be recreated but still be functionally valid for temp_override.
-    
+
     Args:
         ctx_viewport: Dictionary of captured context values
-        
+
     Returns:
         Validated context dictionary, or empty dict if context is invalid
     """
     if not ctx_viewport:
         return {}
-    
+
     try:
         # Check if window is still valid by trying to access its properties
         window = ctx_viewport.get("window")
@@ -65,7 +61,7 @@ def validate_viewport_context(ctx_viewport) -> dict:
                 _ = window.screen
             except (AttributeError, RuntimeError, ReferenceError):
                 return {}
-        
+
         # Check if screen is still valid
         screen = ctx_viewport.get("screen")
         if screen:
@@ -74,7 +70,7 @@ def validate_viewport_context(ctx_viewport) -> dict:
                 _ = screen.areas
             except (AttributeError, RuntimeError, ReferenceError):
                 return {}
-        
+
         # Check if area is still valid
         area = ctx_viewport.get("area")
         if area:
@@ -84,7 +80,7 @@ def validate_viewport_context(ctx_viewport) -> dict:
                 _ = area.spaces
             except (AttributeError, RuntimeError, ReferenceError):
                 return {}
-        
+
         # Check if region is still valid
         region = ctx_viewport.get("region")
         if region:
@@ -93,7 +89,7 @@ def validate_viewport_context(ctx_viewport) -> dict:
                 _ = region.type
             except (AttributeError, RuntimeError, ReferenceError):
                 return {}
-        
+
         # Check if space_data is still valid
         space_data = ctx_viewport.get("space_data")
         if space_data:
@@ -102,24 +98,23 @@ def validate_viewport_context(ctx_viewport) -> dict:
                 _ = space_data.type
             except (AttributeError, RuntimeError, ReferenceError):
                 return {}
-        
+
         # All objects are still valid (can access properties)
         # Note: We don't check membership in parent collections because after undo,
         # Blender may recreate UI objects, making membership checks fail even though
         # the objects are still valid for use in temp_override
         return ctx_viewport
-        
+
     except (AttributeError, RuntimeError, ReferenceError):
         # Context objects are invalid (freed by Blender)
         return {}
 
-
 def calculate_scale_factor(context) -> float:
     """Calculate UI scale factor for fonts and spacing.
-    
+
     Args:
         context: Blender context object
-        
+
     Returns:
         Scale factor as a float
     """
@@ -133,10 +128,9 @@ def calculate_scale_factor(context) -> float:
         except Exception:
             return 1.0
 
-
 def calculate_overlay_position(prefs, region_w, region_h, block_w, block_h, pad_x, pad_y):
     """Calculate overlay position based on anchor setting.
-    
+
     Args:
         prefs: Addon preferences with overlay_position
         region_w: Region width
@@ -145,7 +139,7 @@ def calculate_overlay_position(prefs, region_w, region_h, block_w, block_h, pad_
         block_h: Block height
         pad_x: Horizontal padding
         pad_y: Vertical padding
-        
+
     Returns:
         Tuple of (x, y) coordinates
     """
@@ -163,24 +157,23 @@ def calculate_overlay_position(prefs, region_w, region_h, block_w, block_h, pad_
     else:  # TOP_LEFT
         return pad_x, region_h - pad_y
 
-
 class DrawHandlerManager:
     """Manages draw handlers for modal operators."""
-    
+
     def __init__(self):
         self._draw_handle = None
         self._area = None
         self._region = None
         self._space_type = None
-    
+
     def ensure_handler(self, context, callback, prefs):
         """Set up draw handler if not already active."""
         if not prefs.overlay_enabled or self._draw_handle is not None:
             return
-        
+
         self._area = context.area
         self._region = context.region
-        
+
         # Determine which space type to use
         space = context.space_data
         if space and space.type == 'NODE_EDITOR':
@@ -191,11 +184,11 @@ class DrawHandlerManager:
         else:
             # Default to 3D View
             self._space_type = bpy.types.SpaceView3D
-        
+
         self._draw_handle = self._space_type.draw_handler_add(
             callback, (), "WINDOW", "POST_PIXEL"
         )
-    
+
     def remove_handler(self):
         """Remove draw handler if active."""
         if self._draw_handle is None:
@@ -209,7 +202,7 @@ class DrawHandlerManager:
             pass
         self._draw_handle = None
         self._space_type = None
-    
+
     def tag_redraw(self):
         """Request redraw for the area."""
         if self._area:
@@ -217,19 +210,18 @@ class DrawHandlerManager:
                 self._area.tag_redraw()
             except Exception:
                 pass
-    
+
     @property
     def area(self):
         return self._area
-    
+
     @property
     def region(self):
         return self._region
 
-
 def execute_history_entry_operator(context, entry):
     """Execute an operator from history entry.
-    
+
     Returns:
         tuple: (success: bool, error_message: str or None)
     """
@@ -237,10 +229,10 @@ def execute_history_entry_operator(context, entry):
         mod_name, fn_name = entry.operator.split(".", 1)
         opmod = getattr(bpy.ops, mod_name)
         opfn = getattr(opmod, fn_name)
-        
+
         kwargs = entry.kwargs or {}
         call_ctx = entry.call_context or "EXEC_DEFAULT"
-        
+
         # Use execution context from history if available
         if hasattr(entry, 'execution_context') and entry.execution_context:
             ctx_viewport = entry.execution_context
@@ -252,7 +244,7 @@ def execute_history_entry_operator(context, entry):
             # Fallback for old history entries or missing context
             ctx_viewport = capture_viewport_context(context)
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-        
+
         if call_ctx == "INVOKE_DEFAULT":
             if valid_ctx:
                 try:
@@ -273,12 +265,12 @@ def execute_history_entry_operator(context, entry):
                     result_set = opfn('EXEC_DEFAULT', **kwargs)
             else:
                 result_set = opfn('EXEC_DEFAULT', **kwargs)
-        
+
         # Check if successful
         if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
             return True, None
         return False, None
-        
+
     except Exception as e:
         import traceback
         error_msg = f"Failed to execute operator {entry.operator}: {e}"
@@ -286,10 +278,9 @@ def execute_history_entry_operator(context, entry):
         traceback.print_exc()
         return False, error_msg
 
-
 def execute_history_entry_script(context, entry):
     """Execute a Python script from history entry.
-    
+
     Returns:
         tuple: (success: bool, error_message: str or None)
     """
@@ -299,7 +290,7 @@ def execute_history_entry_script(context, entry):
             error_msg = f"Script file not found: {entry.python_file}"
             print(f"Chord Song: {error_msg}")
             return False, error_msg
-        
+
         # Use execution context from history if available
         if hasattr(entry, 'execution_context') and entry.execution_context:
             ctx_viewport = entry.execution_context
@@ -311,10 +302,10 @@ def execute_history_entry_script(context, entry):
             # Fallback for old history entries or missing context
             ctx_viewport = capture_viewport_context(context)
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-        
+
         with open(entry.python_file, 'r', encoding='utf-8') as f:
             script_text = f.read()
-        
+
         if valid_ctx:
             try:
                 with bpy.context.temp_override(**valid_ctx):
@@ -324,9 +315,9 @@ def execute_history_entry_script(context, entry):
                 exec(compile(script_text, entry.python_file, 'exec'))  # pylint: disable=exec-used
         else:
             exec(compile(script_text, entry.python_file, 'exec'))  # pylint: disable=exec-used
-        
+
         return True, None
-        
+
     except Exception as e:
         import traceback
         error_msg = f"Failed to execute script {entry.python_file}: {e}"
@@ -334,29 +325,28 @@ def execute_history_entry_script(context, entry):
         traceback.print_exc()
         return False, error_msg
 
-
 def execute_history_entry_toggle(context, entry):
     """Execute a context toggle from history entry.
-    
+
     Returns:
         tuple: (success: bool, new_value: bool or None)
     """
     try:
         # Use execution context from history if available
         effective_context = context
-        
+
         if hasattr(entry, 'execution_context') and entry.execution_context:
             ctx_viewport = entry.execution_context
             # Must validate because the area might be closed
             valid_ctx = validate_viewport_context(ctx_viewport)
             if not valid_ctx:
                 return False, "Operator area not found"
-                
+
         else:
             # Fallback for old history entries or missing context
             ctx_viewport = capture_viewport_context(context)
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-        
+
         if valid_ctx:
             effective_context = ContextWrapper(valid_ctx)
 
@@ -375,7 +365,7 @@ def execute_history_entry_toggle(context, entry):
                 return None
             setattr(obj, prop_name, not current_value)
             return not current_value
-        
+
         if valid_ctx:
             try:
                 with bpy.context.temp_override(**valid_ctx):
@@ -385,11 +375,11 @@ def execute_history_entry_toggle(context, entry):
                 new_value = do_toggle()
         else:
             new_value = do_toggle()
-        
+
         if new_value is not None:
             return True, new_value
         return False, None
-        
+
     except Exception as e:
         import traceback
         print(f"Chord Song: Failed to toggle context '{entry.context_path}': {e}")

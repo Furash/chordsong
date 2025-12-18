@@ -4,7 +4,6 @@
 
 import bpy  # type: ignore
 
-
 class CHORDSONG_OT_Open_Keymap(bpy.types.Operator):
     bl_idname = "chordsong.open_keymap"
     bl_label = "Open Keymap Preferences"
@@ -19,5 +18,3 @@ class CHORDSONG_OT_Open_Keymap(bpy.types.Operator):
         except Exception:
             self.report({"INFO"}, "Open Preferences → Keymap → Add-ons → Chord Song")
             return {"FINISHED"}
-
-

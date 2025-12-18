@@ -9,7 +9,6 @@ from bpy.props import IntProperty, EnumProperty
 
 from ..common import prefs
 
-
 def _get_available_groups(_self, context):
     """Get list of available groups for selection."""
     p = prefs(context)
@@ -20,7 +19,6 @@ def _get_available_groups(_self, context):
             items.append((grp.name, grp.name, f"Assign to {grp.name}"))
 
     return items if len(items) > 1 else [("", "(No Groups)", "No groups available")]
-
 
 class CHORDSONG_OT_Group_Select(bpy.types.Operator):
     """Select group from existing groups for a mapping."""

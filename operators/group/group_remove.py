@@ -9,7 +9,6 @@ from bpy.props import EnumProperty, IntProperty
 
 from ..common import prefs
 
-
 def _get_target_groups(self, context):
     """Get list of target groups for reassignment."""
     p = prefs(context)
@@ -20,7 +19,6 @@ def _get_target_groups(self, context):
             items.append((grp.name, grp.name, f"Reassign to {grp.name}"))
 
     return items
-
 
 class CHORDSONG_OT_Group_Remove(bpy.types.Operator):
     """Remove a group and optionally reassign its mappings."""

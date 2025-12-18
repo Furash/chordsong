@@ -7,7 +7,6 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Optional
 
-
 @dataclass
 class HistoryEntry:
     """Represents a single chord invocation in history."""
@@ -25,67 +24,63 @@ class HistoryEntry:
     context_path: Optional[str] = None
     execution_context: Optional[dict] = None
 
-
 class ChordHistory:
     """Manages a limited history of chord invocations."""
-    
+
     def __init__(self, max_size: int = 88):
         """Initialize history with maximum size."""
         self._history = deque(maxlen=max_size)
         self._max_size = max_size
-    
+
     def add(self, entry: HistoryEntry):
         """Add a new entry to history (most recent at the front)."""
         # Check if this exact chord is already at the front
         # If so, we REMOVE the old one and ADD the new one (to update execution_context)
         if self._history and self._are_entries_equal(self._history[0], entry):
             self._history.popleft()
-        
+
         # Add to front of deque
         self._history.appendleft(entry)
-    
+
     def _are_entries_equal(self, entry1: HistoryEntry, entry2: HistoryEntry) -> bool:
         """Check if two entries represent the same command."""
         if entry1.mapping_type != entry2.mapping_type:
             return False
-        
+
         if entry1.mapping_type == "OPERATOR":
-            return (entry1.operator == entry2.operator and 
+            return (entry1.operator == entry2.operator and
                     entry1.kwargs == entry2.kwargs)
         elif entry1.mapping_type == "PYTHON_FILE":
             return entry1.python_file == entry2.python_file
         elif entry1.mapping_type == "CONTEXT_TOGGLE":
             return entry1.context_path == entry2.context_path
-        
+
         return False
-    
+
     def get_all(self) -> list:
         """Get all history entries (most recent first)."""
         return list(self._history)
-    
+
     def get(self, index: int) -> Optional[HistoryEntry]:
         """Get entry at specific index (0-based, 0 is most recent)."""
         if 0 <= index < len(self._history):
             return self._history[index]
         return None
-    
+
     def clear(self):
         """Clear all history."""
         self._history.clear()
-    
+
     def __len__(self):
         """Return number of entries in history."""
         return len(self._history)
 
-
 # Global history instance (88 = 9 + 26 + 26 + 10 + 3 + 14 punctuation)
 _global_history = ChordHistory(max_size=88)
-
 
 def get_history() -> ChordHistory:
     """Get the global history instance."""
     return _global_history
-
 
 def add_to_history(
     chord_tokens: list,
