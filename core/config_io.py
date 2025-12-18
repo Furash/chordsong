@@ -64,6 +64,9 @@ def dump_prefs(prefs) -> dict:
             "color_header": list(getattr(prefs, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))),
             "color_icon": list(getattr(prefs, "overlay_color_icon", (0.8, 0.8, 0.8, 0.7))),
             "color_recents_hotkey": list(getattr(prefs, "overlay_color_recents_hotkey", (0.65, 0.8, 1.0, 1.0))),
+            "color_list_background": list(getattr(prefs, "overlay_list_background", (0.0, 0.0, 0.0, 0.35))),
+            "color_header_background": list(getattr(prefs, "overlay_header_background", (0.0, 0.0, 0.0, 0.35))),
+            "color_footer_background": list(getattr(prefs, "overlay_footer_background", (0.0, 0.0, 0.0, 0.35))),
             "gap": int(getattr(prefs, "overlay_gap", 10)),
             "column_gap": int(getattr(prefs, "overlay_column_gap", 30)),
             "line_height": float(getattr(prefs, "overlay_line_height", 1.5)),
@@ -171,6 +174,9 @@ def apply_config(prefs, data: dict) -> list[str]:
             "color_header": "overlay_color_header",
             "color_icon": "overlay_color_icon",
             "color_recents_hotkey": "overlay_color_recents_hotkey",
+            "color_list_background": "overlay_list_background",
+            "color_header_background": "overlay_header_background",
+            "color_footer_background": "overlay_footer_background",
         }
         
         for key, attr in color_props.items():

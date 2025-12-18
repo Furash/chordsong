@@ -23,6 +23,7 @@ class HistoryEntry:
     python_file: Optional[str] = None
     # Context toggle-specific field
     context_path: Optional[str] = None
+    execution_context: Optional[dict] = None
 
 
 class ChordHistory:
@@ -36,9 +37,9 @@ class ChordHistory:
     def add(self, entry: HistoryEntry):
         """Add a new entry to history (most recent at the front)."""
         # Check if this exact chord is already at the front
-        # If so, don't add it again (avoid duplicate consecutive entries)
+        # If so, we REMOVE the old one and ADD the new one (to update execution_context)
         if self._history and self._are_entries_equal(self._history[0], entry):
-            return
+            self._history.popleft()
         
         # Add to front of deque
         self._history.appendleft(entry)
@@ -96,6 +97,7 @@ def add_to_history(
     call_context: Optional[str] = None,
     python_file: Optional[str] = None,
     context_path: Optional[str] = None,
+    execution_context: Optional[dict] = None,
 ):
     """Convenience function to add an entry to global history."""
     entry = HistoryEntry(
@@ -108,5 +110,6 @@ def add_to_history(
         call_context=call_context,
         python_file=python_file,
         context_path=context_path,
+        execution_context=execution_context,
     )
     _global_history.add(entry)

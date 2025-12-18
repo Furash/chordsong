@@ -48,6 +48,9 @@ def get_prefs_hash(p, region_w, region_h):
         p.overlay_footer_gap,
         p.overlay_footer_token_gap,
         p.overlay_footer_label_gap,
+        p.overlay_list_background,
+        p.overlay_header_background,
+        p.overlay_footer_background,
         region_w,
         region_h,
     )
@@ -193,7 +196,7 @@ def draw_icon(icon_text, x, y, size):
 
 
 def render_overlay(_context, p, columns, footer, x, y, header, header_size, chord_size, body_size,
-                   max_token_w, gap, col_w, col_gap, line_h, icon_size, block_w, max_label_w, region_w, header_w):
+                   max_token_w, gap, col_w, col_gap, line_h, icon_size, block_w, block_h, max_label_w, region_w, header_w, header_h):
     """Render the overlay at the calculated position."""
     import blf  # type: ignore
     
@@ -232,7 +235,7 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
     indices = ((0, 1, 2), (0, 2, 3))
     batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
     shader.bind()
-    shader.uniform_float("color", (0.0, 0.0, 0.0, 0.35))
+    shader.uniform_float("color", p.overlay_header_background)
     batch.draw(shader)
     
     # Restore default blending
@@ -251,6 +254,113 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
     start_y = y
     current_size = header_size  # Track current font size to avoid redundant blf.size() calls
     
+    # Calculate list background dimensions
+    # Total height of the list block
+    list_height = block_h - header_h
+    # list center y is start_y minus half list height, roughly?
+    # Actually we can calculate explicit bounds
+    # Top of list area is roughly start_y + something? 
+    # Let's use the full calculated block_h approach but cleaner.
+    
+    # We know start_y is where the first item starts drawing.
+    # The bottom is determined by max_rows_in_any
+    
+    # Let's rely on the block_h calculated in layout phase?
+    # In layout phase: block_h = int(header_h + (line_h * (max_rows_in_any + footer_rows + 2)))
+    # But we don't pass block_h to render_overlay fully correct or we do? Yes, block_h is passed.
+    
+    # Calculate background rect for list area
+    # y is currently below the header.
+    # We want a full width background covering the list area.
+    
+    # Calculate top of list area to perfectly mate with header background
+    # Header background bottom is at bg_y1 from header section
+    # Reuse the same calculation logic for continuity
+    header_text_center_y = y + (header_size / 2) + (header_size / 2 + text_height * 0.75 + chord_size) # Reverse the y decrement
+    # Actually, simpler: we know header bg bottom is:
+    # y (before decrement) + header_size/2 - text_height * 0.75
+    # The current y is y (after decrement).
+    # current_y = old_y - (header_size/2 + text_height * 0.75 + chord_size)
+    # So old_y = current_y + ...
+    # Let's just recalculate relative to current y?
+    # No, let's use the layout knowledge.
+    
+    # Header BG bottom was:
+    # text_center_y - (text_height * 0.75)
+    # text_center_y = old_y + header_size/2
+    # So bottom = old_y + header_size/2 - text_height * 0.75
+    
+    # We want list_bg_top = Header BG bottom.
+    # We know current y (start_y)
+    # gap = header_size + chord_size - line_h * 0.5 (from analysis)
+    # So list_bg_top should be start_y + gap?
+    # Let's try to reconstruct exact boundary.
+    
+    # Re-calculate header metrics to match exactly
+    h_text_height = max(header_size, body_size) * 1.3
+    # We need to reverse the y-shift to get back to header baseline
+    header_draw_y = start_y + int(header_size / 2 + h_text_height * 0.75 + chord_size)
+    header_center_y = header_draw_y + (header_size / 2)
+    header_bg_bottom = header_center_y - (h_text_height * 0.75)
+    
+    list_bg_top = header_bg_bottom
+
+    
+    # Calculate bottom of list area (below footer if present, or last row)
+    # Total list area height
+    # num_rows = len(columns[0]) if columns else 0
+    # Actually, we should probably just use the footer position if available, or calculate based on rows.
+    
+    # If footer exists, it is at footer_y.
+    # footer_y = start_y - (len(columns[0]) * line_h if columns and columns[0] else 0) - chord_size
+    # So bottom would be below footer.
+    
+    # Use block_h to guess?
+    # block_h in layout included header.
+    
+    # Let's calculate fresh based on what we are about to draw.
+    num_rows = max(len(c) for c in columns) if columns else 0
+    list_content_height = num_rows * line_h
+    
+    list_bg_bottom = start_y - list_content_height - line_h * 0.5
+    
+    if footer:
+        # Footer is further down
+        footer_y = start_y - (len(columns[0]) * line_h if columns and columns[0] else 0) - chord_size
+        
+        # Calculate footer background top to perfectly mate with it
+        f_text_height = max(chord_size, body_size) * 1.3
+        f_text_center_y = footer_y + (chord_size / 2)
+        f_bg_top = f_text_center_y + (f_text_height * 0.45)
+        
+        list_bg_bottom = f_bg_top
+    else:
+        # If no footer, extend to bottom
+        list_bg_bottom = start_y - list_content_height - line_h * 0.5
+        
+    # Draw list background
+    col_list_bg = p.overlay_list_background
+    if col_list_bg[3] > 0.001:  # Only draw if visible
+        bg_x1 = 0
+        bg_x2 = region_w
+        bg_y1 = list_bg_bottom
+        bg_y2 = list_bg_top
+        
+        gpu.state.blend_set('ALPHA')
+        shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+        vertices = (
+            (bg_x1, bg_y1),
+            (bg_x2, bg_y1),
+            (bg_x2, bg_y2),
+            (bg_x1, bg_y2),
+        )
+        indices = ((0, 1, 2), (0, 2, 3))
+        batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
+        shader.bind()
+        shader.uniform_float("color", col_list_bg)
+        batch.draw(shader)
+        gpu.state.blend_set('NONE')
+
     for col_idx, col_rows in enumerate(columns):
         cx = x + col_idx * (col_w + col_gap)
         cy = start_y
@@ -343,7 +453,7 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         indices = ((0, 1, 2), (0, 2, 3))
         batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
         shader.bind()
-        shader.uniform_float("color", (0.0, 0.0, 0.0, 0.35))
+        shader.uniform_float("color", p.overlay_footer_background)
         batch.draw(shader)
         
         # Restore default blending
@@ -500,7 +610,9 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
             "line_h": line_h,
             "icon_size": icon_size,
             "block_w": block_w,
+            "block_h": block_h,
             "max_label_w": max_label_w,
+            "header_h": header_h,
         }
 
         _overlay_cache["buffer_tokens"] = buffer_key
@@ -525,9 +637,11 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         layout["line_h"],
         layout["icon_size"],
         layout["block_w"],
+        layout["block_h"],
         layout["max_label_w"],
         region_w,
         layout["header_w"],
+        layout["header_h"],
     )
 
 

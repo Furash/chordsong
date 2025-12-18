@@ -98,6 +98,9 @@ def draw_addon_preferences(prefs, _context, layout):
         col1.label(text="Icon:")
         col1.label(text="Header:")
         col1.label(text="Recents Hotkey:")
+        col1.label(text="List Background:")
+        col1.label(text="Header Background:")
+        col1.label(text="Footer Background:")
         
         # Second column - color pickers
         col2.prop(prefs, "overlay_color_chord", text="")
@@ -105,6 +108,9 @@ def draw_addon_preferences(prefs, _context, layout):
         col2.prop(prefs, "overlay_color_icon", text="")
         col2.prop(prefs, "overlay_color_header", text="")
         col2.prop(prefs, "overlay_color_recents_hotkey", text="")
+        col2.prop(prefs, "overlay_list_background", text="")
+        col2.prop(prefs, "overlay_header_background", text="")
+        col2.prop(prefs, "overlay_footer_background", text="")
         
         col3.separator()
         col4.separator()

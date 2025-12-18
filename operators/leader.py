@@ -423,6 +423,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             icon=icon,
                             mapping_type="PYTHON_FILE",
                             python_file=python_file,
+                            execution_context=ctx_viewport,
                         )
                         
                     except Exception as e:
@@ -532,6 +533,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             icon=icon,
                             mapping_type="CONTEXT_TOGGLE",
                             context_path=context_path,
+                            execution_context=ctx_viewport,
                         )
                         
                     except Exception as e:
@@ -582,6 +584,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             operator=op,
                             kwargs=kwargs,
                             call_context=call_ctx,
+                            execution_context=ctx_viewport,
                         )
                     
                     # Validate context before using it (may be invalid after undo)

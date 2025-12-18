@@ -342,6 +342,36 @@ class CHORDSONG_Preferences(AddonPreferences):
         default=(0.65, 0.80, 1.00, 1.00),
         update=_on_prefs_changed,
     )
+    overlay_list_background: FloatVectorProperty(
+        name="List background",
+        description="Background color for the chords list area",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(0.0, 0.0, 0.0, 0.35),
+        update=_on_prefs_changed,
+    )
+    overlay_header_background: FloatVectorProperty(
+        name="Header background",
+        description="Background color for the header area",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(0.0, 0.0, 0.0, 0.35),
+        update=_on_prefs_changed,
+    )
+    overlay_footer_background: FloatVectorProperty(
+        name="Footer background",
+        description="Background color for the footer area",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(0.0, 0.0, 0.0, 0.35),
+        update=_on_prefs_changed,
+    )
 
     overlay_position: EnumProperty(
         name="Position",
@@ -351,6 +381,8 @@ class CHORDSONG_Preferences(AddonPreferences):
             ("TOP_RIGHT", "Top Right", ""),
             ("BOTTOM_LEFT", "Bottom Left", ""),
             ("BOTTOM_RIGHT", "Bottom Right", ""),
+            ("CENTER_TOP", "Center Top", ""),
+            ("CENTER_BOTTOM", "Center Bottom", ""),
         ),
         default="BOTTOM_LEFT",
         update=_on_prefs_changed,
@@ -358,14 +390,14 @@ class CHORDSONG_Preferences(AddonPreferences):
     overlay_offset_x: IntProperty(
         name="Offset X",
         default=14,
-        min=0,
+        min=-2000,
         max=2000,
         update=_on_prefs_changed,
     )
     overlay_offset_y: IntProperty(
         name="Offset Y",
         default=14,
-        min=0,
+        min=-2000,
         max=2000,
         update=_on_prefs_changed,
     )

@@ -350,9 +350,11 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 from ..utils.render import validate_viewport_context
                 valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                 ctx_wrapper = _create_context_wrapper(valid_ctx)
-                success, _ = execute_history_entry_operator(ctx_wrapper, entry)
+                success, error_msg = execute_history_entry_operator(ctx_wrapper, entry)
                 if success:
                     _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
+                elif error_msg:
+                    _show_fading_overlay(bpy.context, entry.chord_tokens, error_msg, "CANCEL")
                 return None
 
             bpy.app.timers.register(execute_operator_delayed, first_interval=0.01)
@@ -363,9 +365,11 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 from ..utils.render import validate_viewport_context
                 valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                 ctx_wrapper = _create_context_wrapper(valid_ctx)
-                success, _ = execute_history_entry_script(ctx_wrapper, entry)
+                success, error_msg = execute_history_entry_script(ctx_wrapper, entry)
                 if success:
                     _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
+                elif error_msg:
+                    _show_fading_overlay(bpy.context, entry.chord_tokens, error_msg, "CANCEL")
                 return None
 
             bpy.app.timers.register(execute_script_delayed, first_interval=0.01)
@@ -376,10 +380,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 from ..utils.render import validate_viewport_context
                 valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                 ctx_wrapper = _create_context_wrapper(valid_ctx)
-                success, new_value = execute_history_entry_toggle(ctx_wrapper, entry)
-                if success and new_value is not None:
-                    status = "ON" if new_value else "OFF"
+                success, result = execute_history_entry_toggle(ctx_wrapper, entry)
+                if success and result is not None:
+                    status = "ON" if result else "OFF"
                     _show_fading_overlay(bpy.context, entry.chord_tokens, f"{entry.label} ({status})", entry.icon)
+                elif not success and isinstance(result, str):
+                    _show_fading_overlay(bpy.context, entry.chord_tokens, result, "CANCEL")
                 return None
 
             bpy.app.timers.register(execute_toggle_delayed, first_interval=0.01)

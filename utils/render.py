@@ -11,6 +11,17 @@ import bpy  # type: ignore
 VIEWPORT_CONTEXT_KEYS = ("area", "region", "space_data", "window", "screen")
 
 
+class ContextWrapper:
+    """Wrapper to access dictionary keys as attributes, falling back to bpy.context."""
+    def __init__(self, ctx_dict):
+        self._ctx = ctx_dict
+    
+    def __getattr__(self, name):
+        if name in self._ctx:
+            return self._ctx[name]
+        return getattr(bpy.context, name)
+
+
 def capture_viewport_context(context) -> dict:
     """Capture viewport context for use in deferred operations.
     
@@ -145,6 +156,10 @@ def calculate_overlay_position(prefs, region_w, region_h, block_w, block_h, pad_
         return pad_x, pad_y + block_h
     elif pos == "BOTTOM_RIGHT":
         return region_w - pad_x - block_w, pad_y + block_h
+    elif pos == "CENTER_TOP":
+        return (region_w - block_w) // 2 + pad_x, region_h - pad_y
+    elif pos == "CENTER_BOTTOM":
+        return (region_w - block_w) // 2 + pad_x, pad_y + block_h
     else:  # TOP_LEFT
         return pad_x, region_h - pad_y
 
@@ -226,9 +241,17 @@ def execute_history_entry_operator(context, entry):
         kwargs = entry.kwargs or {}
         call_ctx = entry.call_context or "EXEC_DEFAULT"
         
-        # Capture and validate viewport context
-        ctx_viewport = capture_viewport_context(context)
-        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+        # Use execution context from history if available
+        if hasattr(entry, 'execution_context') and entry.execution_context:
+            ctx_viewport = entry.execution_context
+            # Must validate because the area might be closed
+            valid_ctx = validate_viewport_context(ctx_viewport)
+            if not valid_ctx:
+                return False, "Operator area not found"
+        else:
+            # Fallback for old history entries or missing context
+            ctx_viewport = capture_viewport_context(context)
+            valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
         
         if call_ctx == "INVOKE_DEFAULT":
             if valid_ctx:
@@ -277,9 +300,17 @@ def execute_history_entry_script(context, entry):
             print(f"Chord Song: {error_msg}")
             return False, error_msg
         
-        # Capture and validate viewport context
-        ctx_viewport = capture_viewport_context(context)
-        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+        # Use execution context from history if available
+        if hasattr(entry, 'execution_context') and entry.execution_context:
+            ctx_viewport = entry.execution_context
+            # Must validate because the area might be closed
+            valid_ctx = validate_viewport_context(ctx_viewport)
+            if not valid_ctx:
+                return False, "Operator area not found"
+        else:
+            # Fallback for old history entries or missing context
+            ctx_viewport = capture_viewport_context(context)
+            valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
         
         with open(entry.python_file, 'r', encoding='utf-8') as f:
             script_text = f.read()
@@ -311,13 +342,27 @@ def execute_history_entry_toggle(context, entry):
         tuple: (success: bool, new_value: bool or None)
     """
     try:
-        # Capture and validate viewport context
-        ctx_viewport = capture_viewport_context(context)
-        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+        # Use execution context from history if available
+        effective_context = context
         
+        if hasattr(entry, 'execution_context') and entry.execution_context:
+            ctx_viewport = entry.execution_context
+            # Must validate because the area might be closed
+            valid_ctx = validate_viewport_context(ctx_viewport)
+            if not valid_ctx:
+                return False, "Operator area not found"
+                
+        else:
+            # Fallback for old history entries or missing context
+            ctx_viewport = capture_viewport_context(context)
+            valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+        
+        if valid_ctx:
+            effective_context = ContextWrapper(valid_ctx)
+
         def do_toggle():
             parts = entry.context_path.split('.')
-            obj = bpy.context
+            obj = effective_context
             for part in parts[:-1]:
                 obj = getattr(obj, part, None)
                 if obj is None:
@@ -349,4 +394,4 @@ def execute_history_entry_toggle(context, entry):
         import traceback
         print(f"Chord Song: Failed to toggle context '{entry.context_path}': {e}")
         traceback.print_exc()
-        return False, None
+        return False, str(e)
