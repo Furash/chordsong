@@ -346,7 +346,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # Execute based on mapping type
         if entry.mapping_type == "OPERATOR":
             def execute_operator_delayed():
-                ctx_wrapper = _create_context_wrapper(ctx_viewport)
+                # Validate context before using it (may be invalid after undo)
+                from ..utils.render import validate_viewport_context
+                valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                ctx_wrapper = _create_context_wrapper(valid_ctx)
                 success, _ = execute_history_entry_operator(ctx_wrapper, entry)
                 if success:
                     _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
@@ -356,7 +359,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         elif entry.mapping_type == "PYTHON_FILE":
             def execute_script_delayed():
-                ctx_wrapper = _create_context_wrapper(ctx_viewport)
+                # Validate context before using it (may be invalid after undo)
+                from ..utils.render import validate_viewport_context
+                valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                ctx_wrapper = _create_context_wrapper(valid_ctx)
                 success, _ = execute_history_entry_script(ctx_wrapper, entry)
                 if success:
                     _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
@@ -366,7 +372,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         elif entry.mapping_type == "CONTEXT_TOGGLE":
             def execute_toggle_delayed():
-                ctx_wrapper = _create_context_wrapper(ctx_viewport)
+                # Validate context before using it (may be invalid after undo)
+                from ..utils.render import validate_viewport_context
+                valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                ctx_wrapper = _create_context_wrapper(valid_ctx)
                 success, new_value = execute_history_entry_toggle(ctx_wrapper, entry)
                 if success and new_value is not None:
                     status = "ON" if new_value else "OFF"

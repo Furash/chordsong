@@ -28,6 +28,81 @@ def capture_viewport_context(context) -> dict:
     return ctx_viewport
 
 
+def validate_viewport_context(ctx_viewport) -> dict:
+    """Validate that captured viewport context is still valid.
+    
+    After undo or other operations, context objects (area, region, etc.) can become
+    invalid. This function checks if they're still valid by testing property access.
+    We don't check membership in parent collections because after undo, objects may
+    be recreated but still be functionally valid for temp_override.
+    
+    Args:
+        ctx_viewport: Dictionary of captured context values
+        
+    Returns:
+        Validated context dictionary, or empty dict if context is invalid
+    """
+    if not ctx_viewport:
+        return {}
+    
+    try:
+        # Check if window is still valid by trying to access its properties
+        window = ctx_viewport.get("window")
+        if window:
+            try:
+                # Try to access a property to see if window is still valid
+                _ = window.screen
+            except (AttributeError, RuntimeError, ReferenceError):
+                return {}
+        
+        # Check if screen is still valid
+        screen = ctx_viewport.get("screen")
+        if screen:
+            try:
+                # Try to access a property to see if screen is still valid
+                _ = screen.areas
+            except (AttributeError, RuntimeError, ReferenceError):
+                return {}
+        
+        # Check if area is still valid
+        area = ctx_viewport.get("area")
+        if area:
+            try:
+                # Try to access properties to see if area is still valid
+                _ = area.type
+                _ = area.spaces
+            except (AttributeError, RuntimeError, ReferenceError):
+                return {}
+        
+        # Check if region is still valid
+        region = ctx_viewport.get("region")
+        if region:
+            try:
+                # Try to access a property to see if region is still valid
+                _ = region.type
+            except (AttributeError, RuntimeError, ReferenceError):
+                return {}
+        
+        # Check if space_data is still valid
+        space_data = ctx_viewport.get("space_data")
+        if space_data:
+            try:
+                # Try to access a property to see if space_data is still valid
+                _ = space_data.type
+            except (AttributeError, RuntimeError, ReferenceError):
+                return {}
+        
+        # All objects are still valid (can access properties)
+        # Note: We don't check membership in parent collections because after undo,
+        # Blender may recreate UI objects, making membership checks fail even though
+        # the objects are still valid for use in temp_override
+        return ctx_viewport
+        
+    except (AttributeError, RuntimeError, ReferenceError):
+        # Context objects are invalid (freed by Blender)
+        return {}
+
+
 def calculate_scale_factor(context) -> float:
     """Calculate UI scale factor for fonts and spacing.
     
@@ -151,18 +226,27 @@ def execute_history_entry_operator(context, entry):
         kwargs = entry.kwargs or {}
         call_ctx = entry.call_context or "EXEC_DEFAULT"
         
-        # Capture viewport context
+        # Capture and validate viewport context
         ctx_viewport = capture_viewport_context(context)
+        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
         
         if call_ctx == "INVOKE_DEFAULT":
-            if ctx_viewport:
-                with bpy.context.temp_override(**ctx_viewport):
+            if valid_ctx:
+                try:
+                    with bpy.context.temp_override(**valid_ctx):
+                        result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                    # Context became invalid, fall back to default context
                     result_set = opfn('INVOKE_DEFAULT', **kwargs)
             else:
                 result_set = opfn('INVOKE_DEFAULT', **kwargs)
         else:
-            if ctx_viewport:
-                with bpy.context.temp_override(**ctx_viewport):
+            if valid_ctx:
+                try:
+                    with bpy.context.temp_override(**valid_ctx):
+                        result_set = opfn('EXEC_DEFAULT', **kwargs)
+                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                    # Context became invalid, fall back to default context
                     result_set = opfn('EXEC_DEFAULT', **kwargs)
             else:
                 result_set = opfn('EXEC_DEFAULT', **kwargs)
@@ -193,14 +277,19 @@ def execute_history_entry_script(context, entry):
             print(f"Chord Song: {error_msg}")
             return False, error_msg
         
-        # Capture viewport context
+        # Capture and validate viewport context
         ctx_viewport = capture_viewport_context(context)
+        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
         
         with open(entry.python_file, 'r', encoding='utf-8') as f:
             script_text = f.read()
         
-        if ctx_viewport:
-            with bpy.context.temp_override(**ctx_viewport):
+        if valid_ctx:
+            try:
+                with bpy.context.temp_override(**valid_ctx):
+                    exec(compile(script_text, entry.python_file, 'exec'))  # pylint: disable=exec-used
+            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                # Context became invalid, fall back to default context
                 exec(compile(script_text, entry.python_file, 'exec'))  # pylint: disable=exec-used
         else:
             exec(compile(script_text, entry.python_file, 'exec'))  # pylint: disable=exec-used
@@ -222,8 +311,9 @@ def execute_history_entry_toggle(context, entry):
         tuple: (success: bool, new_value: bool or None)
     """
     try:
-        # Capture viewport context
+        # Capture and validate viewport context
         ctx_viewport = capture_viewport_context(context)
+        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
         
         def do_toggle():
             parts = entry.context_path.split('.')
@@ -241,8 +331,12 @@ def execute_history_entry_toggle(context, entry):
             setattr(obj, prop_name, not current_value)
             return not current_value
         
-        if ctx_viewport:
-            with bpy.context.temp_override(**ctx_viewport):
+        if valid_ctx:
+            try:
+                with bpy.context.temp_override(**valid_ctx):
+                    new_value = do_toggle()
+            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                # Context became invalid, fall back to default context
                 new_value = do_toggle()
         else:
             new_value = do_toggle()

@@ -394,11 +394,22 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         with open(python_file, 'r', encoding='utf-8') as f:
                             script_text = f.read()
                         
+                        # Validate context before using it (may be invalid after undo)
+                        from ..utils.render import validate_viewport_context
+                        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                        
                         # Execute in Blender's context with captured viewport context
-                        if ctx_viewport:
-                            with bpy.context.temp_override(**ctx_viewport):
+                        # Wrap temp_override in try/except as context may become invalid between validation and use.
+                        if valid_ctx:
+                            try:
+                                with bpy.context.temp_override(**valid_ctx):
+                                    exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
+                                    # Show fading overlay on success (inside temp_override for correct space detection)
+                                    _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                # Context became invalid, fall back to default context
                                 exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
-                                # Show fading overlay on success (inside temp_override for correct space detection)
+                                # Show fading overlay on success
                                 _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                         else:
                             exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
@@ -486,11 +497,24 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             # Return the new state for the overlay message
                             return not current_value
                         
+                        # Validate context before using it (may be invalid after undo)
+                        from ..utils.render import validate_viewport_context
+                        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                        
                         # Execute with context override if available
-                        if ctx_viewport:
-                            with bpy.context.temp_override(**ctx_viewport):
+                        # Wrap temp_override in try/except as context may become invalid between validation and use.
+                        if valid_ctx:
+                            try:
+                                with bpy.context.temp_override(**valid_ctx):
+                                    new_value = do_toggle()
+                                    # Show fading overlay (inside temp_override for correct space detection)
+                                    if new_value is not None:
+                                        status = "ON" if new_value else "OFF"
+                                        _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
+                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                # Context became invalid, fall back to default context
                                 new_value = do_toggle()
-                                # Show fading overlay (inside temp_override for correct space detection)
+                                # Show fading overlay
                                 if new_value is not None:
                                     status = "ON" if new_value else "OFF"
                                     _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
@@ -560,12 +584,23 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             call_context=call_ctx,
                         )
                     
+                    # Validate context before using it (may be invalid after undo)
+                    from ..utils.render import validate_viewport_context
+                    valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                    
                     # Execute operator with captured context override.
                     # Context was captured in modal() method (safe) but used in timer (outside draw).
                     # Fading overlay is shown inside temp_override for correct space detection.
+                    # Wrap temp_override in try/except as context may become invalid between validation and use.
                     if call_ctx == "INVOKE_DEFAULT":
-                        if ctx_viewport:
-                            with bpy.context.temp_override(**ctx_viewport):
+                        if valid_ctx:
+                            try:
+                                with bpy.context.temp_override(**valid_ctx):
+                                    result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                                    if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                                        show_success()
+                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                # Context became invalid, fall back to default context
                                 result_set = opfn('INVOKE_DEFAULT', **kwargs)
                                 if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
                                     show_success()
@@ -574,8 +609,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
                                 show_success()
                     else:
-                        if ctx_viewport:
-                            with bpy.context.temp_override(**ctx_viewport):
+                        if valid_ctx:
+                            try:
+                                with bpy.context.temp_override(**valid_ctx):
+                                    result_set = opfn('EXEC_DEFAULT', **kwargs)
+                                    if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                                        show_success()
+                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                # Context became invalid, fall back to default context
                                 result_set = opfn('EXEC_DEFAULT', **kwargs)
                                 if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
                                     show_success()

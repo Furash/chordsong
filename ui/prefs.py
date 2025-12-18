@@ -107,7 +107,7 @@ class CHORDSONG_PG_Group(PropertyGroup):
     expanded: BoolProperty(
         name="Expanded",
         description="Whether this group is expanded in the UI",
-        default=True,
+        default=False,
     )
 
 
@@ -426,7 +426,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     ungrouped_expanded: BoolProperty(
         name="Ungrouped Expanded",
         description="Whether the Ungrouped section is expanded",
-        default=True,
+        default=False,
     )
 
     def ensure_defaults(self):
