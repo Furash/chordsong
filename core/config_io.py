@@ -54,11 +54,16 @@ def dump_prefs(prefs) -> dict:
         "leader_key": get_leader_key_type(),
         "overlay": {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
+            "fading_enabled": bool(getattr(prefs, "overlay_fading_enabled", True)),
+            "show_header": bool(getattr(prefs, "overlay_show_header", True)),
+            "show_footer": bool(getattr(prefs, "overlay_show_footer", True)),
             "max_items": int(getattr(prefs, "overlay_max_items", 14)),
             "column_rows": int(getattr(prefs, "overlay_column_rows", 12)),
             "font_size_header": int(getattr(prefs, "overlay_font_size_header", 14)),
             "font_size_chord": int(getattr(prefs, "overlay_font_size_chord", 12)),
             "font_size_body": int(getattr(prefs, "overlay_font_size_body", 12)),
+            "font_size_footer": int(getattr(prefs, "overlay_font_size_footer", 12)),
+            "font_size_fading": int(getattr(prefs, "overlay_font_size_fading", 24)),
             "color_chord": list(getattr(prefs, "overlay_color_chord", (0.65, 0.8, 1.0, 1.0))),
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
             "color_header": list(getattr(prefs, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))),
@@ -129,8 +134,15 @@ def apply_config(prefs, data: dict) -> list[str]:
     overlay = data.get("overlay", {})
     if isinstance(overlay, dict):
         # Boolean properties
-        if "enabled" in overlay:
-            prefs.overlay_enabled = bool(overlay["enabled"])
+        bool_props = {
+            "enabled": "overlay_enabled",
+            "fading_enabled": "overlay_fading_enabled",
+            "show_header": "overlay_show_header",
+            "show_footer": "overlay_show_footer",
+        }
+        for key, attr in bool_props.items():
+            if key in overlay:
+                setattr(prefs, attr, bool(overlay[key]))
         
         # Integer properties - use a loop to reduce duplication
         int_props = {
@@ -139,6 +151,8 @@ def apply_config(prefs, data: dict) -> list[str]:
             "font_size_header": "overlay_font_size_header",
             "font_size_chord": "overlay_font_size_chord",
             "font_size_body": "overlay_font_size_body",
+            "font_size_footer": "overlay_font_size_footer",
+            "font_size_fading": "overlay_font_size_fading",
             "gap": "overlay_gap",
             "column_gap": "overlay_column_gap",
             "footer_gap": "overlay_footer_gap",

@@ -232,7 +232,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                 col.label(text="Operator not detected automatically", icon="INFO")
                 col.label(text="Please enter the operator ID manually", icon="BLANK1")
                 col.separator()
-                col.label(text="Example: uv.region_clustering", icon="BLANK1")
+                col.label(text="Example: uv.weld", icon="BLANK1")
                 col.label(text="(You can see the Python command in the search menu)", icon="BLANK1")
                 col.separator()
         

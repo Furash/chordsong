@@ -4,21 +4,21 @@ import bpy  # type: ignore
 
 
 def parse_operator_from_text(text):
-    """Parse operator ID from text like 'bpy.ops.uv.region_clustering()' or 'bpy.ops.uv.region_clustering(...)'.
+    """Parse operator ID from text like 'bpy.ops.uv.weld()' or 'bpy.ops.uv.weld(...)'.
     
     Args:
         text: Text string that may contain an operator call
         
     Returns:
-        Operator ID string (e.g., 'uv.region_clustering') or None if not found
+        Operator ID string (e.g., 'uv.weld') or None if not found
     """
     if not text:
         return None
     
     # Pattern to match bpy.ops.module.operator_name(...)
     # Examples:
-    # - bpy.ops.uv.region_clustering()
-    # - bpy.ops.uv.region_clustering(option=True)
+    # - bpy.ops.uv.weld()
+    # - bpy.ops.uv.weld(option=True)
     # - bpy.ops.mesh.primitive_cube_add(location=(0,0,0))
     pattern = r'bpy\.ops\.([a-z_]+)\.([a-z_]+)\s*\('
     match = re.search(pattern, text)

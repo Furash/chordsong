@@ -84,43 +84,53 @@ def wrap_into_columns(rows, max_rows):
 
 
 def calculate_column_widths(columns, footer, chord_size, body_size):
-    """Calculate maximum token and label widths across all columns and footer."""
+    """Calculate token and label widths per column and for footer."""
     import blf  # type: ignore
 
-    max_token_w = 0.0
-    max_label_w = 0.0
-    max_header_row_w = 0.0
-
+    column_metrics = []
+    
     # Set font sizes once
     blf.size(0, chord_size)
     
     # Check all columns
     for col in columns:
+        col_max_token_w = 0.0
+        col_max_label_w = 0.0
+        col_max_header_w = 0.0
+        
         for r in col:
             if r["kind"] == "header":
                 blf.size(0, body_size)
                 w, _ = blf.dimensions(0, r["text"])
-                max_header_row_w = max(max_header_row_w, w)
-                blf.size(0, chord_size)  # Reset to chord size
+                col_max_header_w = max(col_max_header_w, w)
+                blf.size(0, chord_size)
             else:
-                # Token width (already at chord_size)
-                tw, _ = blf.dimensions(0, r["token"])
-                max_token_w = max(max_token_w, tw)
+                # Token width
+                tw, _ = blf.dimensions(0, f"{r['token'].upper()}")
+                col_max_token_w = max(col_max_token_w, tw)
                 
                 # Label width
                 blf.size(0, body_size)
                 lw, _ = blf.dimensions(0, r["label"])
-                max_label_w = max(max_label_w, lw)
-                blf.size(0, chord_size)  # Reset to chord size
+                col_max_label_w = max(col_max_label_w, lw)
+                blf.size(0, chord_size)
+        
+        column_metrics.append({
+            "token": col_max_token_w,
+            "label": col_max_label_w,
+            "header": col_max_header_w
+        })
 
-    # Check footer items (already at chord_size)
+    # Check footer items
+    f_token_w = 0.0
+    f_label_w = 0.0
     for r in footer:
-        tw, _ = blf.dimensions(0, r["token"])
-        max_token_w = max(max_token_w, tw)
+        tw, _ = blf.dimensions(0, f"{r['token'].upper()}")
+        f_token_w = max(f_token_w, tw)
         
         blf.size(0, body_size)
         lw, _ = blf.dimensions(0, r["label"])
-        max_label_w = max(max_label_w, lw)
-        blf.size(0, chord_size)  # Reset to chord size
+        f_label_w = max(f_label_w, lw)
+        blf.size(0, chord_size)
 
-    return max_token_w, max_label_w, max_header_row_w
+    return column_metrics, {"token": f_token_w, "label": f_label_w}

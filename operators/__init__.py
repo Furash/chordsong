@@ -24,6 +24,7 @@ from .config.open_prefs import CHORDSONG_OT_Open_Prefs
 from .recents import CHORDSONG_OT_Recents
 from .config.save_config import CHORDSONG_OT_Save_Config
 from .script_select import CHORDSONG_OT_Script_Select, CHORDSONG_OT_Script_Select_Apply
+from .test_overlay import CHORDSONG_OT_TestFadingOverlay, CHORDSONG_OT_TestMainOverlay
 
 __all__ = [
     "CHORDSONG_OT_ApplyConflictFix",
@@ -52,6 +53,8 @@ __all__ = [
     "CHORDSONG_OT_Save_Config",
     "CHORDSONG_OT_Script_Select",
     "CHORDSONG_OT_Script_Select_Apply",
+    "CHORDSONG_OT_TestFadingOverlay",
+    "CHORDSONG_OT_TestMainOverlay",
     "cleanup_all_handlers",
     "register_context_menu",
     "unregister_context_menu",

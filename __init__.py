@@ -49,6 +49,8 @@ from .operators import (
     CHORDSONG_OT_Save_Config,
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
+    CHORDSONG_OT_TestFadingOverlay,
+    CHORDSONG_OT_TestMainOverlay,
     cleanup_all_handlers,
     register_context_menu,
     unregister_context_menu,
@@ -85,6 +87,8 @@ _classes = (
     CHORDSONG_OT_Save_Config,
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
+    CHORDSONG_OT_TestFadingOverlay,
+    CHORDSONG_OT_TestMainOverlay,
 )
 
 _addon_keymaps = []

@@ -195,21 +195,34 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # Calculate from current_y (bottom of header) not y (top of header)
         footer_y = current_y - (items_per_column * line_h) - chord_size
         
-        footer_items = [
-            {"token": "ESC", "label": "Close", "icon": ""}
-        ]
+        # Determine footer visibility and position
+        footer_bg_top = footer_y + chord_size # Default if no footer
         
-        # We need mock max_token_w/max_label_w for footer spacing calculation
-        # Or calculate it here?
-        blf.size(0, chord_size)
-        f_token_w, _ = blf.dimensions(0, "<ESC>") # Approx check
-        blf.size(0, body_size)
-        f_label_w, _ = blf.dimensions(0, "Close")
-        
-        footer_bg_top = draw_overlay_footer(
-            p, region_w, footer_y, footer_items, chord_size, body_size, scale_factor, 
-            icon_size, f_token_w, f_label_w
-        )
+        if p.overlay_show_footer:
+            footer_items = [
+                {"token": "ESC", "label": "Close", "icon": ""}
+            ]
+            
+            # Use prefs for footer text size
+            footer_text_size_base = getattr(p, "overlay_font_size_footer", 12)
+            footer_text_size = max(int(footer_text_size_base * scale_factor), 10)
+            
+            # We need mock max_token_w/max_label_w for footer spacing calculation
+            blf.size(0, footer_text_size)
+            f_token_w, _ = blf.dimensions(0, "<ESC>") 
+            blf.size(0, body_size)
+            f_label_w, _ = blf.dimensions(0, "Close")
+            
+            footer_bg_top = draw_overlay_footer(
+                p, region_w, footer_y, footer_items, footer_text_size, footer_text_size, scale_factor, 
+                icon_size, f_token_w, f_label_w
+            )
+        else:
+            # If no footer, align list bg bottom with the end of list content
+            # (or block bottom). We can reuse footer_y logic but adjust slightly.
+             # Actually, if no footer, we want the list background to end where the content ends
+             # items_per_column * line_h gives the height.
+             footer_bg_top = current_y - (items_per_column * line_h) - (chord_size * 0.5)
 
         draw_list_background(p, region_w, header_bg_bottom, footer_bg_top)
 

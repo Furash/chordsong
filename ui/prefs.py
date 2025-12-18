@@ -250,6 +250,12 @@ class CHORDSONG_Preferences(AddonPreferences):
         default=True,
         update=_on_prefs_changed,
     )
+    overlay_fading_enabled: BoolProperty(
+        name="Fading Overlay",
+        description="Show notification overlay after command execution",
+        default=True,
+        update=_on_prefs_changed,
+    )
     overlay_max_items: IntProperty(
         name="Overlay max items",
         default=14,
@@ -289,6 +295,34 @@ class CHORDSONG_Preferences(AddonPreferences):
         default=14,
         min=8,
         max=72,
+        update=_on_prefs_changed,
+    )
+    overlay_font_size_footer: IntProperty(
+        name="Footer font size",
+        default=12,
+        min=8,
+        max=72,
+        update=_on_prefs_changed,
+    )
+    overlay_font_size_fading: IntProperty(
+        name="Fading Overlay Size",
+        description="Font size for fading result overlay",
+        default=24,
+        min=8,
+        max=96,
+        update=_on_prefs_changed,
+    )
+
+    overlay_show_header: BoolProperty(
+        name="Show Header",
+        description="Show the overlay header bar",
+        default=True,
+        update=_on_prefs_changed,
+    )
+    overlay_show_footer: BoolProperty(
+        name="Show Footer",
+        description="Show the overlay footer bar",
+        default=True,
         update=_on_prefs_changed,
     )
 

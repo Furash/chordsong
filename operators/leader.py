@@ -19,6 +19,7 @@ from ..core.history import add_to_history
 from ..ui.overlay import draw_overlay, draw_fading_overlay
 from ..utils.render import capture_viewport_context
 from .common import prefs
+from .test_overlay import disable_test_overlays
 
 
 # Global state for fading overlay
@@ -156,6 +157,7 @@ def _cleanup_fading_overlay():
 def cleanup_all_handlers():
     """Clean up all draw handlers and timers. Called on addon unregister."""
     _cleanup_fading_overlay()
+    disable_test_overlays()
     # Note: Last chord tracking removed - now handled by history system
 
 
@@ -249,6 +251,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
     def invoke(self, context: bpy.types.Context, _event: bpy.types.Event):
         """Start chord capture modal operation."""
+        # Clean up any active test overlays
+        disable_test_overlays()
         p = prefs(context)
         p.ensure_defaults()
 

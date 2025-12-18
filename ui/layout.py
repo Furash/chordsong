@@ -41,42 +41,51 @@ def draw_addon_preferences(prefs, _context, layout):
     if prefs.prefs_tab == "UI":
         # Overlay settings
         box = col.box()
+        
+        # Toggles row
         r = box.row(align=True)
         r.prop(prefs, "overlay_enabled", toggle=True)
         r.separator()
+        r.prop(prefs, "overlay_fading_enabled", toggle=True, text="Fading")
+        r.separator()
+        r.prop(prefs, "overlay_show_header", toggle=True, text="Header")
+        r.separator()
+        r.prop(prefs, "overlay_show_footer", toggle=True, text="Footer")
+        
+        # Counts
+        r = box.row(align=True)
         r.prop(prefs, "overlay_max_items")
         r.separator()
         r.prop(prefs, "overlay_column_rows")
-        r.separator()
-        box.separator()
 
-        # Font size settings
+        
+        # Font sizes
         r = box.row(align=True)
-        r.prop(prefs, "overlay_font_size_header")
-        r.separator()
-        r.prop(prefs, "overlay_font_size_chord")
-        r.separator()
-        r.prop(prefs, "overlay_font_size_body")
-        box.separator()
+        r.prop(prefs, "overlay_font_size_header", text="Header Size")
+        r.prop(prefs, "overlay_font_size_footer", text="Footer Size")
 
+        box.separator()
+        
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_font_size_chord")
+        r.prop(prefs, "overlay_font_size_body")
+        r.prop(prefs, "overlay_font_size_fading")
+
+        
         # Layout settings
         r = box.row(align=True)
         r.prop(prefs, "overlay_gap", text="Element Gap")
-        r.separator()
         r.prop(prefs, "overlay_column_gap", text="Column Gap")
-        r.separator()
         r.prop(prefs, "overlay_line_height", text="Line Height")
-        box.separator()
         r = box.row(align=True)
         r.prop(prefs, "overlay_footer_gap", text="Footer Item Gap")
-        r.separator()
         r.prop(prefs, "overlay_footer_token_gap", text="Footer Token Gap")
-        r.separator()
         r.prop(prefs, "overlay_footer_label_gap", text="Footer Label Gap")
-        box.separator()
 
         # Position settings
         r = box.row(align=True)
+        r.label(text="Position:")
+        r.scale_x = 2.5
         r.prop(prefs, "overlay_position", text="")
         r.separator()
         r.prop(prefs, "overlay_offset_x")
@@ -116,6 +125,13 @@ def draw_addon_preferences(prefs, _context, layout):
         col4.separator()
         col5.separator()
 
+        # Testing
+        box_test = col.box()
+        box_test.label(text="Testing")
+        row = box_test.row()
+        row.operator("chordsong.test_main_overlay", text="Test Main Overlay", icon="PLAY")
+        row.operator("chordsong.test_fading_overlay", text="Test Fading Overlay", icon="PLAY")
+        
         box.separator()
 
         return
