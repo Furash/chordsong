@@ -52,7 +52,7 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
     
     # Set up new fading overlay
     state["active"] = True
-    state["chord_text"] = "+".join(chord_tokens)
+    state["chord_text"] = " ".join(chord_tokens)
     state["label"] = label
     state["icon"] = icon
     state["start_time"] = time.time()

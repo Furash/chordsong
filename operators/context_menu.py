@@ -6,6 +6,7 @@ import bpy  # type: ignore
 from bpy.props import StringProperty, EnumProperty  # type: ignore
 
 from .common import prefs, schedule_autosave_safe
+import re
 
 
 class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
@@ -67,6 +68,32 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
         default="VIEW_3D",
     )
 
+    def _parse_operator_from_text(self, text):
+        """Parse operator ID from text like 'bpy.ops.uv.region_clustering()' or 'bpy.ops.uv.region_clustering(...)'.
+        
+        Args:
+            text: Text string that may contain an operator call
+            
+        Returns:
+            Operator ID string (e.g., 'uv.region_clustering') or None if not found
+        """
+        if not text:
+            return None
+        
+        # Pattern to match bpy.ops.module.operator_name(...)
+        # Examples:
+        # - bpy.ops.uv.region_clustering()
+        # - bpy.ops.uv.region_clustering(option=True)
+        # - bpy.ops.mesh.primitive_cube_add(location=(0,0,0))
+        pattern = r'bpy\.ops\.([a-z_]+)\.([a-z_]+)\s*\('
+        match = re.search(pattern, text)
+        if match:
+            module = match.group(1)
+            operator = match.group(2)
+            return f"{module}.{operator}"
+        
+        return None
+    
     def _suggest_chord(self, group, label):
         """Generate a smart chord suggestion based on group and label.
         
@@ -150,6 +177,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
         - Items in the F3 search menu
         - Menu items
         - Boolean properties (for toggle)
+        - Info panel text (e.g., bpy.ops.uv.region_clustering())
         """
         # Reset all properties to default values to avoid carrying over old data
         self.operator = ""
@@ -164,6 +192,118 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
         button_operator = getattr(context, "button_operator", None)
         button_prop = getattr(context, "button_prop", None)
         button_pointer = getattr(context, "button_pointer", None)
+        
+        # Try to extract operator from Info panel text if we're in Info panel
+        # Check if we can get selected text or the line that was right-clicked
+        if not button_operator and not self.operator:
+            # Check if we're in Info panel context
+            # Info panel can be accessed through CONSOLE space type or through area type
+            space = context.space_data
+            area = context.area
+            
+            # Check if we're in Info/Console area
+            is_info_panel = False
+            if area and hasattr(area, 'type'):
+                # Info panel is typically in a CONSOLE area
+                if area.type == 'CONSOLE':
+                    is_info_panel = True
+            elif space and hasattr(space, 'type'):
+                if space.type == 'CONSOLE':
+                    is_info_panel = True
+            
+            if is_info_panel:
+                # Try to get text from Info panel
+                try:
+                    # Method 1: Check Info panel history (console history)
+                    if space and hasattr(space, 'history'):
+                        history = space.history
+                        if history:
+                            # Check the last few entries for operator calls
+                            for entry in reversed(history[-10:]):  # Check last 10 entries
+                                if hasattr(entry, 'body'):
+                                    parsed_op = self._parse_operator_from_text(entry.body)
+                                    if parsed_op:
+                                        self.operator = parsed_op
+                                        break
+                                elif isinstance(entry, str):
+                                    parsed_op = self._parse_operator_from_text(entry)
+                                    if parsed_op:
+                                        self.operator = parsed_op
+                                        break
+                    
+                    # Method 2: Try to get selected text from clipboard
+                    # User might have selected text before right-clicking
+                    try:
+                        clipboard = context.window_manager.clipboard
+                        if clipboard:
+                            parsed_op = self._parse_operator_from_text(clipboard)
+                            if parsed_op:
+                                self.operator = parsed_op
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            
+            # Also try to parse from any text that might be in button_pointer
+            if not self.operator and button_pointer:
+                # Check if button_pointer has text content
+                if hasattr(button_pointer, 'body'):
+                    parsed_op = self._parse_operator_from_text(button_pointer.body)
+                    if parsed_op:
+                        self.operator = parsed_op
+                elif isinstance(button_pointer, str):
+                    parsed_op = self._parse_operator_from_text(button_pointer)
+                    if parsed_op:
+                        self.operator = parsed_op
+        
+        # Try to extract operator ID from alternative sources when button_operator is not available
+        # This handles cases where Blender doesn't set button_operator for some search menu items
+        if not button_operator and button_pointer:
+            # Check if button_pointer is actually an operator instance
+            # First check if it has bl_idname (direct operator)
+            if hasattr(button_pointer, "bl_idname"):
+                self.operator = button_pointer.bl_idname
+                button_operator = button_pointer
+            # Check if button_pointer has an operator attribute
+            elif hasattr(button_pointer, "operator"):
+                op_attr = getattr(button_pointer, "operator", None)
+                if op_attr:
+                    if hasattr(op_attr, "bl_idname"):
+                        self.operator = op_attr.bl_idname
+                        button_operator = op_attr
+                    elif isinstance(op_attr, str):
+                        self.operator = op_attr
+            # Check if button_pointer's class name indicates it's an operator
+            elif hasattr(button_pointer, "__class__"):
+                tpname = button_pointer.__class__.__name__
+                # Check if it's an operator class (contains _OT_)
+                if "_OT_" in tpname:
+                    parts = tpname.split("_OT_")
+                    if len(parts) == 2:
+                        idname = f"{parts[0].lower()}.{parts[1].lower()}"
+                        self.operator = idname
+                        button_operator = button_pointer
+            # Try to extract operator ID from RNA type identifier
+            if not button_operator and hasattr(button_pointer, "rna_type"):
+                try:
+                    rna_type_name = button_pointer.rna_type.identifier
+                    # Check if it's an operator type (contains _OT_)
+                    if "_OT_" in rna_type_name:
+                        parts = rna_type_name.split("_OT_")
+                        if len(parts) == 2:
+                            idname = f"{parts[0].lower()}.{parts[1].lower()}"
+                            self.operator = idname
+                            # Try to get the actual operator class
+                            op_class = getattr(bpy.types, rna_type_name, None)
+                            if op_class and issubclass(op_class, bpy.types.Operator):
+                                # Create a temporary instance to get properties
+                                try:
+                                    temp_op = op_class()
+                                    button_operator = temp_op
+                                except Exception:
+                                    pass
+                except Exception:
+                    pass
         
         # Check if it's a boolean property (for context toggle)
         if button_prop and button_pointer and not button_operator:
@@ -211,7 +351,6 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                         
                         # Fallback: just use the property name if we can't determine context
                         else:
-                            print(f"Chord Song: Unknown RNA type '{rna_type_name}' for property '{prop_name}'")
                             path_parts = [prop_name]
                     else:
                         # No rna_type, just use property name
@@ -246,11 +385,50 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                     
                     # Show dialog for entering chord
                     return context.window_manager.invoke_props_dialog(self, width=450)
-            except Exception as e:
-                print(f"Chord Song: Failed to detect property: {e}")
-                import traceback
-                traceback.print_exc()
+            except Exception:
                 # Fall through to operator detection
+                pass
+        
+        # If we parsed an operator from Info panel text, process it
+        if self.operator and not button_operator:
+            # We have an operator ID but no button_operator instance
+            # Try to extract group and name from operator ID
+            if "." in self.operator:
+                parts = self.operator.split(".")
+                if len(parts) == 2:
+                    group_name = parts[0].replace("_", " ").title()
+                    self.group = group_name
+                    label_name = parts[1].replace("_", " ").title()
+                    self.name = label_name
+                    # Auto-detect context based on operator prefix
+                    if parts[0].lower() in ["uv", "image"]:
+                        self.editor_context = "IMAGE_EDITOR"
+                    elif parts[0].lower() == "node":
+                        self.editor_context = "GEOMETRY_NODE"
+                    else:
+                        # Detect based on current editor
+                        space = context.space_data
+                        if space:
+                            if space.type == 'NODE_EDITOR':
+                                if hasattr(space, 'tree_type'):
+                                    if space.tree_type == 'GeometryNodeTree':
+                                        self.editor_context = "GEOMETRY_NODE"
+                                    elif space.tree_type == 'ShaderNodeTree':
+                                        self.editor_context = "SHADER_EDITOR"
+                                    else:
+                                        self.editor_context = "SHADER_EDITOR"
+                                else:
+                                    self.editor_context = "GEOMETRY_NODE"
+                            elif space.type == 'IMAGE_EDITOR':
+                                self.editor_context = "IMAGE_EDITOR"
+                            else:
+                                self.editor_context = "VIEW_3D"
+                        else:
+                            self.editor_context = "VIEW_3D"
+                    # Generate smart chord suggestion
+                    self.chord = self._suggest_chord(self.group, self.name)
+                    # Show dialog for entering chord
+                    return context.window_manager.invoke_props_dialog(self, width=450)
         
         # Try operator detection
         if button_operator:
@@ -350,8 +528,54 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                 # Show dialog for entering chord
                 return context.window_manager.invoke_props_dialog(self, width=450)
         
-        self.report({'WARNING'}, "Could not detect operator or property from context")
-        return {"CANCELLED"}
+        # If we couldn't detect an operator automatically, still show the dialog
+        # but with empty operator field so user can manually enter it
+        # This handles cases where Blender doesn't set button_operator for some search menu items
+        if self.operator:
+            # We have an operator ID but no button_operator instance
+            # Try to extract group and name from operator ID
+            if "." in self.operator:
+                parts = self.operator.split(".")
+                if len(parts) == 2:
+                    group_name = parts[0].replace("_", " ").title()
+                    self.group = group_name
+                    label_name = parts[1].replace("_", " ").title()
+                    self.name = label_name
+                    # Auto-detect context based on operator prefix
+                    if parts[0].lower() == "uv" or parts[0].lower() == "image":
+                        self.editor_context = "IMAGE_EDITOR"
+                    elif parts[0].lower() == "node":
+                        self.editor_context = "GEOMETRY_NODE"
+                    else:
+                        # Detect based on current editor
+                        space = context.space_data
+                        if space:
+                            if space.type == 'NODE_EDITOR':
+                                if hasattr(space, 'tree_type'):
+                                    if space.tree_type == 'GeometryNodeTree':
+                                        self.editor_context = "GEOMETRY_NODE"
+                                    elif space.tree_type == 'ShaderNodeTree':
+                                        self.editor_context = "SHADER_EDITOR"
+                                    else:
+                                        self.editor_context = "SHADER_EDITOR"
+                                else:
+                                    self.editor_context = "GEOMETRY_NODE"
+                            elif space.type == 'IMAGE_EDITOR':
+                                self.editor_context = "IMAGE_EDITOR"
+                            else:
+                                self.editor_context = "VIEW_3D"
+                        else:
+                            self.editor_context = "VIEW_3D"
+                    # Generate smart chord suggestion
+                    self.chord = self._suggest_chord(self.group, self.name)
+                    # Show dialog for entering chord
+                    return context.window_manager.invoke_props_dialog(self, width=450)
+        
+        # If we still don't have an operator, show a dialog to manually enter it
+        # This handles cases where Blender doesn't expose operator info through context
+        self.mapping_type = "OPERATOR"
+        # Show dialog - the operator field will be empty and user can fill it in
+        return context.window_manager.invoke_props_dialog(self, width=450)
 
     def draw(self, context):
         """Draw the dialog UI"""
@@ -361,8 +585,22 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
         if self.mapping_type == "CONTEXT_TOGGLE":
             col.label(text=f"Toggle: {self.context_path}", icon="CHECKBOX_HLT")
         else:
-            col.label(text=f"Operator: {self.operator}", icon="SETTINGS")
-        col.separator()
+            if self.operator:
+                col.label(text=f"Operator: {self.operator}", icon="SETTINGS")
+            else:
+                # Show help text when operator is not detected
+                col.label(text="Operator not detected automatically", icon="INFO")
+                col.label(text="Please enter the operator ID manually", icon="BLANK1")
+                col.separator()
+                col.label(text="Example: uv.region_clustering", icon="BLANK1")
+                col.label(text="(You can see the Python command in the search menu)", icon="BLANK1")
+                col.separator()
+        
+        # Operator input field (show prominently if empty)
+        if not self.operator:
+            col.label(text="Operator ID:", icon="SETTINGS")
+            col.prop(self, "operator", text="")
+            col.separator()
         
         # Chord input (main field)
         col.label(text="Enter Chord:")
@@ -404,8 +642,27 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             msg = f"Added chord '{self.chord}' for toggle: {self.context_path}"
         else:
             if not self.operator:
-                self.report({'WARNING'}, "No operator specified")
+                self.report({'WARNING'}, "No operator specified. Please enter an operator ID (e.g., 'uv.region_clustering')")
                 return {"CANCELLED"}
+            
+            # If name/group weren't auto-filled, try to extract them from operator ID
+            if not self.name or not self.group:
+                if "." in self.operator:
+                    parts = self.operator.split(".")
+                    if len(parts) == 2:
+                        if not self.group:
+                            self.group = parts[0].replace("_", " ").title()
+                        if not self.name:
+                            self.name = parts[1].replace("_", " ").title()
+            
+            # Auto-detect context if not already set
+            if self.editor_context == "VIEW_3D" and "." in self.operator:
+                parts = self.operator.split(".")
+                if len(parts) == 2:
+                    if parts[0].lower() in ["uv", "image"]:
+                        self.editor_context = "IMAGE_EDITOR"
+                    elif parts[0].lower() == "node":
+                        self.editor_context = "GEOMETRY_NODE"
             
             # Create new operator mapping
             m = p.mappings.add()
@@ -454,21 +711,23 @@ def button_context_menu_draw(self, context):
     - Items in the search menu (F3)
     - Menu items
     - Boolean properties (for toggle)
+    - Info panel text (e.g., bpy.ops.uv.region_clustering())
+    
+    Note: We always show the menu item when we're in WM_MT_button_context,
+    even if we can't detect an operator. The invoke method will try to extract
+    operator information from various sources, including parsing from Info panel text.
     """
     layout = self.layout
     
-    button_pointer = getattr(context, "button_pointer", None)
-    button_prop = getattr(context, "button_prop", None)
-    button_operator = getattr(context, "button_operator", None)
-    
-    # Show if we can detect an operator or boolean property
-    if button_operator or (button_prop and button_prop.type == 'BOOLEAN'):
-        layout.separator()
-        layout.operator(
-            CHORDSONG_OT_Context_Menu.bl_idname,
-            text="Add Chord Mapping",
-            icon="KEYINGSET"
-        )
+    # Always show the menu item when we're in the button context menu
+    # This ensures it appears for all search menu items, even when button_operator isn't set
+    # The invoke method will handle extracting operator information from various sources
+    layout.separator()
+    layout.operator(
+        CHORDSONG_OT_Context_Menu.bl_idname,
+        text="Add Chord Mapping",
+        icon="KEYINGSET"
+    )
 
 
 def register_context_menu():
