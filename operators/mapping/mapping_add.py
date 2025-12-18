@@ -5,7 +5,7 @@
 import bpy  # type: ignore
 from bpy.props import StringProperty, EnumProperty  # type: ignore
 
-from .common import prefs
+from ..common import prefs
 
 
 class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
@@ -49,7 +49,7 @@ class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
             p.mappings.move(last_index, 0)
 
         # Autosave is handled by update callbacks, but adding a new item may not trigger them.
-        from .common import schedule_autosave_safe
+        from ..common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)
 
         return {"FINISHED"}

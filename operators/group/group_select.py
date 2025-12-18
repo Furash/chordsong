@@ -7,7 +7,7 @@
 import bpy
 from bpy.props import IntProperty, EnumProperty
 
-from .common import prefs
+from ..common import prefs
 
 
 def _get_available_groups(_self, context):

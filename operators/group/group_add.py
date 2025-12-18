@@ -7,7 +7,7 @@
 import bpy
 from bpy.props import StringProperty
 
-from .common import prefs
+from ..common import prefs
 
 
 class CHORDSONG_OT_Group_Add(bpy.types.Operator):
@@ -44,7 +44,7 @@ class CHORDSONG_OT_Group_Add(bpy.types.Operator):
         grp = p.groups.add()
         grp.name = name
 
-        from .common import schedule_autosave_safe
+        from ..common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)
 
         self.report({"INFO"}, f"Added group {name}")

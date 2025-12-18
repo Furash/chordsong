@@ -5,7 +5,7 @@
 import bpy  # type: ignore
 from bpy.props import IntProperty  # type: ignore
 
-from .common import prefs
+from ..common import prefs
 
 
 class CHORDSONG_OT_Mapping_Duplicate(bpy.types.Operator):
@@ -48,7 +48,7 @@ class CHORDSONG_OT_Mapping_Duplicate(bpy.types.Operator):
         if target_index < new_index:
             p.mappings.move(new_index, target_index)
 
-        from .common import schedule_autosave_safe
+        from ..common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)
 
         return {"FINISHED"}

@@ -8,7 +8,7 @@ import re
 import bpy  # type: ignore
 from bpy.props import IntProperty  # type: ignore
 
-from .common import prefs
+from ..common import prefs
 
 
 def _ast_value_to_string(node):

@@ -6,9 +6,9 @@ import os
 
 import bpy  # type: ignore
 
-from ..core.autosave import autosave_path
-from ..core.config_io import apply_config, loads_json
-from .common import prefs
+from ...core.autosave import autosave_path
+from ...core.config_io import apply_config, loads_json
+from ..common import prefs
 
 
 class CHORDSONG_OT_Load_Autosave(bpy.types.Operator):

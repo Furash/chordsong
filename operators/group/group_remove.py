@@ -7,7 +7,7 @@
 import bpy
 from bpy.props import EnumProperty, IntProperty
 
-from .common import prefs
+from ..common import prefs
 
 
 def _get_target_groups(self, context):
@@ -89,7 +89,7 @@ class CHORDSONG_OT_Group_Remove(bpy.types.Operator):
 
         p.groups.remove(self.index)
 
-        from .common import schedule_autosave_safe
+        from ..common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)
 
         if target:

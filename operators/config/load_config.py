@@ -8,8 +8,8 @@ import bpy  # type: ignore
 from bpy_extras.io_utils import ImportHelper  # type: ignore
 from bpy.props import StringProperty  # type: ignore
 
-from ..core.config_io import apply_config, loads_json
-from .common import prefs
+from ...core.config_io import apply_config, loads_json
+from ..common import prefs
 
 
 class CHORDSONG_OT_Load_Config(bpy.types.Operator, ImportHelper):

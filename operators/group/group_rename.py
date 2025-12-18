@@ -7,7 +7,7 @@
 import bpy
 from bpy.props import IntProperty, StringProperty
 
-from .common import prefs
+from ..common import prefs
 
 
 class CHORDSONG_OT_Group_Rename(bpy.types.Operator):
@@ -72,7 +72,7 @@ class CHORDSONG_OT_Group_Rename(bpy.types.Operator):
         p.groups[self.index].name = new_name
 
         try:
-            from ..core.autosave import schedule_autosave
+            from ...core.autosave import schedule_autosave
             schedule_autosave(p, delay_s=5.0)
         except Exception:
             pass

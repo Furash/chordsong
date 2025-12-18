@@ -4,7 +4,7 @@
 
 import bpy  # type: ignore
 
-from .common import prefs
+from ..common import prefs
 
 
 class CHORDSONG_OT_Load_Default(bpy.types.Operator):

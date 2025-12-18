@@ -11,8 +11,8 @@ import bpy  # type: ignore
 from bpy_extras.io_utils import ExportHelper  # type: ignore
 from bpy.props import StringProperty  # type: ignore
 
-from ..core.config_io import dump_prefs
-from .common import prefs
+from ...core.config_io import dump_prefs
+from ..common import prefs
 
 
 class CHORDSONG_OT_Save_Config(bpy.types.Operator, ExportHelper):
