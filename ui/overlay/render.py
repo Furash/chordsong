@@ -19,24 +19,36 @@ def draw_icon(icon_text, x, y, size):
     blf.position(0, x, y, 0)
     blf.draw(0, icon_text)
 
-def draw_rect(x1, y1, x2, y2, color):
-    """Draw a filled rectangle with the given color."""
-    if color[3] < 0.001:  # Only draw if visible
+def draw_rect(x1, y1, x2, y2, color, border_color=None, border_thickness=0):
+    """Draw a filled rectangle with the given color and optional border."""
+    if color[3] < 0.001 and (not border_color or border_color[3] < 0.001):
         return
 
     gpu.state.blend_set('ALPHA')
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-    vertices = (
-        (x1, y1),
-        (x2, y1),
-        (x2, y2),
-        (x1, y2),
-    )
-    indices = ((0, 1, 2), (0, 2, 3))
-    batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
     shader.bind()
-    shader.uniform_float("color", color)
-    batch.draw(shader)
+
+    # Draw background
+    if color[3] >= 0.001:
+        vertices = ((x1, y1), (x2, y1), (x2, y2), (x1, y2))
+        indices = ((0, 1, 2), (0, 2, 3))
+        batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
+        shader.uniform_float("color", color)
+        batch.draw(shader)
+
+    # Draw border if requested
+    if border_color and border_color[3] >= 0.001 and border_thickness > 0:
+        # Simplified border drawing using 4 rects for crispness
+        t = border_thickness
+        # Bottom
+        draw_rect(x1, y1, x2, y1 + t, border_color)
+        # Top
+        draw_rect(x1, y2 - t, x2, y2, border_color)
+        # Left
+        draw_rect(x1, y1 + t, x1 + t, y2 - t, border_color)
+        # Right
+        draw_rect(x2 - t, y1 + t, x2, y2 - t, border_color)
+
     gpu.state.blend_set('NONE')
 
 def draw_overlay_header(p, region_w, y, header_text, header_size, body_size, chord_size, header_w):
@@ -66,9 +78,16 @@ def draw_overlay_header(p, region_w, y, header_text, header_size, body_size, cho
     new_y = y - int(header_size / 2 + text_height * 0.75 + chord_size)
     return new_y, bg_y1
 
-def draw_list_background(p, region_w, top_y, bottom_y):
-    """Draw the background for the list area."""
-    draw_rect(0, bottom_y, region_w, top_y, p.overlay_list_background)
+def draw_list_background(p, region_w, top_y, bottom_y, scale_factor=1.0):
+    """Draw the background for the list area with a subtle border."""
+    # Use a slightly lighter/darker color for the border to give it a premium look
+    bg = p.overlay_list_background
+    border_color = (1.0, 1.0, 1.0, 0.1 * bg[3]) # Subtle white border
+    
+    # Thickness based on scale factor
+    thickness = max(1, int(1 * scale_factor))
+    
+    draw_rect(0, bottom_y, region_w, top_y, bg, border_color=border_color, border_thickness=thickness)
 
 def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_size, scale_factor, icon_size, max_token_w, max_label_w):
     """Draw the overlay footer background and items."""
@@ -180,10 +199,10 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         footer_bg_top = start_y - list_content_height + line_h * 0.5
 
     # 3. Draw List Background
-    draw_list_background(p, region_w, header_bg_bottom, footer_bg_top)
+    draw_list_background(p, region_w, header_bg_bottom, footer_bg_top, scale_factor)
 
     # 4. Draw Columns
-    current_size = chord_size # Init
+    current_size = -1 # Force first blf.size call
 
     current_x_offset = 0
 
@@ -484,22 +503,11 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     bg_y2 = text_center_y + (text_height * 0.45)
 
     # Draw semi-transparent background with fade (full width)
-    bg_alpha = 0.35 * fade_alpha
+    # Respect preferences for background color instead of hardcoded black
+    bg_color = list(p.overlay_list_background)
+    bg_color[3] *= fade_alpha
 
-    gpu.state.blend_set('ALPHA')
-    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-    vertices = (
-        (bg_x1, bg_y1),
-        (bg_x2, bg_y1),
-        (bg_x2, bg_y2),
-        (bg_x1, bg_y2),
-    )
-    indices = ((0, 1, 2), (0, 2, 3))
-    batch = batch_for_shader(shader, 'TRIS', {"pos": vertices}, indices=indices)
-    shader.bind()
-    shader.uniform_float("color", (0.0, 0.0, 0.0, bg_alpha))
-    batch.draw(shader)
-    gpu.state.blend_set('NONE')
+    draw_rect(bg_x1, bg_y1, bg_x2, bg_y2, bg_color)
 
     # Draw content (centered horizontally)
     text_y = y

@@ -110,7 +110,7 @@ def validate_viewport_context(ctx_viewport) -> dict:
         return {}
 
 def calculate_scale_factor(context) -> float:
-    """Calculate UI scale factor for fonts and spacing.
+    """Calculate UI scale factor for fonts and spacing, respecting Blender UI settings.
 
     Args:
         context: Blender context object
@@ -119,12 +119,42 @@ def calculate_scale_factor(context) -> float:
         Scale factor as a float
     """
     try:
-        ui_scale = getattr(context.preferences.view, "ui_scale", 1.0)
-        dpi = context.preferences.system.dpi
-        return ui_scale * (dpi / 72.0)
+        # Access preferences via bpy.context for robustness in draw handlers
+        prefs = bpy.context.preferences
+        
+        # Respect UI Scale (System > Interface > Resolution Scale)
+        # Note: view.ui_scale is often 1.0, while system.dpi reflects the Resolution Scale.
+        ui_scale = getattr(prefs.view, "ui_scale", 1.0)
+        
+        # Respect DPI (System > Interface > Resolution Scale also affects this)
+        # Standard DPI is 72. 
+        dpi = prefs.system.dpi
+        
+        # Respect Pixel Size (1 for standard, 2 for Retina/HighDPI)
+        # This is the most reliable way to scale for High DPI.
+        pixel_size = getattr(prefs.system, "pixel_size", 1.0)
+        
+        # Respect Line Width (System > Interface > Line Width)
+        # This affects the 'thickness' of the UI.
+        # Enums: 'THIN', 'AUTO', 'THICK'
+        line_width_mult = 1.0
+        if hasattr(prefs.system, "line_width"):
+            lw = prefs.system.line_width
+            if lw == 'THICK':
+                line_width_mult = 1.25
+            elif lw == 'THIN':
+                line_width_mult = 0.85
+
+        # Base scale factor combines DPI and UI scale
+        scale = ui_scale * (dpi / 72.0)
+        
+        # Ensure it's at least pixel_size
+        scale = max(scale, pixel_size)
+        
+        return scale * line_width_mult
     except Exception:
         try:
-            return context.preferences.system.dpi / 72.0
+            return bpy.context.preferences.system.dpi / 72.0
         except Exception:
             return 1.0
 

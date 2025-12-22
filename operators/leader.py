@@ -28,9 +28,8 @@ _fading_overlay_state = {
     "label": "",
     "icon": "",
     "start_time": 0,
-    "draw_handle": None,
+    "draw_handles": {},  # Dictionary of space_type -> handle
     "area": None,
-    "space_type": None,  # Store the space type for proper cleanup
 }
 
 def _show_fading_overlay(context, chord_tokens, label, icon):
@@ -38,14 +37,7 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
     state = _fading_overlay_state
 
     # Clean up any existing overlay
-    if state["draw_handle"] is not None:
-        try:
-            if state["space_type"]:
-                state["space_type"].draw_handler_remove(state["draw_handle"], "WINDOW")
-            else:
-                bpy.types.SpaceView3D.draw_handler_remove(state["draw_handle"], "WINDOW")
-        except Exception:
-            pass
+    _cleanup_fading_overlay()
 
     # Set up new fading overlay
     state["active"] = True
@@ -55,20 +47,17 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
     state["start_time"] = time.time()
     state["area"] = context.area
 
-    # Determine which space type to use for the draw handler
-    space = context.space_data
-    if space and space.type == 'NODE_EDITOR':
-        state["space_type"] = bpy.types.SpaceNodeEditor
-    elif space and space.type == 'IMAGE_EDITOR':
-        state["space_type"] = bpy.types.SpaceImageEditor
-    else:
-        state["space_type"] = bpy.types.SpaceView3D
+    # Add draw handlers for all major space types
+    supported_types = [
+        bpy.types.SpaceView3D,
+        bpy.types.SpaceNodeEditor,
+        bpy.types.SpaceImageEditor,
+        bpy.types.SpaceSequenceEditor,
+    ]
 
-    # Add draw handler
     def draw_callback():
         try:
-            # In a draw handler, Blender provides the correct context.region automatically
-            # Don't use temp_override here as it interferes with the drawing context
+            # Respect UI settings in calculate_scale_factor (called inside draw_fading_overlay)
             p = prefs(bpy.context)
             still_active = draw_fading_overlay(
                 bpy.context, p,
@@ -79,14 +68,14 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
             )
 
             if not still_active:
-                # Time to remove the overlay
                 _cleanup_fading_overlay()
         except Exception:
             _cleanup_fading_overlay()
 
-    state["draw_handle"] = state["space_type"].draw_handler_add(
-        draw_callback, (), "WINDOW", "POST_PIXEL"
-    )
+    state["draw_handles"] = {}
+    for st in supported_types:
+        handle = st.draw_handler_add(draw_callback, (), "WINDOW", "POST_PIXEL")
+        state["draw_handles"][st] = handle
 
     # Helper function to tag all relevant areas for redraw
     def tag_all_views():
@@ -122,16 +111,13 @@ def _cleanup_fading_overlay():
     state = _fading_overlay_state
     state["active"] = False
 
-    if state["draw_handle"] is not None:
-        try:
-            if state["space_type"]:
-                state["space_type"].draw_handler_remove(state["draw_handle"], "WINDOW")
-            else:
-                bpy.types.SpaceView3D.draw_handler_remove(state["draw_handle"], "WINDOW")
-        except Exception:
-            pass
-        state["draw_handle"] = None
-        state["space_type"] = None
+    if state["draw_handles"]:
+        for st, handle in state["draw_handles"].items():
+            try:
+                st.draw_handler_remove(handle, "WINDOW")
+            except Exception:
+                pass
+        state["draw_handles"] = {}
 
     # Tag all relevant areas for redraw to clear the overlay
     try:
@@ -160,51 +146,44 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     bl_label = "Chord Song Leader"
     bl_options = {"REGISTER"}
 
-    _draw_handle = None
+    _draw_handles = {}  # Dictionary of space_type -> handle
     _buffer = None
     _region = None
     _area = None
     _scroll_offset = 0
     _context_type = None  # Store the detected context type
-    _space_type = None  # Store the space type for draw handler
 
     def _ensure_draw_handler(self, context: bpy.types.Context):
         p = prefs(context)
-        if not p.overlay_enabled or self._draw_handle is not None:
+        if not p.overlay_enabled or self._draw_handles:
             return
 
         # Best effort: only draw in the region/area we started from.
         self._area = context.area
         self._region = context.region
 
-        # Determine which space type to use for the draw handler
-        space = context.space_data
-        if space and space.type == 'NODE_EDITOR':
-            # For Node Editor (Shader Editor, Geometry Nodes)
-            self._space_type = bpy.types.SpaceNodeEditor
-        elif space and space.type == 'IMAGE_EDITOR':
-            self._space_type = bpy.types.SpaceImageEditor
-        else:
-            # Default to 3D View
-            self._space_type = bpy.types.SpaceView3D
+        # Register handlers for all major space types to ensure visibility across split views
+        self._draw_handles = {}
+        supported_types = [
+            bpy.types.SpaceView3D,
+            bpy.types.SpaceNodeEditor,
+            bpy.types.SpaceImageEditor,
+            bpy.types.SpaceSequenceEditor,
+        ]
 
-        self._draw_handle = self._space_type.draw_handler_add(
-            self._draw_callback, (), "WINDOW", "POST_PIXEL"
-        )
+        for st in supported_types:
+            handle = st.draw_handler_add(self._draw_callback, (), "WINDOW", "POST_PIXEL")
+            self._draw_handles[st] = handle
 
     def _remove_draw_handler(self):
-        if self._draw_handle is None:
+        if not self._draw_handles:
             return
-        try:
-            if self._space_type:
-                self._space_type.draw_handler_remove(self._draw_handle, "WINDOW")
-            else:
-                # Fallback to SpaceView3D if space_type wasn't set
-                bpy.types.SpaceView3D.draw_handler_remove(self._draw_handle, "WINDOW")
-        except Exception:
-            pass
-        self._draw_handle = None
-        self._space_type = None
+        for st, handle in self._draw_handles.items():
+            try:
+                st.draw_handler_remove(handle, "WINDOW")
+            except Exception:
+                pass
+        self._draw_handles = {}
 
     def _tag_redraw(self):
         if self._area:
