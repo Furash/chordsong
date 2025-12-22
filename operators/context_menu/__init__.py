@@ -21,7 +21,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
     """Add a chord mapping for this UI element"""
     bl_idname = "chordsong.context_menu"
     bl_label = "Add Chord Mapping"
-    bl_options = {"INTERNAL"}
+    bl_options = {"REGISTER", "UNDO"}
 
     operator: StringProperty(
         name="Operator",
@@ -114,17 +114,21 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
 
             # 1. Try to extract from Info Panel / Clipboard if no button context
             if not button_operator and not self.operator:
-                extracted = extract_from_info_panel(context)
+                extracted, extracted_kwargs = extract_from_info_panel(context)
                 if extracted:
                     self.operator = extracted
+                    if extracted_kwargs:
+                        self.kwargs = extracted_kwargs
 
             # 2. Try to extract from button pointer (e.g. search menu items with no button_operator)
             if not self.operator and button_pointer:
-               op_id, op_inst = extract_from_button_pointer(button_pointer)
-               if op_id:
-                   self.operator = op_id
-               if op_inst:
-                   button_operator = op_inst
+                op_id, op_inst, op_kwargs = extract_from_button_pointer(button_pointer)
+                if op_id:
+                    self.operator = op_id
+                    if op_kwargs:
+                        self.kwargs = op_kwargs
+                if op_inst:
+                    button_operator = op_inst
 
             # 3. Check if it's a boolean property (for context toggle)
             if button_prop and button_pointer and not button_operator:
@@ -173,12 +177,18 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                                     if k == 'type' and isinstance(v, str) and self.operator.startswith("node."):
                                         node_type_value = v
 
-                                    if isinstance(v, str):
-                                        args.append(f'{k} = "{v}"')
-                                    elif isinstance(v, bool):
-                                        args.append(f'{k} = {v}')
-                                    elif isinstance(v, (int, float)):
-                                        args.append(f'{k} = {v}')
+                                    # Handle mathutils types (Vector, Color, Euler, etc.)
+                                    if hasattr(v, "to_tuple"):
+                                        v = v.to_tuple()
+                                    elif hasattr(v, "to_list"):
+                                        v = v.to_list()
+
+                                    # Use repr to get a Python-evaluable string for the value
+                                    val_str = repr(v)
+                                    
+                                    # Blender's repr for vectors/colors might include the class name, 
+                                    # let's try to keep it simple if possible but repr is safest for round-trip
+                                    args.append(f'{k} = {val_str}')
                                 except Exception:
                                     continue
                     except Exception:
@@ -248,6 +258,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
 
         col.prop(self, "name", text="Label")
         col.prop(self, "group", text="Group")
+        col.prop(self, "kwargs", text="Parameters")
 
     def execute(self, context: bpy.types.Context):
         # If execute is called directly without going through invoke/dialog
@@ -323,6 +334,8 @@ def button_context_menu_draw(self, context):
     """Draw function that adds our button to the right-click context menu."""
     layout = self.layout
     layout.separator()
+    # Force INVOKE_DEFAULT to ensure the dialog shows up, especially in Info/Console panels
+    layout.operator_context = 'INVOKE_DEFAULT'
     layout.operator(CHORDSONG_OT_Context_Menu.bl_idname, text="Add Chord Mapping", icon="EVENT_K")
 
 def register_context_menu():

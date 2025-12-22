@@ -168,10 +168,10 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
             for idx, conflict in enumerate(self._conflicts["prefix_conflicts"]):
                 cbox = box.box()
                 cbox.row().label(text=f"Prefix: {conflict['prefix_chord']}")
-                cbox.row().label(text=f"  → {conflict['prefix_label']}", icon="BLANK1")
+                cbox.row().label(text=f"  → {conflict['prefix_label']} [{conflict['prefix_group'] or 'No Group'}]", icon="BLANK1")
                 cbox.separator(factor=0.3)
                 cbox.row().label(text=f"Blocks: {conflict['full_chord']}")
-                cbox.row().label(text=f"  → {conflict['full_label']}", icon="BLANK1")
+                cbox.row().label(text=f"  → {conflict['full_label']} [{conflict['full_group'] or 'No Group'}]", icon="BLANK1")
                 cbox.row().label(text=f"Context: {conflict['context']}", icon="WORLD")
                 cbox.separator(factor=0.5)
                 cbox.row().label(text=f"💡 Suggested fix: {conflict['suggested_fix']}", icon="HELP")
@@ -191,8 +191,9 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 dbox.row().label(text=f"Context: {dup['context']}", icon="WORLD")
                 dbox.separator(factor=0.3)
                 dbox.row().label(text=f"Found {dup['count']} times:")
-                for label in dup['labels']:
-                    dbox.row().label(text=f"  → {label}", icon="BLANK1")
+                for i, label in enumerate(dup['labels']):
+                    group = dup['groups'][i]
+                    dbox.row().label(text=f"  → {label} [{group or 'No Group'}]", icon="BLANK1")
 
                 dbox.separator(factor=0.5)
 
@@ -288,21 +289,56 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
             if not _check_chord_conflicts(new_key, chords_to_check):
                 return new_chord
 
-        # Fallback: try numbers if adding
+        # 2. Try numbers if adding
         if not change_last:
-            for num in "0123456789":
-                if num not in exclude_symbols:
-                    new_chord = " ".join(base_tokens + [num])
-                    new_key = tuple(base_tokens + [num])
-                    if not _check_chord_conflicts(new_key, chords_to_check):
-                        return new_chord
+            for num in "1234567890":
+                if num in exclude_symbols:
+                    continue
+                new_tokens = base_tokens + [num]
+                new_key = tuple(new_tokens)
+                if not _check_chord_conflicts(new_key, chords_to_check):
+                    return " ".join(new_tokens)
 
-        # Last resort
+        # 3. Last resort fallback: find any valid non-conflicting chord.
+        # If the prefix is "poisoned" (e.g. 's u' blocks all 's u ...'),
+        # we try changing tokens until we find a clear path.
+        
+        fallback_alphabet = "abcdefghijklmnopqrstuvwxyz1234567890"
+        
+        # Differentiate search order to keep suggestions diverse:
+        # - Change Last strategy: prioritize changing tokens from the END (index 2, 1, 0)
+        # - Add strategy: prioritize changing tokens from the START (index 0, 1, 2)
         if change_last:
-            fallback = "a" if base_tokens[-1] != "a" else "b"
-            return " ".join(base_tokens[:-1] + [fallback])
+            indices = range(len(base_tokens) - 1, -1, -1)
         else:
-            return " ".join(base_tokens + ["x"])
+            indices = range(len(base_tokens))
+            
+        for i in indices:
+            for sym in fallback_alphabet:
+                if sym in exclude_symbols:
+                    continue
+                
+                new_tokens = list(base_tokens)
+                if i < len(new_tokens):
+                    if new_tokens[i] == sym:
+                        continue
+                    new_tokens[i] = sym
+                
+                if not _check_chord_conflicts(tuple(new_tokens), chords_to_check):
+                    return " ".join(new_tokens)
+
+        # 4. Absolute last resort: just pick a non-excluded symbol to guarantee uniqueness in results
+        # even if it still results in a conflict with something else (better than a duplicate fix).
+        suffix = "x"
+        for s in "xyzuvwabcdefghijklmnopqrt":
+            if s not in exclude_symbols:
+                suffix = s
+                break
+        
+        if change_last and len(base_tokens) > 0:
+            return " ".join(base_tokens[:-1] + [suffix])
+        else:
+            return " ".join(base_tokens + [suffix])
 
     def _find_conflicts(self, mappings):
         """Find all chord conflicts."""
@@ -363,6 +399,7 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                         "context": ctx,
                         "count": len(mappings_list),
                         "labels": [get_str_attr(m, "label") for m in mappings_list],
+                        "groups": [get_str_attr(m, "group") for m in mappings_list],
                         "mappings": mappings_list,
                         "suggested_fixes_add": fixes["add"],
                         "suggested_fixes_change_last": fixes["change_last"]
@@ -386,8 +423,10 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                     conflicts["prefix_conflicts"].append({
                         "prefix_chord": prefix_chord,
                         "prefix_label": get_str_attr(chord_map[prefix_key][0], "label"),
+                        "prefix_group": get_str_attr(chord_map[prefix_key][0], "group"),
                         "full_chord": full_chord,
                         "full_label": get_str_attr(chord_map[full_key][0], "label"),
+                        "full_group": get_str_attr(chord_map[full_key][0], "group"),
                         "context": ctx,
                         "prefix_mapping": chord_map[prefix_key][0],
                         "suggested_fix": self._generate_chord(prefix_chord, all_chords, exclude_chord=full_chord)

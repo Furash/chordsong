@@ -3,30 +3,32 @@ import re
 import bpy  # type: ignore
 
 def parse_operator_from_text(text):
-    """Parse operator ID from text like 'bpy.ops.uv.weld()' or 'bpy.ops.uv.weld(...)'.
-
-    Args:
-        text: Text string that may contain an operator call
+    """Parse operator ID and arguments from text like 'bpy.ops.uv.weld()' or 'bpy.ops.uv.weld(type="TEST")'.
 
     Returns:
-        Operator ID string (e.g., 'uv.weld') or None if not found
+        Tuple (Operator ID, Arguments String) or (None, None)
     """
     if not text:
-        return None
+        return None, None
 
-    # Pattern to match bpy.ops.module.operator_name(...)
-    # Examples:
-    # - bpy.ops.uv.weld()
-    # - bpy.ops.uv.weld(option=True)
-    # - bpy.ops.mesh.primitive_cube_add(location=(0,0,0))
-    pattern = r'bpy\.ops\.([a-z_]+)\.([a-z_]+)\s*\('
+    # Pattern to match [bpy.ops.]module.operator_name(...)
+    pattern = r'(?:bpy\.ops\.)?([a-z0-9_]+)\.([a-z0-9_]+)\s*\((.*)\)'
     match = re.search(pattern, text)
     if match:
         module = match.group(1)
         operator = match.group(2)
-        return f"{module}.{operator}"
+        kwargs = match.group(3).strip()
+        return f"{module}.{operator}", kwargs
 
-    return None
+    # Fallback for just the ID if no parentheses
+    pattern_no_args = r'(?:bpy\.ops\.)?([a-z0-9_]+)\.([a-z0-9_]+)'
+    match = re.search(pattern_no_args, text)
+    if match:
+        module = match.group(1)
+        operator = match.group(2)
+        return f"{module}.{operator}", ""
+
+    return None, None
 
 def extract_from_info_panel(context):
     """Try to extract operator from Info panel text or clipboard."""
@@ -42,25 +44,33 @@ def extract_from_info_panel(context):
             is_info_panel = True
 
     operator = None
+    kwargs = ""
 
     if is_info_panel:
         # Method 1: Try to get selected report text by copying it
         try:
-            old_clipboard = context.window_manager.clipboard
-            try:
-                with context.temp_override(area=area):
-                    bpy.ops.info.report_copy()
-                new_clipboard = context.window_manager.clipboard
-                if new_clipboard and new_clipboard != old_clipboard:
-                    operator = parse_operator_from_text(new_clipboard)
-                    context.window_manager.clipboard = old_clipboard
-                else:
-                    context.window_manager.clipboard = old_clipboard
-            except Exception:
+            wm = context.window_manager
+            old_clipboard = wm.clipboard
+            
+            # Check if we can call report_copy safely
+            if hasattr(bpy.ops.info, "report_copy"):
+                # Use temp_override if area is provided, otherwise target the current context
                 try:
-                    context.window_manager.clipboard = old_clipboard
+                    if area:
+                        with context.temp_override(area=area):
+                            bpy.ops.info.report_copy()
+                    else:
+                        bpy.ops.info.report_copy()
+                    
+                    # If clipboard changed, it worked
+                    new_clipboard = wm.clipboard
+                    if new_clipboard and new_clipboard != old_clipboard:
+                        operator, kwargs = parse_operator_from_text(new_clipboard)
                 except Exception:
                     pass
+            
+            # Restore clipboard immediately after trying
+            wm.clipboard = old_clipboard
         except Exception:
             pass
 
@@ -71,7 +81,7 @@ def extract_from_info_panel(context):
                 if hasattr(wm, 'reports'):
                     for report in reversed(list(wm.reports.values())[-20:] if hasattr(wm.reports, 'values') else []):
                         if hasattr(report, 'message'):
-                            operator = parse_operator_from_text(report.message)
+                            operator, kwargs = parse_operator_from_text(report.message)
                             if operator:
                                 break
             except Exception:
@@ -83,11 +93,11 @@ def extract_from_info_panel(context):
             if history:
                 for entry in reversed(history[-10:]):
                     if hasattr(entry, 'body'):
-                        operator = parse_operator_from_text(entry.body)
+                        operator, kwargs = parse_operator_from_text(entry.body)
                         if operator:
                             break
                     elif isinstance(entry, str):
-                        operator = parse_operator_from_text(entry)
+                        operator, kwargs = parse_operator_from_text(entry)
                         if operator:
                             break
 
@@ -96,28 +106,29 @@ def extract_from_info_panel(context):
         try:
             clipboard = context.window_manager.clipboard
             if clipboard:
-                operator = parse_operator_from_text(clipboard)
+                operator, kwargs = parse_operator_from_text(clipboard)
         except Exception:
             pass
 
-    return operator
+    return operator, kwargs
 
 def extract_from_button_pointer(button_pointer):
     """Try to extract operator logic from button pointer."""
     operator = None
     button_operator = None
+    kwargs = ""
 
     if not button_pointer:
-        return None, None
+        return None, None, ""
 
     # Check if button_pointer has text content to parse
     if hasattr(button_pointer, 'body'):
-        operator = parse_operator_from_text(button_pointer.body)
+        operator, kwargs = parse_operator_from_text(button_pointer.body)
     elif isinstance(button_pointer, str):
-        operator = parse_operator_from_text(button_pointer)
+        operator, kwargs = parse_operator_from_text(button_pointer)
 
     if operator:
-        return operator, None
+        return operator, None, kwargs
 
     # Check if button_pointer is actually an operator instance
     if hasattr(button_pointer, "bl_idname"):
@@ -157,7 +168,7 @@ def extract_from_button_pointer(button_pointer):
         except Exception:
             pass
 
-    return operator, button_operator
+    return operator, button_operator, kwargs
 
 def extract_context_path(button_prop, button_pointer):
     """Attempt to construct a context path for a property."""

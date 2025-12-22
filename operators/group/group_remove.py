@@ -12,7 +12,10 @@ from ..common import prefs
 def _get_target_groups(self, context):
     """Get list of target groups for reassignment."""
     p = prefs(context)
-    items = [("", "None (Clear)", "Remove group from mappings")]
+    items = [
+        ("", "None (Clear Group)", "Remove group from mappings but keep the chords"),
+        ("__DELETE__", "Delete Mappings", "Permanently delete all mappings in this group", "TRASH", 0),
+    ]
 
     for idx, grp in enumerate(p.groups):
         if idx != self.index:
@@ -69,7 +72,7 @@ class CHORDSONG_OT_Group_Remove(bpy.types.Operator):
             layout.prop(self, "target_group")
 
     def execute(self, context):
-        """Remove group and reassign mappings."""
+        """Remove group and reassign/delete mappings."""
         p = prefs(context)
 
         if self.index < 0 or self.index >= len(p.groups):
@@ -77,24 +80,38 @@ class CHORDSONG_OT_Group_Remove(bpy.types.Operator):
             return {"CANCELLED"}
 
         group_name = p.groups[self.index].name
-        target = self.target_group.strip()
+        target = self.target_group
 
         count = 0
-        for m in p.mappings:
-            if m.group == group_name:
-                m.group = target
+        if target == "__DELETE__":
+            # Remove mappings belonging to this group
+            to_remove = []
+            for i, m in enumerate(p.mappings):
+                if m.group == group_name:
+                    to_remove.append(i)
+            
+            # Remove from last to first to preserve indices
+            for i in reversed(to_remove):
+                p.mappings.remove(i)
                 count += 1
+        else:
+            # Reassign or clear group
+            for m in p.mappings:
+                if m.group == group_name:
+                    m.group = target
+                    count += 1
 
         p.groups.remove(self.index)
 
         from ..common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)
 
-        if target:
+        if target == "__DELETE__":
+            msg = f"Removed group {group_name} and deleted {count} mappings"
+        elif target:
             msg = f"Removed group {group_name} and reassigned {count} mappings to {target}"
-            self.report({"INFO"}, msg)
         else:
-            msg = f"Removed group {group_name} and cleared {count} mappings"
-            self.report({"INFO"}, msg)
+            msg = f"Removed group {group_name} and cleared group from {count} mappings"
 
+        self.report({"INFO"}, msg)
         return {"FINISHED"}

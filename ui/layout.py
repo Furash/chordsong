@@ -333,6 +333,7 @@ def draw_addon_preferences(prefs, _context, layout):
             elif m.mapping_type == "CONTEXT_TOGGLE":
                 r2.prop(m, "context_path", text="")
             else:
+                r2.scale_x = 1.1
                 r2.prop(m, "operator", text="")
                 # Small convert button - create subsection with tight scaling
                 sub = r2.row(align=True)

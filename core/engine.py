@@ -167,20 +167,51 @@ def parse_kwargs(kwargs_json: str) -> dict:
         import ast
         import re
 
+        # If it's a full bpy.ops call, extract just the part inside ()
+        k_strip = kwargs_json.strip()
+        if "(" in k_strip and k_strip.endswith(")") and not k_strip.startswith("("):
+            # Stricter check: must look like a function call and not just property assignments
+            # A full call shouldn't have an '=' before the first '('
+            first_paren = k_strip.find("(")
+            prefix = k_strip[:first_paren].strip()
+            
+            # If it's a full call, the prefix should be a valid python identifier/path
+            # and there should be no '=' in the prefix (which would mean it's an assignment)
+            if "=" not in prefix and "." in prefix:
+                if any(prefix.startswith(p) for p in ("bpy.", "ops.", "bpy.ops.")) or " " not in prefix:
+                    inner_match = re.search(r'\((.*)\)', k_strip)
+                    if inner_match:
+                        kwargs_json = inner_match.group(1)
+
         # Parse Python-like assignment format
         result = {}
-        # Split by commas, but respect quoted strings
+        # Split by commas, but respect quoted strings and nested brackets/parens
         parts = []
         current = []
         in_quotes = False
+        quote_char = ''
+        nesting_level = 0
+        
         for char in kwargs_json:
-            if char == '"' or char == "'":
-                in_quotes = not in_quotes
-            if char == ',' and not in_quotes:
+            if char in ('"', "'"):
+                if not in_quotes:
+                    in_quotes = True
+                    quote_char = char
+                elif char == quote_char:
+                    in_quotes = False
+            
+            if not in_quotes:
+                if char in ('(', '[', '{'):
+                    nesting_level += 1
+                elif char in (')', ']', '}'):
+                    nesting_level -= 1
+            
+            if char == ',' and not in_quotes and nesting_level == 0:
                 parts.append(''.join(current).strip())
                 current = []
             else:
                 current.append(char)
+        
         if current:
             parts.append(''.join(current).strip())
 
@@ -191,11 +222,11 @@ def parse_kwargs(kwargs_json: str) -> dict:
                 key = key.strip()
                 value = value.strip()
 
-                # Try to evaluate the value
+                # Try to evaluate the value safely using ast.literal_eval
                 try:
                     result[key] = ast.literal_eval(value)
                 except (ValueError, SyntaxError):
-                    # Keep as string if can't evaluate
+                    # Keep as string if can't evaluate (strip extra quotes)
                     result[key] = value.strip('"\'')
 
         return result
