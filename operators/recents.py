@@ -7,7 +7,11 @@
 import bpy  # type: ignore
 
 from ..core.history import get_history
-from ..core.engine import normalize_token
+from ..core.engine import (
+    normalize_token,
+    get_leader_key_type,
+    get_leader_key_token,
+)
 from ..utils.render import (
     DrawHandlerManager,
     calculate_scale_factor,
@@ -197,8 +201,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         footer_bg_top = footer_y + chord_size # Default if no footer
 
         if p.overlay_show_footer:
+            leader_token = get_leader_key_token()
             footer_items = [
-                {"token": "ESC", "label": "Close", "icon": ""}
+                {"token": "ESC", "label": "Close", "icon": ""},
+                {"token": leader_token, "label": "Repeat Most Recent", "icon": ""}
             ]
 
             # Use prefs for footer text size
@@ -207,9 +213,15 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
             # We need mock max_token_w/max_label_w for footer spacing calculation
             blf.size(0, footer_text_size)
-            f_token_w, _ = blf.dimensions(0, "<ESC>")
-            blf.size(0, body_size)
-            f_label_w, _ = blf.dimensions(0, "Close")
+            f_token_w = 0.0
+            f_label_w = 0.0
+            for item in footer_items:
+                tw, _ = blf.dimensions(0, f"<{item['token'].upper()}>")
+                f_token_w = max(f_token_w, tw)
+                blf.size(0, body_size)
+                lw, _ = blf.dimensions(0, item["label"])
+                f_label_w = max(f_label_w, lw)
+                blf.size(0, footer_text_size)
 
             footer_bg_top = draw_overlay_footer(
                 p, region_w, footer_y, footer_items, footer_text_size, footer_text_size, scale_factor,
@@ -367,6 +379,18 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         if event.value != "PRESS":
             return {"RUNNING_MODAL"}
+
+        # Check for leader key to repeat most recent
+        leader_key = get_leader_key_type()
+        if event.type == leader_key:
+            entry = history.get(0)
+            if entry:
+                self._execute_history_entry(context, entry)
+                return {"FINISHED"}
+            else:
+                self.report({"WARNING"}, "No history entry to repeat")
+                self._finish(context)
+                return {"CANCELLED"}
 
         # Check for digit input (1-9 only, immediate execution)
         tok = normalize_token(event.type, shift=event.shift)
