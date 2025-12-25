@@ -11,7 +11,7 @@ class CHORDSONG_OT_Open_Prefs(bpy.types.Operator):
 
     addon: bpy.props.StringProperty(
         name="Add-on Name",
-        description="Module name of the addon (e.g. 'chordsong', 'mesh_looptools')",
+        description="Module name of the addon (e.g. 'chordsong', 'InteractionOps')",
         default=""
     )
 

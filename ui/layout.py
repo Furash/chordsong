@@ -92,12 +92,11 @@ def draw_addon_preferences(prefs, _context, layout):
         box.separator()
 
         # Color settings
-        split = box.split(factor=0.11)
+        split = box.split(factor=0.3)
         col1 = split.column()
         col2 = split.column()
         col3 = split.column()
         col4 = split.column()
-        col5 = split.column()
 
         # First column - labels
         col1.label(text="Chord:")
@@ -121,7 +120,15 @@ def draw_addon_preferences(prefs, _context, layout):
 
         col3.separator()
         col4.separator()
-        col5.separator()
+
+        box = col.box()
+        box.separator()
+        r = box.row(align=True)
+        split = r.split(factor=0.3)
+        split.label(text="Overlay Style:")
+        split.prop(prefs, "overlay_folder_style", text="")
+        split.separator()
+        box.separator()
 
         # Testing
         box_test = col.box()
@@ -129,8 +136,6 @@ def draw_addon_preferences(prefs, _context, layout):
         row = box_test.row()
         row.operator("chordsong.test_main_overlay", text="Test Main Overlay", icon="PLAY")
         row.operator("chordsong.test_fading_overlay", text="Test Fading Overlay", icon="PLAY")
-
-        box.separator()
 
         return
 

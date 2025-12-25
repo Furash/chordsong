@@ -155,8 +155,10 @@ class DummyMapping:
         self.icon = icons[i % len(icons)]
 
         # Assign groups to test grouping visualization
-        if i < 5:
+        if i < 3:
             self.group = "Common"
+        elif i < 5:
+            self.group = "UV"
         elif i < 15:
             self.group = "Modeling"
         else:

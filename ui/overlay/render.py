@@ -261,29 +261,40 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                 blf.size(0, body_size)
                 current_size = body_size
             
-            # Support partial alpha via '||' separator (part||alpha_mult)
-            # Or dedicated 'item' parts. For simplicity here, we split by whitespace 
-            # and check if it's the arrow to apply the requested 0.35 alpha.
-            label_parts = label_txt.split("  ") # We used double space in layout.py
-            
-            blf.position(0, label_x, cy, 0)
-            current_draw_x = label_x
-            
-            for part in label_parts:
-                if not part: continue
-                
-                # Apply 0.2 alpha to the arrow
-                if "→" in part:
+            # Helper to draw text with specific alpha for the separator
+            def draw_part_with_alpha(txt, start_x):
+                # Check for separators that should be dimmed
+                sep = None
+                if "→" in txt: sep = "→"
+                elif ">" in txt: sep = ">"
+                elif "::" in txt: sep = "::"
+
+                if sep:
+                    # Draw separator with 0.2 alpha
                     blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3] * 0.2)
+                    blf.position(0, start_x, cy, 0)
+                    blf.draw(0, sep)
+                    
+                    # Spacing after separator
+                    sep_w, _ = blf.dimensions(0, sep + "  ")
+                    
+                    # Draw remaining text at full alpha
+                    blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
+                    blf.position(0, start_x + sep_w, cy, 0)
+                    blf.draw(0, txt.replace(sep, "", 1).strip())
                 else:
                     blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
-                
-                blf.position(0, current_draw_x, cy, 0)
-                blf.draw(0, part)
-                
-                # Advance X for next part (add back the double space width)
-                pw, _ = blf.dimensions(0, part + "  ")
-                current_draw_x += pw
+                    blf.position(0, start_x, cy, 0)
+                    blf.draw(0, txt)
+
+            # 1. Draw base label
+            draw_part_with_alpha(r["label"], label_x)
+            
+            # 2. Draw extra label (aligned)
+            if r.get("label_extra"):
+                sw, _ = blf.dimensions(0, "  ")
+                extra_x = label_x + metrics["label_base"] + sw
+                draw_part_with_alpha(r["label_extra"], extra_x)
                 
             cy -= line_h
 
@@ -359,7 +370,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         line_h = int(body_size * p.overlay_line_height)
 
         # Build rows and footer
-        rows, footer = build_overlay_rows(cands, bool(buffer_tokens))
+        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p)
         max_rows = max(int(p.overlay_column_rows), 1)
         columns = wrap_into_columns(rows, max_rows)
 

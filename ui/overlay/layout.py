@@ -1,9 +1,12 @@
 """Layout calculation functions for overlay."""
 from ...core.engine import get_leader_key_token
 
-def build_overlay_rows(cands, has_buffer, mappings=None):
+def build_overlay_rows(cands, has_buffer, p=None):
     """Build display rows from candidates, footer returned separately."""
     rows = []
+    
+    # Get style from prefs if available
+    style = getattr(p, "overlay_folder_style", "GROUPS_FIRST") if p else "GROUPS_FIRST"
     
     # Sort candidates by group then token
     sorted_cands = sorted(cands, key=lambda c: (c.group.lower(), c.next_token))
@@ -15,12 +18,40 @@ def build_overlay_rows(cands, has_buffer, mappings=None):
         if c.count > 1 or not c.is_final:
             # Folder/Summary row - always use folder style if not a final command
             # No icon for summary/folder items
-            suffix = "s" if c.count > 1 else ""
-            label = f"→  +{c.count} keymap{suffix}"
-            rows.append({"kind": "item", "token": token, "label": label, "icon": ""})
+            suffix = "s" if c.count > 1 else " "
+            
+            # Groups summary part
+            groups_str = "(unlabeled)"
+            if c.groups:
+                visible_groups = c.groups[:2]
+                groups_str = ", ".join(visible_groups)
+                if len(c.groups) > 2:
+                    groups_str += "..."
+            
+            label_base = ""
+            label_extra = ""
+
+            if style == "DEFAULT":
+                # Default: → +N keymaps
+                label_base = f"→  +{c.count} keymap{suffix}"
+                label_extra = ""
+            elif style == "GROUPS_AFTER":
+                # Count + Groups: → +N keymaps :: Groups
+                label_base = f"→  +{c.count} keymap{suffix}"
+                label_extra = f"::  {groups_str}"
+            elif style == "GROUPS_FIRST":
+                # Groups + Aligned Count: → Groups → N keymaps
+                label_base = f"→  {groups_str}"
+                label_extra = f"→  {c.count} keymap{suffix}"
+            elif style == "HYBRID":
+                # Hybrid Minimal: → Groups :: N
+                label_base = f"→  {groups_str}"
+                label_extra = f"::  {c.count} keymap{suffix}"
+                
+            rows.append({"kind": "item", "token": token, "label": label_base, "label_extra": label_extra, "icon": ""})
         else:
             # Single final chord, show its label
-            rows.append({"kind": "item", "token": token, "label": c.label, "icon": icon})
+            rows.append({"kind": "item", "token": token, "label": c.label, "label_extra": "", "icon": icon})
 
     # Footer items (always at bottom)
     footer = []
@@ -66,7 +97,8 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
     # Check all columns
     for col in columns:
         col_max_token_w = 0.0
-        col_max_label_w = 0.0
+        col_max_label_base_w = 0.0
+        col_max_label_total_w = 0.0
         col_max_header_w = 0.0
         has_any_icon = False
 
@@ -86,13 +118,25 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
 
                 # Label width
                 blf.size(0, body_size)
-                lw, _ = blf.dimensions(0, r["label"])
-                col_max_label_w = max(col_max_label_w, lw)
+                
+                # Base part
+                lbw, _ = blf.dimensions(0, r["label"])
+                col_max_label_base_w = max(col_max_label_base_w, lbw)
+                
+                # Total width (base + gap + extra)
+                full_txt = r["label"]
+                if r.get("label_extra"):
+                    full_txt += "  " + r["label_extra"]
+                
+                lw, _ = blf.dimensions(0, full_txt)
+                col_max_label_total_w = max(col_max_label_total_w, lw)
+                
                 blf.size(0, chord_size)
 
         column_metrics.append({
             "token": col_max_token_w,
-            "label": col_max_label_w,
+            "label": col_max_label_total_w,
+            "label_base": col_max_label_base_w,
             "header": col_max_header_w,
             "has_icons": has_any_icon
         })

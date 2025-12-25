@@ -475,6 +475,19 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
+    overlay_folder_style: EnumProperty(
+        name="Overlay Style",
+        description="Choose how folder/summary items (prefixes leading to multiple actions) are displayed",
+        items=(
+            ("DEFAULT", "Default: → +N keymaps", "Classic count-only style"),
+            ("GROUPS_AFTER", "→ +N keymaps :: Groups", "Count followed by a summary of groups"),
+            ("GROUPS_FIRST", "→ Groups → N keymaps", "Summary of groups followed by a vertically aligned count"),
+            ("HYBRID", "→ Groups :: N", "Groups followed by a simple count with :: symbol"),
+        ),
+        default="GROUPS_FIRST",
+        update=_on_prefs_changed,
+    )
+
     mappings: CollectionProperty(type=CHORDSONG_PG_Mapping)
     groups: CollectionProperty(type=CHORDSONG_PG_Group)
     nerd_icons: CollectionProperty(type=CHORDSONG_PG_NerdIcon)

@@ -86,6 +86,7 @@ class Candidate:
     icon: str = ""
     is_final: bool = False  # True if this is the last token in the chord
     count: int = 1          # Number of mappings reachable through this token
+    groups: tuple[str, ...] = () # Unique groups reachable through this token
 
 def build_match_sets(mappings):
     """
@@ -146,11 +147,18 @@ def candidates_for_prefix(mappings, buffer_tokens):
         is_final = len(tokens) == len(bt) + 1
         # Track counts and keep first label per next token for minimal UI
         if nxt not in out:
-            out[nxt] = {"cand": Candidate(nxt, label, group, icon, is_final), "count": 1}
+            out[nxt] = {
+                "cand": Candidate(nxt, label, group, icon, is_final), 
+                "count": 1,
+                "groups": {group} if group else set()
+            }
         else:
             out[nxt]["count"] += 1
+            if group:
+                out[nxt]["groups"].add(group)
+            
             # If we already have a non-final candidate, but found a final one, update the candidate
-            # but keep the accumulated count
+            # but keep the accumulated count and groups
             if not out[nxt]["cand"].is_final and is_final:
                 out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final)
 
@@ -164,7 +172,8 @@ def candidates_for_prefix(mappings, buffer_tokens):
             group=c.group,
             icon=c.icon,
             is_final=c.is_final,
-            count=data["count"]
+            count=data["count"],
+            groups=tuple(sorted(data["groups"]))
         ))
     return result
 

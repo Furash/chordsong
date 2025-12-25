@@ -77,6 +77,7 @@ def dump_prefs(prefs) -> dict:
             "footer_token_gap": int(getattr(prefs, "overlay_footer_token_gap", 10)),
             "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
             "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
+            "style": getattr(prefs, "overlay_folder_style", "GROUPS_FIRST"),
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
         },
@@ -208,6 +209,15 @@ def apply_config(prefs, data: dict) -> list[str]:
                 prefs.overlay_position = pos
             else:
                 warnings.append(f'Unknown overlay.position "{pos}", keeping current')
+
+        # Folder/Overlay style enum
+        style = overlay.get("style", None)
+        if isinstance(style, str):
+            valid = _enum_items_as_set(prefs, "overlay_folder_style")
+            if style in valid:
+                prefs.overlay_folder_style = style
+            else:
+                warnings.append(f'Unknown overlay.style "{style}", keeping current')
 
     # Groups - Load groups before mappings for proper validation
     groups_data = data.get("groups", None)
