@@ -12,19 +12,12 @@ def build_overlay_rows(cands, has_buffer, mappings=None):
         token = c.next_token
         icon = c.icon if c.icon else ""
         
-        if c.count > 1:
-            # Multiple actions share this prefix - show a summary as requested
+        if c.count > 1 or not c.is_final:
+            # Folder/Summary row - always use folder style if not a final command
             # No icon for summary/folder items
-            label = f"→  +{c.count} keymaps"
+            suffix = "s" if c.count > 1 else ""
+            label = f"→  +{c.count} keymap{suffix}"
             rows.append({"kind": "item", "token": token, "label": label, "icon": ""})
-        elif not c.is_final:
-            # Intermediate chord level with only 1 action
-            # Keep showing the destination label or group name if preferred, 
-            # but usually for 1 action showing the destination label is best.
-            # We'll use the label from engine.py (which is group[0].label)
-            # but append ... to indicate it's not final.
-            label = f"{c.label}..."
-            rows.append({"kind": "item", "token": token, "label": label, "icon": icon})
         else:
             # Single final chord, show its label
             rows.append({"kind": "item", "token": token, "label": c.label, "icon": icon})

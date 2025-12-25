@@ -6,19 +6,26 @@ import bpy  # type: ignore
 
 class CHORDSONG_OT_Open_Prefs(bpy.types.Operator):
     bl_idname = "chordsong.open_prefs"
-    bl_label = "Open Chord Song Preferences"
+    bl_label = "Open Add-on Preferences"
     bl_options = {"INTERNAL", "UNDO"}
+
+    addon: bpy.props.StringProperty(
+        name="Add-on Name",
+        description="Module name of the addon (e.g. 'chordsong', 'mesh_looptools')",
+        default=""
+    )
 
     def execute(self, context: bpy.types.Context):
         try:
-            # Get the addon package name
-            addon_name = __package__.split(".")[0]
+            # Use provided name or fall back to current package (chordsong)
+            target = self.addon
+            if not target:
+                target = __package__.split(".")[0]
 
-            # Open preferences and show this addon
-            # This operator handles opening the preferences window if needed
-            bpy.ops.preferences.addon_show(module=addon_name)
+            # Open preferences and show the specific addon
+            bpy.ops.preferences.addon_show(module=target)
 
             return {"FINISHED"}
         except Exception as ex:
-            self.report({"WARNING"}, f"Failed to open preferences: {ex}")
+            self.report({"WARNING"}, f"Failed to open preferences for '{self.addon or 'current addon'}': {ex}")
             return {"CANCELLED"}
