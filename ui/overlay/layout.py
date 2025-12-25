@@ -3,50 +3,31 @@ from ...core.engine import get_leader_key_token
 
 def build_overlay_rows(cands, has_buffer, mappings=None):
     """Build display rows from candidates, footer returned separately."""
-    # Group candidates by next token to detect multi-chord prefixes
-    token_groups = {}
-    for c in cands:
-        token = c.next_token
-        if token not in token_groups:
-            token_groups[token] = []
-        token_groups[token].append(c)
-
     rows = []
-    for token, group in sorted(token_groups.items()):
-        # Use first icon if available, or empty string
-        icon = group[0].icon if group[0].icon else ""
-
-        # Check if any candidate in this group is non-final (intermediate level)
-        has_non_final = any(not c.is_final for c in group)
-
-        if has_non_final:
-            # Intermediate chord level - show group name instead of label
-            # Check if all items in this group have the same group name
-            group_names = {c.group for c in group if c.group}
-            if len(group_names) == 1:
-                # All belong to the same group, use group name
-                label = f"{list(group_names)[0]}..."
-            else:
-                # Mixed groups or no group, use generic label
-                label = "More..."
-
-            rows.append({"kind": "item", "token": token, "label": label, "icon": icon})
-        elif len(group) > 1:
-            # Multiple final chords share this prefix, show a summary
-            # Check if all items in this group have the same group name
-            group_names = {c.group for c in group if c.group}
-            if len(group_names) == 1:
-                # All belong to the same group, use group name
-                label = f"{list(group_names)[0]}..."
-            else:
-                # Mixed groups or no group, use first label's first word
-                label = f"{group[0].label.split()[0] if group[0].label else 'More'}..."
-
+    
+    # Sort candidates by group then token
+    sorted_cands = sorted(cands, key=lambda c: (c.group.lower(), c.next_token))
+    
+    for c in sorted_cands:
+        token = c.next_token
+        icon = c.icon if c.icon else ""
+        
+        if c.count > 1:
+            # Multiple actions share this prefix - show a summary as requested
+            # No icon for summary/folder items
+            label = f"→  +{c.count} keymaps"
+            rows.append({"kind": "item", "token": token, "label": label, "icon": ""})
+        elif not c.is_final:
+            # Intermediate chord level with only 1 action
+            # Keep showing the destination label or group name if preferred, 
+            # but usually for 1 action showing the destination label is best.
+            # We'll use the label from engine.py (which is group[0].label)
+            # but append ... to indicate it's not final.
+            label = f"{c.label}..."
             rows.append({"kind": "item", "token": token, "label": label, "icon": icon})
         else:
             # Single final chord, show its label
-            c = group[0]
-            rows.append({"kind": "item", "token": c.next_token or "", "label": c.label, "icon": c.icon})
+            rows.append({"kind": "item", "token": token, "label": c.label, "icon": icon})
 
     # Footer items (always at bottom)
     footer = []
@@ -94,6 +75,7 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
         col_max_token_w = 0.0
         col_max_label_w = 0.0
         col_max_header_w = 0.0
+        has_any_icon = False
 
         for r in col:
             if r["kind"] == "header":
@@ -102,6 +84,9 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
                 col_max_header_w = max(col_max_header_w, w)
                 blf.size(0, chord_size)
             else:
+                if r.get("icon"):
+                    has_any_icon = True
+                
                 # Token width
                 tw, _ = blf.dimensions(0, f"{r['token'].upper()}")
                 col_max_token_w = max(col_max_token_w, tw)
@@ -115,7 +100,8 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
         column_metrics.append({
             "token": col_max_token_w,
             "label": col_max_label_w,
-            "header": col_max_header_w
+            "header": col_max_header_w,
+            "has_icons": has_any_icon
         })
 
     # Check footer items

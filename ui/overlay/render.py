@@ -217,7 +217,8 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         cy = start_y
 
         icon_x = cx
-        token_col_left_x = cx + icon_size + gap
+        row_icon_size = icon_size if metrics["has_icons"] else 0
+        token_col_left_x = cx + row_icon_size + (gap if metrics["has_icons"] else 0)
         # Labels are now positioned dynamically per row to keep gap constant
 
         for r in col_rows:
@@ -252,17 +253,38 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             blf.position(0, token_col_left_x, cy, 0)
             blf.draw(0, token_txt)
 
-            # Calculate token width for dynamic label positioning
-            tw, _ = blf.dimensions(0, token_txt)
-            label_x = token_col_left_x + tw + gap
+            # Calculate label position (aligned per column)
+            label_x = token_col_left_x + metrics["token"] + gap
 
             # Draw label
             if current_size != body_size:
                 blf.size(0, body_size)
                 current_size = body_size
-            blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
+            
+            # Support partial alpha via '||' separator (part||alpha_mult)
+            # Or dedicated 'item' parts. For simplicity here, we split by whitespace 
+            # and check if it's the arrow to apply the requested 0.35 alpha.
+            label_parts = label_txt.split("  ") # We used double space in layout.py
+            
             blf.position(0, label_x, cy, 0)
-            blf.draw(0, label_txt)
+            current_draw_x = label_x
+            
+            for part in label_parts:
+                if not part: continue
+                
+                # Apply 0.2 alpha to the arrow
+                if "→" in part:
+                    blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3] * 0.2)
+                else:
+                    blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
+                
+                blf.position(0, current_draw_x, cy, 0)
+                blf.draw(0, part)
+                
+                # Advance X for next part (add back the double space width)
+                pw, _ = blf.dimensions(0, part + "  ")
+                current_draw_x += pw
+                
             cy -= line_h
 
         current_x_offset += col_total_w + col_gap
@@ -347,7 +369,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         # Calculate width per column
         total_cols_w = 0
         for m in col_metrics:
-            content_w = icon_size + gap + m["token"] + gap + m["label"]
+            col_icon_w = (icon_size + gap) if m["has_icons"] else 0
+            content_w = col_icon_w + m["token"] + gap + m["label"]
             width = max(content_w, m["header"])
             m["total_w"] = width
             total_cols_w += width

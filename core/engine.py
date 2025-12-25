@@ -85,6 +85,7 @@ class Candidate:
     group: str
     icon: str = ""
     is_final: bool = False  # True if this is the last token in the chord
+    count: int = 1          # Number of mappings reachable through this token
 
 def build_match_sets(mappings):
     """
@@ -143,13 +144,29 @@ def candidates_for_prefix(mappings, buffer_tokens):
         icon = get_str_attr(m, "icon")
         # Check if this is the final token in the chord
         is_final = len(tokens) == len(bt) + 1
-        # Keep first label per next token for minimal UI
+        # Track counts and keep first label per next token for minimal UI
         if nxt not in out:
-            out[nxt] = Candidate(nxt, label, group, icon, is_final)
-        elif not out[nxt].is_final and is_final:
-            # If we already have a non-final candidate, but found a final one, update it
-            out[nxt] = Candidate(nxt, label, group, icon, is_final)
-    return list(out.values())
+            out[nxt] = {"cand": Candidate(nxt, label, group, icon, is_final), "count": 1}
+        else:
+            out[nxt]["count"] += 1
+            # If we already have a non-final candidate, but found a final one, update the candidate
+            # but keep the accumulated count
+            if not out[nxt]["cand"].is_final and is_final:
+                out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final)
+
+    # Convert back to Candidate list with updated counts
+    result = []
+    for token, data in out.items():
+        c = data["cand"]
+        result.append(Candidate(
+            next_token=c.next_token,
+            label=c.label,
+            group=c.group,
+            icon=c.icon,
+            is_final=c.is_final,
+            count=data["count"]
+        ))
+    return result
 
 def parse_kwargs(kwargs_json: str) -> dict:
     if not (kwargs_json or "").strip():

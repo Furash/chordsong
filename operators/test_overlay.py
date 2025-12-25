@@ -129,7 +129,12 @@ class DummyMapping:
         # Generate unique starting token so all items appear in the top-level list.
         # Vary FIRST token length to test column width calculation
 
-        if i % 3 == 0:
+        if i < 8:
+             # Force multiple identical prefixes to test summary (+8 keymaps)
+             prefix = "a"
+             self.chord = f"a {chr(97+i)}"
+             self.label = f"Sub Action {i+1}"
+        elif i % 3 == 0:
              # Long first token (simulating modifiers)
              prefix = f"ctrl+shift+k{i+1:02d}"
              self.chord = f"{prefix} a b c"
