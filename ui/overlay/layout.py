@@ -100,6 +100,7 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
         col_max_label_base_w = 0.0
         col_max_label_total_w = 0.0
         col_max_header_w = 0.0
+        col_max_icon_w = 0.0
         has_any_icon = False
 
         for r in col:
@@ -111,6 +112,10 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
             else:
                 if r.get("icon"):
                     has_any_icon = True
+                    # Measure actual icon width (can be multiple characters)
+                    blf.size(0, chord_size)
+                    iw, _ = blf.dimensions(0, r["icon"])
+                    col_max_icon_w = max(col_max_icon_w, iw)
                 
                 # Token width
                 tw, _ = blf.dimensions(0, f"{r['token'].upper()}")
@@ -138,7 +143,8 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
             "label": col_max_label_total_w,
             "label_base": col_max_label_base_w,
             "header": col_max_header_w,
-            "has_icons": has_any_icon
+            "has_icons": has_any_icon,
+            "icon_w": col_max_icon_w
         })
 
     # Check footer items

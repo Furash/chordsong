@@ -217,7 +217,7 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
         cy = start_y
 
         icon_x = cx
-        row_icon_size = icon_size if metrics["has_icons"] else 0
+        row_icon_size = metrics["icon_w"] if metrics["has_icons"] else 0
         token_col_left_x = cx + row_icon_size + (gap if metrics["has_icons"] else 0)
         # Labels are now positioned dynamically per row to keep gap constant
 
@@ -380,7 +380,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         # Calculate width per column
         total_cols_w = 0
         for m in col_metrics:
-            col_icon_w = (icon_size + gap) if m["has_icons"] else 0
+            col_icon_w = (m["icon_w"] + gap) if m["has_icons"] else 0
             content_w = col_icon_w + m["token"] + gap + m["label"]
             width = max(content_w, m["header"])
             m["total_w"] = width
@@ -504,8 +504,12 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     pad_y = int(p.overlay_offset_y * scale_factor)
 
     # Calculate content width
-    icon_w = icon_size if icon else 0
-    content_w = icon_w + gap + chord_w + gap + label_w
+    if icon:
+        blf.size(0, icon_size)
+        icon_w, _ = blf.dimensions(0, icon)
+    else:
+        icon_w = 0
+    content_w = icon_w + (gap if icon_w > 0 else 0) + chord_w + gap + label_w
 
     # Position at the same level as the main overlay header
     # Calculate position using same logic as main overlay
