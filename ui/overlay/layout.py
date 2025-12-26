@@ -55,6 +55,10 @@ def build_overlay_rows(cands, has_buffer, p=None):
 
     # Footer items (always at bottom)
     footer = []
+    
+    # 1. Mod hints (informational)
+    footer.append({"kind": "hint", "token": ">R  ^Ctrl  !Alt  +Shift  #Win", "label": "", "icon": ""})
+
     if not has_buffer:
         # Only show recents at root level (no buffer)
         leader_token = get_leader_key_token()
@@ -151,12 +155,17 @@ def calculate_column_widths(columns, footer, chord_size, body_size):
     f_token_w = 0.0
     f_label_w = 0.0
     for r in footer:
-        tw, _ = blf.dimensions(0, f"{r['token'].upper()}")
-        f_token_w = max(f_token_w, tw)
+        if r["kind"] == "hint":
+            # Hint uses its raw text as token, label is empty
+            tw, _ = blf.dimensions(0, r["token"])
+            f_token_w = max(f_token_w, tw)
+        else:
+            tw, _ = blf.dimensions(0, f"<{r['token'].upper()}>")
+            f_token_w = max(f_token_w, tw)
 
-        blf.size(0, body_size)
-        lw, _ = blf.dimensions(0, r["label"])
-        f_label_w = max(f_label_w, lw)
-        blf.size(0, chord_size)
+            blf.size(0, body_size)
+            lw, _ = blf.dimensions(0, r["label"])
+            f_label_w = max(f_label_w, lw)
+            blf.size(0, chord_size)
 
     return column_metrics, {"token": f_token_w, "label": f_label_w}

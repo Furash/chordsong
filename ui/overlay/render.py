@@ -107,54 +107,88 @@ def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_si
     # Draw background
     draw_rect(0, bg_y1, region_w, bg_y2, p.overlay_footer_background)
 
-    # Calculate layout
+    # Calculate layout - compute widths for each item individually
     footer_token_gap = int(p.overlay_footer_token_gap * scale_factor)
     footer_label_gap = int(p.overlay_footer_label_gap * scale_factor)
-    footer_item_width = max_token_w + footer_token_gap + icon_size + footer_label_gap + max_label_w
     footer_gap = int(p.overlay_footer_gap * scale_factor)
-    total_footer_width = len(footer_items) * footer_item_width + (len(footer_items) - 1) * footer_gap
-
-    footer_x = (region_w - total_footer_width) // 2
-
-    blf.size(0, chord_size)
-
+    
+    item_layouts = []
+    total_footer_width = 0
+    
+    # First pass: calculate widths
     for r in footer_items:
+        kind = r.get("kind", "item")
         token_txt = r["token"]
         label_txt = r["label"]
         icon_text = r.get("icon", "")
 
-        # Update token for "Recent Commands"
+        # Token for "Recent Commands"
         if label_txt == "Recent Commands" and "+" in token_txt:
             leader_token = get_leader_key_token()
             token_txt = f"{leader_token}+{leader_token}"
 
-        token_x = footer_x
-
-        # Draw token
-        blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
-        display_token = f"<{token_txt.upper()}>"
+        # Measure token
+        blf.size(0, chord_size)
+        display_token = token_txt if kind == "hint" else f"<{token_txt.upper()}>"
         tw, _ = blf.dimensions(0, display_token)
+        
+        # Measure label
+        blf.size(0, body_size)
+        lw, _ = blf.dimensions(0, label_txt)
+        
+        # Total item width
+        icon_w = icon_size if icon_text else 0
+        gap_token = footer_token_gap if (icon_text or label_txt) else 0
+        gap_label = footer_label_gap if (icon_text and label_txt) else 0
+        
+        width = tw + gap_token + icon_w + gap_label + lw
+        item_layouts.append({
+            "token": display_token,
+            "label": label_txt,
+            "icon": icon_text,
+            "tw": tw,
+            "width": width,
+            "kind": kind
+        })
+        total_footer_width += width
+
+    total_footer_width += (len(footer_items) - 1) * footer_gap
+    footer_x = (region_w - total_footer_width) // 2
+
+    # Second pass: Draw
+    for layout in item_layouts:
+        token_x = footer_x
+        kind = layout["kind"]
+        
+        # Draw token
+        blf.size(0, chord_size)
+        if kind == "hint":
+            # Subtle hint color
+            blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3] * 0.4)
+        else:
+            blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3])
+            
         blf.position(0, token_x, footer_y, 0)
-        blf.draw(0, display_token)
+        blf.draw(0, layout["token"])
 
         # Draw icon
-        icon_x = token_x + tw + footer_token_gap
-        if icon_text:
+        icon_x = token_x + layout["tw"] + (footer_token_gap if (layout["icon"] or layout["label"]) else 0)
+        if layout["icon"]:
             try:
                 blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3])
-                draw_icon(icon_text, icon_x, footer_y, icon_size)
+                draw_icon(layout["icon"], icon_x, footer_y, icon_size)
             except Exception:
                 pass
 
         # Draw label
-        label_x = icon_x + (icon_size if icon_text else 0) + (footer_label_gap if icon_text else footer_token_gap)
-        blf.size(0, body_size)
-        blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
-        blf.position(0, label_x, footer_y, 0)
-        blf.draw(0, label_txt)
+        if layout["label"]:
+            label_x = icon_x + (icon_size if layout["icon"] else 0) + (footer_label_gap if layout["icon"] else 0)
+            blf.size(0, body_size)
+            blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
+            blf.position(0, label_x, footer_y, 0)
+            blf.draw(0, layout["label"])
 
-        blf.size(0, chord_size)
-        footer_x += footer_item_width + footer_gap
+        footer_x += layout["width"] + footer_gap
 
     return bg_y2 # Return top of footer bg (for list bg connection)
 

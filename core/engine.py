@@ -5,75 +5,94 @@ def get_str_attr(obj, attr, default=""):
     """Get string attribute with fallback and strip whitespace."""
     return (getattr(obj, attr, default) or default).strip()
 
-def normalize_token(event_type: str, shift: bool = False):
+def normalize_token(event_type: str, shift: bool = False, ctrl: bool = False, alt: bool = False, oskey: bool = False, mod_side: str = None):
     """
-    Convert a Blender event.type into a chord token.
-    Minimal rules:
-    - Letters: lowercase by default, uppercase if shift is pressed.
-    - Digits remain digits.
-    - Ignore pure modifiers and non-keyboard noise.
-
-    Args:
-        event_type: The Blender event type string
-        shift: Whether shift key is pressed
+    Convert a Blender event into a chord token using AHK-style modifier symbols.
+    
+    Symbols:
+    ^ : Ctrl
+    ! : Alt
+    + : Shift
+    # : Win (OSKey)
+    < : Left modifier prefix (e.g., <^ for LCtrl)
+    > : Right modifier prefix (e.g., >! for RAlt)
     """
     if not event_type:
         return None
 
-    if event_type in {"LEFT_SHIFT", "RIGHT_SHIFT", "LEFT_CTRL", "RIGHT_CTRL", "LEFT_ALT", "RIGHT_ALT", "OSKEY"}:
+    # Ignore pure modifiers as tokens
+    if event_type in {
+        "LEFT_SHIFT", "RIGHT_SHIFT", 
+        "LEFT_CTRL", "RIGHT_CTRL", 
+        "LEFT_ALT", "RIGHT_ALT", 
+        "OSKEY"
+    }:
         return None
 
+    # Get the base key name (lower case, no shift applied yet)
+    base = None
     if len(event_type) == 1 and event_type.isalpha():
-        # Return uppercase if shift is pressed, lowercase otherwise
-        return event_type.upper() if shift else event_type.lower()
+        base = event_type.lower()
+    elif event_type.isdigit():
+        base = event_type
+    else:
+        # Common named keys - always use the base (unshifted) key name
+        named = {
+            "SPACE": "space",
+            "TAB": "tab",
+            "RET": "enter",
+            "ESC": "esc",
+            "BACK_SPACE": "backspace",
+            # Number keys (main row)
+            "ZERO": "0", "ONE": "1", "TWO": "2", "THREE": "3", "FOUR": "4",
+            "FIVE": "5", "SIX": "6", "SEVEN": "7", "EIGHT": "8", "NINE": "9",
+            # Numpad keys
+            "NUMPAD_0": "n0", "NUMPAD_1": "n1", "NUMPAD_2": "n2", "NUMPAD_3": "n3",
+            "NUMPAD_4": "n4", "NUMPAD_5": "n5", "NUMPAD_6": "n6", "NUMPAD_7": "n7",
+            "NUMPAD_8": "n8", "NUMPAD_9": "n9",
+            # Common punctuation
+            "MINUS": "-", "EQUAL": "=",
+            "LEFT_BRACKET": "[", "RIGHT_BRACKET": "]",
+            "SEMI_COLON": ";", "QUOTE": "'",
+            "COMMA": ",", "PERIOD": ".",
+            "SLASH": "/", "BACK_SLASH": "\\",
+            "GRAVE_ACCENT": "grave", "ACCENT_GRAVE": "grave",
+            # Numpad Operators
+            "NUMPAD_SLASH": "n/", "NUMPAD_ASTERISK": "n*",
+            "NUMPAD_MINUS": "n-", "NUMPAD_PLUS": "n+",
+            "NUMPAD_ENTER": "nenter", "NUMPAD_PERIOD": "n.",
+        }
+        base = named.get(event_type, None)
 
-    if event_type.isdigit():
-        return event_type
+    if base is None:
+        return None
 
-    # Common named keys (expand later)
-    named = {
-        "SPACE": "space",
-        "TAB": "tab",
-        "RET": "enter",
-        "ESC": "esc",
-        "BACK_SPACE": "backspace",
-        # Number keys (main row) - with shift support for symbols
-        "ZERO": ")" if shift else "0",
-        "ONE": "!" if shift else "1",
-        "TWO": "@" if shift else "2",
-        "THREE": "#" if shift else "3",
-        "FOUR": "$" if shift else "4",
-        "FIVE": "%" if shift else "5",
-        "SIX": "^" if shift else "6",
-        "SEVEN": "&" if shift else "7",
-        "EIGHT": "*" if shift else "8",
-        "NINE": "(" if shift else "9",
-        # Numpad keys (prefixed with 'n')
-        "NUMPAD_0": "n0",
-        "NUMPAD_1": "n1",
-        "NUMPAD_2": "n2",
-        "NUMPAD_3": "n3",
-        "NUMPAD_4": "n4",
-        "NUMPAD_5": "n5",
-        "NUMPAD_6": "n6",
-        "NUMPAD_7": "n7",
-        "NUMPAD_8": "n8",
-        "NUMPAD_9": "n9",
-        # Common punctuation (with shift support)
-        "MINUS": "_" if shift else "-",
-        "EQUAL": "+" if shift else "=",
-        "LEFT_BRACKET": "{" if shift else "[",
-        "RIGHT_BRACKET": "}" if shift else "]",
-        "SEMI_COLON": ":" if shift else ";",
-        "QUOTE": '"' if shift else "'",
-        "COMMA": "<" if shift else ",",
-        "PERIOD": ">" if shift else ".",
-        "SLASH": "?" if shift else "/",
-        "BACK_SLASH": "|" if shift else "\\",
-        "GRAVE_ACCENT": "~" if shift else "grave",
-        "ACCENT_GRAVE": "~" if shift else "grave",  # Blender uses ACCENT_GRAVE
-    }
-    return named.get(event_type, None)
+    # Build modifier prefix
+    mods = ""
+    
+    # OSKey (Windows/Cmd)
+    if oskey:
+        mods += "#"
+
+    # Ctrl
+    if ctrl:
+        if mod_side == "LEFT": mods += "<^"
+        elif mod_side == "RIGHT": mods += ">^"
+        else: mods += "^"
+
+    # Alt
+    if alt:
+        if mod_side == "LEFT": mods += "<!"
+        elif mod_side == "RIGHT": mods += ">!"
+        else: mods += "!"
+
+    # Shift
+    if shift:
+        if mod_side == "LEFT": mods += "<+"
+        elif mod_side == "RIGHT": mods += ">+"
+        else: mods += "+"
+
+    return mods + base
 
 def split_chord(chord: str):
     return [t for t in (chord or "").strip().split() if t]
@@ -106,19 +125,107 @@ def build_match_sets(mappings):
             prefixes.add(chord_tokens[:i])
     return exact, prefixes
 
+def _get_token_parts(token: str) -> tuple[set[str], str]:
+    """Split a token into a set of modifiers and a base key."""
+    mod_symbols = {'#', '^', '!', '+'}
+    found_mods = set()
+    res = token
+    
+    i = 0
+    while i < len(res):
+        char = res[i]
+        if char in mod_symbols:
+            found_mods.add(char)
+            i += 1
+        elif (char == '<' or char == '>') and i + 1 < len(res) and res[i+1] in mod_symbols:
+            # Side-specific modifier (e.g. <^ )
+            found_mods.add(res[i:i+2])
+            i += 2
+        else:
+            break
+            
+    return found_mods, res[i:]
+
+def tokens_match(mapping_token: str, pressed_token: str) -> bool:
+    """Check if a mapping token matches a pressed token, handling AHK modifiers and order."""
+    if mapping_token == pressed_token:
+        return True
+    
+    m_mods, m_base = _get_token_parts(mapping_token)
+    p_mods, p_base = _get_token_parts(pressed_token)
+    
+    if m_base != p_base:
+        return False
+        
+    # If the mapping doesn't have side indicators (< or >), we allow it to match 
+    # any side of that modifier in the pressed token.
+    has_m_side = any(('<' in m or '>' in m) for m in m_mods)
+    
+    if not has_m_side:
+        # Strip side indicators from pressed mods for comparison
+        stripped_p_mods = {mod.replace('<', '').replace('>', '') for mod in p_mods}
+        return m_mods == stripped_p_mods
+    
+    # If mapping HAS side indicators, they must match exactly
+    return m_mods == p_mods
+
+def humanize_token(token: str) -> str:
+    """Convert an internal AHK-style token to a more readable format for the user."""
+    # Mapping table for modifiers
+    mod_map = {
+        '^': 'Ctrl',
+        '!': 'Alt',
+        '+': 'Shift',
+        '#': 'Win'
+    }
+    
+    # Process side indicators and modifiers
+    res = token
+    parts = []
+    
+    # Loop to pull off potential <^ >! etc prefixes
+    while len(res) > 0:
+        side = ""
+        if res.startswith('<'):
+            # Left is default, show no prefix
+            side = ""
+            res = res[1:]
+        elif res.startswith('>'):
+            side = "R"
+            res = res[1:]
+            
+        if len(res) > 0 and res[0] in mod_map:
+            parts.append(f"{side}{mod_map[res[0]]}")
+            res = res[1:]
+        else:
+            # Reached the base key
+            # If we had a side indicator with no modifier, put it back or ignore
+            # but usually it's tied to one.
+            parts.append(res)
+            break
+            
+    return "+".join(parts)
+
+def humanize_chord(tokens: list[str]) -> str:
+    """Convert a list of tokens into a readable chord string."""
+    return " ".join(humanize_token(t) for t in tokens)
+
 def find_exact_mapping(mappings, buffer_tokens):
     bt = tuple(buffer_tokens)
     for m in mappings:
         if not getattr(m, "enabled", True):
             continue
-        if tuple(split_chord(get_str_attr(m, "chord"))) == bt:
+        chord_tokens = split_chord(get_str_attr(m, "chord"))
+        if len(chord_tokens) != len(bt):
+            continue
+            
+        if all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(chord_tokens, bt)):
             return m
     return None
 
 def candidates_for_prefix(mappings, buffer_tokens):
     """
     For the current prefix, list the next possible token(s) and labels.
-    For a chord 'g g' and prefix ['g'], candidate is next_token='g'.
     """
     bt = tuple(buffer_tokens)
     out = {}
@@ -126,7 +233,7 @@ def candidates_for_prefix(mappings, buffer_tokens):
         if not getattr(m, "enabled", True):
             continue
 
-        # Skip chordsong.recents operator - it's only shown in footer
+        # Skip chordsong.recents operator
         if getattr(m, "mapping_type", "") == "OPERATOR":
             operator = get_str_attr(m, "operator")
             if operator == "chordsong.recents":
@@ -135,10 +242,17 @@ def candidates_for_prefix(mappings, buffer_tokens):
         tokens = split_chord(get_str_attr(m, "chord"))
         if not tokens:
             continue
-        if bt and tuple(tokens[: len(bt)]) != bt:
-            continue
+            
+        # Check if the current buffer matches the chord prefix
+        if bt:
+            if len(tokens) <= len(bt):
+                continue
+            if not all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(tokens[:len(bt)], bt)):
+                continue
+        
         if len(tokens) <= len(bt):
             continue
+            
         nxt = tokens[len(bt)]
         label = get_str_attr(m, "label") or "(missing label)"
         group = get_str_attr(m, "group")

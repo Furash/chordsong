@@ -40,8 +40,9 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
     _cleanup_fading_overlay()
 
     # Set up new fading overlay
+    from ..core.engine import humanize_chord
     state["active"] = True
-    state["chord_text"] = " ".join(chord_tokens)
+    state["chord_text"] = humanize_chord(chord_tokens)
     state["label"] = label
     state["icon"] = icon
     state["start_time"] = time.time()
@@ -152,6 +153,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     _area = None
     _scroll_offset = 0
     _context_type = None  # Store the detected context type
+    _last_mod_type = None  # Store the type of the last modifier key
 
     def _ensure_draw_handler(self, context: bpy.types.Context):
         p = prefs(context)
@@ -306,12 +308,37 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if event.value != "PRESS":
             return {"RUNNING_MODAL"}
 
-        # Check if shift is pressed
-        shift_pressed = event.shift
+        # Track the last modifier key pressed to determine which side (left/right) it was on.
+        # This allows supporting AHK symbols like <^ (LCtrl) or >! (RAlt).
+        if event.type in {
+            "LEFT_SHIFT", "RIGHT_SHIFT",
+            "LEFT_CTRL", "RIGHT_CTRL",
+            "LEFT_ALT", "RIGHT_ALT",
+        }:
+            self._last_mod_type = event.type
+            return {"RUNNING_MODAL"}
 
-        tok = normalize_token(event.type, shift=shift_pressed)
+        # Determine the side of the relevant modifier
+        mod_side = None
+        if self._last_mod_type:
+            if "LEFT" in self._last_mod_type:
+                mod_side = "LEFT"
+            elif "RIGHT" in self._last_mod_type:
+                mod_side = "RIGHT"
+
+        tok = normalize_token(
+            event.type,
+            shift=event.shift,
+            ctrl=event.ctrl,
+            alt=event.alt,
+            oskey=event.oskey,
+            mod_side=mod_side
+        )
         if tok is None:
             return {"RUNNING_MODAL"}
+
+        # Reset last modifier type after a non-modifier key is processed
+        self._last_mod_type = None
 
         # Check for <leader><leader>
         # If buffer is empty and user presses the leader key again, show recents
@@ -614,6 +641,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             return {"RUNNING_MODAL"}
 
         # No match
-        self.report({"WARNING"}, f'Unknown chord: "{" ".join(self._buffer)}"')
+        from ..core.engine import humanize_chord
+        self.report({"WARNING"}, f'Unknown chord: "{humanize_chord(self._buffer)}"')
         self._finish(context)
         return {"CANCELLED"}

@@ -101,20 +101,21 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             elif idx < 35:  # 9 + 26
                 return chr(ord('a') + (idx - 9))  # a-z for items 10-35
             elif idx < 61:  # 35 + 26
-                return chr(ord('A') + (idx - 35))  # A-Z for items 36-61
+                char = chr(ord('a') + (idx - 35))
+                return f"+{char}" # +a-+z for items 36-61
             elif idx < 71:  # 61-70 (10 items)
-                # !@#$%^&*() for items 62-71
-                shifted = "!@#$%^&*()"
+                # +1-+0 for items 62-71
+                shifted = ["+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+0"]
                 shift_idx = idx - 61
                 return shifted[shift_idx] if shift_idx < len(shifted) else "?"
             elif idx < 74:  # 71-73 (3 items)
-                # -=+ for items 72-74
-                extra = ["-", "=", "+"]
+                # - = + for items 72-74 (careful: + is shifted =)
+                extra = ["-", "=", "+="]
                 extra_idx = idx - 71
                 return extra[extra_idx] if extra_idx < len(extra) else "?"
             else:  # 74-87 (14 items)
-                # `~,.<>:;'"[]{} for items 75-88
-                punctuation = "`~,.<>:;'\"[]{}"
+                # ` ~ , . < > : ; ' " [ ] { }
+                punctuation = ["grave", "+grave", ",", ".", "+,", "+.", "+;", ";", "'", "+'", "[", "]", "+[", "+]"]
                 punct_idx = idx - 74
                 return punctuation[punct_idx] if punct_idx < len(punctuation) else "?"
 
@@ -132,10 +133,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             header = f"Recents  |  Press 1-9, a-z, A-{last_key} to execute"
         elif num_entries <= 71:  # 61 + 10 shifted
             last_key = index_to_hotkey(num_entries-1)
-            header = f"Recents  |  Press 1-9, a-z, A-Z, !-{last_key} to execute"
+            header = f"Recents  |  Press 1-9, a-z, +a-+z, +1-{last_key} to execute"
         elif num_entries <= 74:  # 71 + 3 extra
             last_key = index_to_hotkey(num_entries-1)
-            header = f"Recents  |  Press 1-9, a-z, A-Z, !-), -{last_key} to execute"
+            header = f"Recents  |  Press 1-9, a-z, +a-+z, +1-+0, -/=/+= to execute"
         else:
             header = f"Recents  |  Press any hotkey (showing {min(88, p.overlay_max_items)})"
 
@@ -393,7 +394,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 return {"CANCELLED"}
 
         # Check for digit input (1-9 only, immediate execution)
-        tok = normalize_token(event.type, shift=event.shift)
+        tok = normalize_token(event.type, shift=event.shift, ctrl=event.ctrl, alt=event.alt, oskey=event.oskey)
         if tok and tok.isdigit():
             try:
                 number = int(tok)
@@ -423,9 +424,9 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 return {"CANCELLED"}
 
         # Handle uppercase letter keys (A-Z for items 36-61)
-        if tok and len(tok) == 1 and tok.isalpha() and tok.isupper():
-            # A=36th item (index 35), B=37th (index 36), etc.
-            index = ord(tok) - ord('A') + 35
+        if tok and tok.startswith('+') and len(tok) == 2 and tok[1].isalpha():
+            # +a=36th item (index 35), +b=37th (index 36), etc.
+            index = ord(tok[1]) - ord('a') + 35
             entry = history.get(index)
             if entry:
                 self._execute_history_entry(context, entry)
@@ -435,52 +436,49 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 self._finish(context)
                 return {"CANCELLED"}
 
-        # Handle shifted number keys (!@#$%^&*() for items 62-71)
-        if tok and tok in "!@#$%^&*()":
-            shifted_map = {"!": 0, "@": 1, "#": 2, "$": 3, "%": 4, "^": 5, "&": 6, "*": 7, "(": 8, ")": 9}
-            index = shifted_map.get(tok, -1) + 61
-            if index >= 61:
-                entry = history.get(index)
-                if entry:
-                    self._execute_history_entry(context, entry)
-                    return {"FINISHED"}
-                else:
-                    self.report({"WARNING"}, f"No history entry at position '{tok}'")
-                    self._finish(context)
-                    return {"CANCELLED"}
+        # Handle shifted number keys (+1-+0 for items 62-71)
+        shifted_map = {"+1": 61, "+2": 62, "+3": 63, "+4": 64, "+5": 65, "+6": 66, "+7": 67, "+8": 68, "+9": 69, "+0": 70}
+        if tok in shifted_map:
+            index = shifted_map[tok]
+            entry = history.get(index)
+            if entry:
+                self._execute_history_entry(context, entry)
+                return {"FINISHED"}
+            else:
+                self.report({"WARNING"}, f"No history entry at position '{tok}'")
+                self._finish(context)
+                return {"CANCELLED"}
 
-        # Handle extra keys (-=+ for items 72-74)
-        if tok and tok in "-=+":
-            extra_map = {"-": 71, "=": 72, "+": 73}
-            index = extra_map.get(tok, -1)
-            if index >= 71:
-                entry = history.get(index)
-                if entry:
-                    self._execute_history_entry(context, entry)
-                    return {"FINISHED"}
-                else:
-                    self.report({"WARNING"}, f"No history entry at position '{tok}'")
-                    self._finish(context)
-                    return {"CANCELLED"}
+        # Handle extra keys (- = += for items 72-74)
+        extra_map = {"-": 71, "=": 72, "+=": 73}
+        if tok in extra_map:
+            index = extra_map[tok]
+            entry = history.get(index)
+            if entry:
+                self._execute_history_entry(context, entry)
+                return {"FINISHED"}
+            else:
+                self.report({"WARNING"}, f"No history entry at position '{tok}'")
+                self._finish(context)
+                return {"CANCELLED"}
 
-        # Handle punctuation keys (`~,.<>:;'"[]{} for items 75-88)
-        if tok and tok in "`~,.<>:;'\"[]{}":
-            punct_map = {
-                "`": 74, "~": 75, ",": 76, ".": 77,
-                "<": 78, ">": 79, ":": 80, ";": 81,
-                "'": 82, "\"": 83, "[": 84, "]": 85,
-                "{": 86, "}": 87
-            }
-            index = punct_map.get(tok, -1)
-            if index >= 74:
-                entry = history.get(index)
-                if entry:
-                    self._execute_history_entry(context, entry)
-                    return {"FINISHED"}
-                else:
-                    self.report({"WARNING"}, f"No history entry at position '{tok}'")
-                    self._finish(context)
-                    return {"CANCELLED"}
+        # Handle punctuation keys (grave, +grave ... for items 75-88)
+        punct_map = {
+            "grave": 74, "+grave": 75, ",": 76, ".": 77,
+            "+,": 78, "+.": 79, "+;": 80, ";": 81,
+            "'": 82, "+'": 83, "[": 84, "]": 85,
+            "+[": 86, "+]": 87
+        }
+        if tok in punct_map:
+            index = punct_map[tok]
+            entry = history.get(index)
+            if entry:
+                self._execute_history_entry(context, entry)
+                return {"FINISHED"}
+            else:
+                self.report({"WARNING"}, f"No history entry at position '{tok}'")
+                self._finish(context)
+                return {"CANCELLED"}
 
         # Unknown key, ignore
         return {"RUNNING_MODAL"}
