@@ -39,103 +39,114 @@ def draw_addon_preferences(prefs, _context, layout):
     box.separator()
 
     if prefs.prefs_tab == "UI":
-        # Overlay settings
+        # Section: Global Visibility
         box = col.box()
-
-        # Toggles row
+        header = box.row()
+        header.label(text="Display Control", icon='HIDE_OFF')
+        
         r = box.row(align=True)
-        r.prop(prefs, "overlay_enabled", toggle=True)
-        r.separator()
-        r.prop(prefs, "overlay_fading_enabled", toggle=True, text="Fading")
-        r.separator()
-        r.prop(prefs, "overlay_show_header", toggle=True, text="Header")
-        r.separator()
-        r.prop(prefs, "overlay_show_footer", toggle=True, text="Footer")
-
-        # Counts
+        r.prop(prefs, "overlay_enabled", toggle=True, text="Global Overlay Visibility")
+        r.prop(prefs, "overlay_fading_enabled", toggle=True, text="Enable Fading Overlay")
         r = box.row(align=True)
-        r.prop(prefs, "overlay_max_items")
-        r.separator()
-        r.prop(prefs, "overlay_column_rows")
+        r.prop(prefs, "overlay_show_header", toggle=True, text="Show Header")
+        r.prop(prefs, "overlay_show_footer", toggle=True, text="Show Footer")
 
-        # Font sizes
+        # Section: Layout & Items
+        box = col.box()
+        header = box.row()
+        header.label(text="Layout & Items", icon='MOD_LENGTH')
+        
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_max_items", text="Max Items")
+        r.prop(prefs, "overlay_column_rows", text="Rows per Column")
+        
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_gap", text="Vertical Gap")
+        r.prop(prefs, "overlay_line_height", text="Line Height")
+        
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_column_gap", text="Horizontal Column Gap")
+
+        # Section: Typography
+        box = col.box()
+        header = box.row()
+        header.label(text="Typography", icon='FONT_DATA')
+        
         r = box.row(align=True)
         r.prop(prefs, "overlay_font_size_header", text="Header Size")
+        r.prop(prefs, "overlay_font_size_chord", text="Chord Size")
+        
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_font_size_body", text="Body Size")
         r.prop(prefs, "overlay_font_size_footer", text="Footer Size")
+        
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_font_size_fading", text="Fading Font Size")
+        
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_font_size_toggle", text="Toggle Icon Size")
+        r.prop(prefs, "overlay_toggle_offset_y", text="Vertical Offset")
 
+        # Section: Positioning
+        box = col.box()
+        header = box.row()
+        header.label(text="Positioning", icon='CURSOR')
+        
+        box.prop(prefs, "overlay_position", text="Anchor Position")
+        
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_offset_x", text="X Offset")
+        r.prop(prefs, "overlay_offset_y", text="Y Offset")
+
+        # Section: Footer Fine-Tuning
+        box = col.box()
+        header = box.row()
+        header.label(text="Footer Fine-Tuning", icon='ALIGN_BOTTOM')
+        
+        box.prop(prefs, "overlay_footer_gap", text="Space Between Footer Items")
+        
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_footer_token_gap", text="Inner Token Gap")
+        r.prop(prefs, "overlay_footer_label_gap", text="Inner Label Gap")
+
+        # Section: Appearance & Theme
+        box = col.box()
+        header = box.row()
+        header.label(text="Appearance", icon='BRUSH_DATA')
+        
+        r = box.row(align=True)
+        r.label(text="Folder Display Style:")
+        r.prop(prefs, "overlay_folder_style", text="")
         box.separator()
 
-        r = box.row(align=True)
-        r.prop(prefs, "overlay_font_size_chord")
-        r.prop(prefs, "overlay_font_size_body")
-        r.prop(prefs, "overlay_font_size_fading")
-
-        # Layout settings
-        r = box.row(align=True)
-        r.prop(prefs, "overlay_gap", text="Element Gap")
-        r.prop(prefs, "overlay_column_gap", text="Column Gap")
-        r.prop(prefs, "overlay_line_height", text="Line Height")
-        r = box.row(align=True)
-        r.prop(prefs, "overlay_footer_gap", text="Footer Item Gap")
-        r.prop(prefs, "overlay_footer_token_gap", text="Footer Token Gap")
-        r.prop(prefs, "overlay_footer_label_gap", text="Footer Label Gap")
-
-        # Position settings
-        r = box.row(align=True)
-        r.label(text="Position:")
-        r.scale_x = 2.5
-        r.prop(prefs, "overlay_position", text="")
-        r.separator()
-        r.prop(prefs, "overlay_offset_x")
-        r.separator()
-        r.prop(prefs, "overlay_offset_y")
-        box.separator()
-
-        # Color settings
+        # Color table logic
         split = box.split(factor=0.3)
         col1 = split.column()
         col2 = split.column()
-        col3 = split.column()
-        col4 = split.column()
+        
+        # Labels and Pickers grouped together
+        for label, prop in [
+            ("Chord Color", "overlay_color_chord"),
+            ("Label Color", "overlay_color_label"),
+            ("Icon Color", "overlay_color_icon"),
+            ("Toggle ON", "overlay_color_toggle_on"),
+            ("Toggle OFF", "overlay_color_toggle_off"),
+            ("Header Text", "overlay_color_header"),
+            ("Recents Key", "overlay_color_recents_hotkey"),
+            ("List Background", "overlay_list_background"),
+            ("Header Background", "overlay_header_background"),
+            ("Footer Background", "overlay_footer_background"),
+        ]:
+            col1.label(text=label)
+            col2.prop(prefs, prop, text="")
 
-        # First column - labels
-        col1.label(text="Chord:")
-        col1.label(text="Label:")
-        col1.label(text="Icon:")
-        col1.label(text="Header:")
-        col1.label(text="Recents Hotkey:")
-        col1.label(text="List Background:")
-        col1.label(text="Header Background:")
-        col1.label(text="Footer Background:")
-
-        # Second column - color pickers
-        col2.prop(prefs, "overlay_color_chord", text="")
-        col2.prop(prefs, "overlay_color_label", text="")
-        col2.prop(prefs, "overlay_color_icon", text="")
-        col2.prop(prefs, "overlay_color_header", text="")
-        col2.prop(prefs, "overlay_color_recents_hotkey", text="")
-        col2.prop(prefs, "overlay_list_background", text="")
-        col2.prop(prefs, "overlay_header_background", text="")
-        col2.prop(prefs, "overlay_footer_background", text="")
-
-        col3.separator()
-        col4.separator()
-
-        box = col.box()
-        box.separator()
-        r = box.row(align=True)
-        split = r.split(factor=0.3)
-        split.label(text="Overlay Style:")
-        split.prop(prefs, "overlay_folder_style", text="")
-        split.separator()
-        box.separator()
-
-        # Testing
+        # Testing Section
         box_test = col.box()
-        box_test.label(text="Testing")
+        header = box_test.row()
+        header.label(text="Debug Tools", icon='TOOL_SETTINGS')
         row = box_test.row()
-        row.operator("chordsong.test_main_overlay", text="Test Main Overlay", icon="PLAY")
-        row.operator("chordsong.test_fading_overlay", text="Test Fading Overlay", icon="PLAY")
+        row.operator("chordsong.test_main_overlay", text="Preview Main", icon="PLAY")
+        row.operator("chordsong.test_fading_overlay", text="Preview Fading", icon="PLAY")
 
         return
 
@@ -189,6 +200,11 @@ def draw_addon_preferences(prefs, _context, layout):
     row.operator("chordsong.group_cleanup", text="", icon="BRUSH_DATA")
     row.operator("chordsong.group_fold_all", text="", icon="TRIA_UP")
     row.operator("chordsong.group_unfold_all", text="", icon="TRIA_DOWN")
+    
+    row = col.row(align=True)
+    row.scale_y = 1.5
+    op = row.operator("chordsong.group_add", text="Add New Group", icon="ADD")
+    op.name = "New Group"
 
     # Grouped UI boxes with foldable sections
     from ..core.engine import get_str_attr
@@ -292,9 +308,6 @@ def draw_addon_preferences(prefs, _context, layout):
             # Group selection with searchable dropdown
             r.prop_search(m, "group", prefs, "groups", icon="FILE_FOLDER", text="")
 
-            # Button to create new group
-            op = r.operator("chordsong.group_add", text="", icon="ADD", emboss=True)
-            op.name = "New Group"
             r.separator()
 
             # Icon display and selection button (compact)
@@ -310,44 +323,116 @@ def draw_addon_preferences(prefs, _context, layout):
             op.index = idx
 
             # Second row with context and type selector and type-specific fields
-            r2 = box.row(align=True)
+            row2 = box.row(align=True)
+            
+            # Use a split to separate icons from the action area
+            # This allows us to nudge the icons down slightly to align with the box contents
+            r2_split = row2.split(factor=0.21, align=True)
+            
+            # Left side: Icons (nudged down for better alignment with box text)
+            icon_col = r2_split.column()
+            icon_col.separator(factor=0.5)
+            icon_row = icon_col.row(align=True)
+            
             # Context selector (icon-only)
-            r2.prop_enum(m, "context", "VIEW_3D", icon="VIEW3D", text="")
-            r2.separator()
-            r2.prop_enum(m, "context", "GEOMETRY_NODE", icon="GEOMETRY_NODES", text="")
-            r2.separator()
-            r2.prop_enum(m, "context", "SHADER_EDITOR", icon="NODE_MATERIAL", text="")
-            r2.separator()
-            r2.prop_enum(m, "context", "IMAGE_EDITOR", icon="UV", text="")
-            r2.separator()
-            r2.separator()
+            icon_row.prop_enum(m, "context", "VIEW_3D", icon="VIEW3D", text="")
+            icon_row.separator()
+            icon_row.prop_enum(m, "context", "GEOMETRY_NODE", icon="GEOMETRY_NODES", text="")
+            icon_row.separator()
+            icon_row.prop_enum(m, "context", "SHADER_EDITOR", icon="NODE_MATERIAL", text="")
+            icon_row.separator()
+            icon_row.prop_enum(m, "context", "IMAGE_EDITOR", icon="UV", text="")
+            icon_row.separator()
+            icon_row.separator()
+            
             # Icon-only mapping type selector
-            r2.prop_enum(m, "mapping_type", "OPERATOR", icon="SETTINGS", text="")
-            r2.separator()
-            r2.prop_enum(m, "mapping_type", "PYTHON_FILE", icon="FILE_SCRIPT", text="")
-            r2.separator()
-            r2.prop_enum(m, "mapping_type", "CONTEXT_TOGGLE", icon="CHECKBOX_HLT", text="")
-            r2.separator()
+            icon_row.prop_enum(m, "mapping_type", "OPERATOR", icon="SETTINGS", text="")
+            icon_row.separator()
+            icon_row.prop_enum(m, "mapping_type", "PYTHON_FILE", icon="FILE_SCRIPT", text="")
+            icon_row.separator()
+            icon_row.prop_enum(m, "mapping_type", "CONTEXT_TOGGLE", icon="CHECKBOX_HLT", text="")
+            icon_row.separator()
+            icon_row.prop_enum(m, "mapping_type", "CONTEXT_PROPERTY", icon="PROPERTIES", text="")
+            
+            # Right side: Type-specific fields (Toggles, Properties, etc.)
+            r2 = r2_split.column()
 
             if m.mapping_type == "PYTHON_FILE":
-                r2.prop(m, "python_file", text="")
-                r2.separator()
-                # Script selector button
-                op = r2.operator("chordsong.script_select", text="Select Script", icon="FILEBROWSER", emboss=True)
+                # For script, we don't need a box, but we need horizontal alignment
+                script_row = r2.row(align=True)
+                script_row.prop(m, "python_file", text="")
+                script_row.separator()
+                op = script_row.operator("chordsong.script_select", text="Select Script", icon="FILEBROWSER", emboss=True)
                 op.mapping_index = idx
+                
             elif m.mapping_type == "CONTEXT_TOGGLE":
-                r2.prop(m, "context_path", text="")
+                # Create a box for all toggles
+                toggle_area = r2.box()
+                
+                # First row
+                row1 = toggle_area.row(align=True)
+                row1.prop(m, "context_path", text="")
+                op = row1.operator("chordsong.subitem_add", text="Add Property", icon="ADD")
+                op.mapping_index = idx
+                
+                # Sub items
+                for i, item in enumerate(m.sub_items):
+                    row = toggle_area.row(align=True)
+                    row.prop(item, "path", text="")
+                    rem = row.operator("chordsong.subitem_remove", text="Remove Property", icon="TRASH")
+                    rem.mapping_index = idx
+                    rem.item_index = i
+
+            elif m.mapping_type == "CONTEXT_PROPERTY":
+                # Create a common box for all property rows
+                prop_area = r2.box()
+                
+                # Layout helper for property rows within the box
+                def draw_prop_row(layout, path_ptr, path_prop, val_ptr, val_prop, is_primary, sub_idx=-1):
+                    row = layout.row(align=True)
+                    
+                    # Rebalanced splits
+                    path_split = row.split(factor=0.35, align=True)
+                    path_split.prop(path_ptr, path_prop, text="")
+                    
+                    val_split = path_split.split(factor=0.5, align=True)
+                    val_split.prop(val_ptr, val_prop, text="Value")
+                    
+                    btn_row = val_split.row(align=True)
+                    
+                    # Convert button
+                    conv = btn_row.operator("chordsong.property_mapping_convert", text="Convert", icon="SOLO_ON")
+                    conv.index = idx
+                    conv.sub_index = sub_idx
+
+                    # Add/Remove button
+                    if is_primary:
+                        op_add = btn_row.operator("chordsong.subitem_add", text="Add", icon="ADD")
+                        op_add.mapping_index = idx
+                    else:
+                        rem = btn_row.operator("chordsong.subitem_remove", text="Remove", icon="TRASH")
+                        rem.mapping_index = idx
+                        rem.item_index = sub_idx
+                    
+
+                # Draw first row in the box
+                draw_prop_row(prop_area, m, "context_path", m, "property_value", True)
+                
+                # Draw sub-items in the same box
+                for i, item in enumerate(m.sub_items):
+                    draw_prop_row(prop_area, item, "path", item, "value", False, i)
             else:
-                r2.scale_x = 1.1
-                r2.prop(m, "operator", text="")
-                # Small convert button - create subsection with tight scaling
-                sub = r2.row(align=True)
+                # Standard operator row
+                row_op = r2.row(align=True)
+                row_op.scale_x = 1.1
+                row_op.prop(m, "operator", text="")
+                
+                sub = row_op.row(align=True)
                 sub.separator()
                 sub.scale_x = 0.9
                 sub.alignment = 'LEFT'
                 op_convert = sub.operator("chordsong.mapping_convert", text="Convert", emboss=True)
                 op_convert.index = idx
-                # Call context selector (EXEC vs INVOKE)
                 sub.separator()
                 sub.prop(m, "call_context", text="")
 

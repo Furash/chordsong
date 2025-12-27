@@ -461,17 +461,16 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 def execute_toggle_delayed():
                     try:
                         # Define the toggle function to execute with proper context
-                        def do_toggle():
+                        def do_toggle_path(path):
                             # Navigate to the property using the path
                             # e.g., "space_data.overlay.show_stats"
-                            parts = context_path.split('.')
+                            parts = path.split('.')
                             obj = bpy.context
 
                             # Navigate to the parent object
                             for i, part in enumerate(parts[:-1]):
                                 next_obj = getattr(obj, part, None)
                                 if next_obj is None:
-                                    current_path = ".".join(parts[:i+1])
                                     return None
                                 obj = next_obj
 
@@ -485,42 +484,62 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             current_value = getattr(obj, prop_name)
 
                             if not isinstance(current_value, bool):
-                                print(f"Chord Song: Property '{context_path}' is not a boolean (got {type(current_value).__name__})")
+                                print(f"Chord Song: Property '{path}' is not a boolean (got {type(current_value).__name__})")
                                 return None
 
                             # Toggle it
-                            setattr(obj, prop_name, not current_value)
+                            set_val = not current_value
+                            setattr(obj, prop_name, set_val)
 
                             # Return the new state for the overlay message
-                            return not current_value
+                            return set_val
+
+                        # Collect all paths
+                        paths = []
+                        if context_path:
+                            paths.append(context_path)
+                        for item in m.sub_items:
+                            if item.path.strip():
+                                paths.append(item.path.strip())
 
                         # Validate context before using it (may be invalid after undo)
                         from ..utils.render import validate_viewport_context
                         valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
+                        # Results for overlay
+                        results = []
+
                         # Execute with context override if available
-                        # Wrap temp_override in try/except as context may become invalid between validation and use.
                         if valid_ctx:
                             try:
                                 with bpy.context.temp_override(**valid_ctx):
-                                    new_value = do_toggle()
-                                    # Show fading overlay (inside temp_override for correct space detection)
-                                    if new_value is not None:
-                                        status = "ON" if new_value else "OFF"
-                                        _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
+                                    for path in paths:
+                                        res = do_toggle_path(path)
+                                        if res is not None:
+                                            results.append(res)
                             except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                 # Context became invalid, fall back to default context
-                                new_value = do_toggle()
-                                # Show fading overlay
-                                if new_value is not None:
-                                    status = "ON" if new_value else "OFF"
-                                    _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
+                                for path in paths:
+                                    res = do_toggle_path(path)
+                                    if res is not None:
+                                        results.append(res)
                         else:
-                            new_value = do_toggle()
-                            # Show fading overlay
-                            if new_value is not None:
-                                status = "ON" if new_value else "OFF"
+                            for path in paths:
+                                res = do_toggle_path(path)
+                                if res is not None:
+                                    results.append(res)
+                        
+                        # Show fading overlay with multi-status if applicable
+                        if results:
+                            if len(results) == 1:
+                                status = "ON" if results[0] else "OFF"
                                 _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
+                            else:
+                                # Show count or joined status
+                                on_count = sum(1 for r in results if r)
+                                off_count = len(results) - on_count
+                                status_str = f"{on_count} ON, {off_count} OFF"
+                                _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status_str})", icon)
 
                         # Add to history
                         add_to_history(
@@ -539,6 +558,110 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     return None
 
                 bpy.app.timers.register(execute_toggle_delayed, first_interval=0.01)
+                return {"FINISHED"}
+
+            # Handle context property execution
+            if mapping_type == "CONTEXT_PROPERTY":
+                context_path = (getattr(m, "context_path", "") or "").strip()
+                property_value = (getattr(m, "property_value", "") or "").strip()
+                if not context_path:
+                    self.report({"ERROR"}, f'Property mapping "{" ".join(self._buffer)}" has no context path. Please fix in preferences.')
+                    self._finish(context)
+                    return {"CANCELLED"}
+
+                # Capture viewport context BEFORE finishing modal
+                ctx_viewport = capture_viewport_context(context)
+
+                self._finish(context)
+
+                def execute_property_delayed():
+                    try:
+                        import ast
+                        # Helper to execute a single set
+                        def do_set_item(path, val_str):
+                            if not path or not val_str:
+                                return False
+                                
+                            try:
+                                val_to_set = ast.literal_eval(val_str)
+                            except (ValueError, SyntaxError):
+                                val_to_set = val_str
+
+                            parts = path.split('.')
+                            obj = bpy.context
+
+                            # Navigate to the parent object
+                            for i, part in enumerate(parts[:-1]):
+                                next_obj = getattr(obj, part, None)
+                                if next_obj is None:
+                                    return False
+                                obj = next_obj
+
+                            # Get the property name
+                            prop_name = parts[-1]
+
+                            # Set the value
+                            if not hasattr(obj, prop_name):
+                                return False
+
+                            setattr(obj, prop_name, val_to_set)
+                            return True
+
+                        # Collect all pairs
+                        items = []
+                        if context_path:
+                            items.append((context_path, property_value))
+                        for sub in m.sub_items:
+                            if sub.path.strip():
+                                items.append((sub.path.strip(), sub.value))
+
+                        # Validate context before using it (may be invalid after undo)
+                        from ..utils.render import validate_viewport_context
+                        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+
+                        success_count = 0
+
+                        # Execute with context override if available
+                        if valid_ctx:
+                            try:
+                                with bpy.context.temp_override(**valid_ctx):
+                                    for p, v in items:
+                                        if do_set_item(p, v):
+                                            success_count += 1
+                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                # Fallback
+                                for p, v in items:
+                                    if do_set_item(p, v):
+                                        success_count += 1
+                        else:
+                            for p, v in items:
+                                if do_set_item(p, v):
+                                    success_count += 1
+                        
+                        if success_count > 0:
+                            if success_count == 1:
+                                _show_fading_overlay(bpy.context, chord_tokens, f"{label}: {property_value}", icon)
+                            else:
+                                _show_fading_overlay(bpy.context, chord_tokens, f"{label}: {success_count} values set", icon)
+
+                        # Add to history
+                        add_to_history(
+                            chord_tokens=chord_tokens,
+                            label=label,
+                            icon=icon,
+                            mapping_type="CONTEXT_PROPERTY",
+                            context_path=context_path,
+                            property_value=property_value,
+                            execution_context=ctx_viewport,
+                        )
+
+                    except Exception as e:
+                        import traceback
+                        print(f"Chord Song: Failed to set property '{context_path}': {e}")
+                        traceback.print_exc()
+                    return None
+
+                bpy.app.timers.register(execute_property_delayed, first_interval=0.01)
                 return {"FINISHED"}
 
             # Handle operator execution

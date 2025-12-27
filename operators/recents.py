@@ -20,6 +20,7 @@ from ..utils.render import (
     execute_history_entry_operator,
     execute_history_entry_script,
     execute_history_entry_toggle,
+    execute_history_entry_property,
 )
 from .common import prefs
 
@@ -161,14 +162,22 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # Calculate column widths
         blf.size(0, chord_size)
         max_hotkey_w = 0.0
+        max_icon_w = 0.0
         max_chord_w = 0.0
         max_label_w = 0.0
+        has_any_icon = False
 
         for i, entry in enumerate(visible_entries):
             # Hotkey width (1-9, a-z)
             hotkey_text = index_to_hotkey(i)
             hw, _ = blf.dimensions(0, hotkey_text)
             max_hotkey_w = max(max_hotkey_w, hw)
+
+            # Icon width
+            if entry.icon:
+                has_any_icon = True
+                iw, _ = blf.dimensions(0, entry.icon)
+                max_icon_w = max(max_icon_w, iw)
 
             # Chord width
             chord_text = "+".join(entry.chord_tokens)
@@ -183,7 +192,8 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         # Calculate positions
         col_spacing = int(30 * scale_factor)
-        col_w = max_hotkey_w + gap + icon_size + gap + max_chord_w + gap + max_label_w
+        icon_part_w = (max_icon_w + gap) if has_any_icon else 0
+        col_w = max_hotkey_w + gap + icon_part_w + max_chord_w + gap + max_label_w
         block_w = max(header_w, col_w * num_columns + col_spacing * (num_columns - 1))
         items_per_column = min(column_rows, max_items)
         block_h = int(header_h + (line_h * (items_per_column + 3)))
@@ -257,7 +267,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             # Column positions
             hotkey_col_x = column_x
             icon_col_x = column_x + max_hotkey_w + gap
-            chord_col_x = icon_col_x + icon_size + gap
+            chord_col_x = icon_col_x + icon_part_w
             label_col_x = chord_col_x + max_chord_w + gap
 
             # Draw hotkey (1-9, a-z)
@@ -276,7 +286,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                     pass
 
             # Draw chord (50% alpha)
-            chord_text = " ".join(entry.chord_tokens)
+            chord_text = "+".join(entry.chord_tokens)
             blf.size(0, chord_size)
             blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * 0.25)
             blf.position(0, chord_col_x, current_y, 0)
@@ -369,6 +379,21 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 return None
 
             bpy.app.timers.register(execute_toggle_delayed, first_interval=0.01)
+
+        elif entry.mapping_type == "CONTEXT_PROPERTY":
+            def execute_property_delayed():
+                # Validate context before using it (may be invalid after undo)
+                from ..utils.render import validate_viewport_context
+                valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                ctx_wrapper = _create_context_wrapper(valid_ctx)
+                success, error_msg = execute_history_entry_property(ctx_wrapper, entry)
+                if success:
+                    _show_fading_overlay(bpy.context, entry.chord_tokens, f"{entry.label}: {entry.property_value}", entry.icon)
+                elif error_msg:
+                    _show_fading_overlay(bpy.context, entry.chord_tokens, error_msg, "CANCEL")
+                return None
+
+            bpy.app.timers.register(execute_property_delayed, first_interval=0.01)
 
     def modal(self, context: bpy.types.Context, event: bpy.types.Event):
         history = get_history()

@@ -415,3 +415,61 @@ def execute_history_entry_toggle(context, entry):
         print(f"Chord Song: Failed to toggle context '{entry.context_path}': {e}")
         traceback.print_exc()
         return False, str(e)
+
+def execute_history_entry_property(context, entry):
+    """Execute a property set from history entry.
+
+    Returns:
+        tuple: (success: bool, error_message: str or None)
+    """
+    try:
+        import ast
+        try:
+            val_to_set = ast.literal_eval(entry.property_value)
+        except (ValueError, SyntaxError):
+            val_to_set = entry.property_value
+
+        effective_context = context
+
+        if hasattr(entry, 'execution_context') and entry.execution_context:
+            ctx_viewport = entry.execution_context
+            valid_ctx = validate_viewport_context(ctx_viewport)
+            if not valid_ctx:
+                return False, "Operator area not found"
+        else:
+            ctx_viewport = capture_viewport_context(context)
+            valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+
+        if valid_ctx:
+            effective_context = ContextWrapper(valid_ctx)
+
+        def do_set():
+            parts = entry.context_path.split('.')
+            obj = effective_context
+            for part in parts[:-1]:
+                obj = getattr(obj, part, None)
+                if obj is None:
+                    return False
+            prop_name = parts[-1]
+            if not hasattr(obj, prop_name):
+                return False
+            setattr(obj, prop_name, val_to_set)
+            return True
+
+        if valid_ctx:
+            try:
+                with bpy.context.temp_override(**valid_ctx):
+                    success = do_set()
+            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                success = do_set()
+        else:
+            success = do_set()
+
+        return success, None
+
+    except Exception as e:
+        import traceback
+        error_msg = f"Failed to set property '{entry.context_path}': {e}"
+        print(f"Chord Song: {error_msg}")
+        traceback.print_exc()
+        return False, error_msg

@@ -19,6 +19,8 @@ from .mapping.mapping_add import CHORDSONG_OT_Mapping_Add
 from .mapping.mapping_convert import CHORDSONG_OT_Mapping_Convert
 from .mapping.mapping_duplicate import CHORDSONG_OT_Mapping_Duplicate
 from .mapping.mapping_remove import CHORDSONG_OT_Mapping_Remove
+from .mapping.property_convert import CHORDSONG_OT_Property_Mapping_Convert
+from .mapping.subitem_ops import CHORDSONG_OT_SubItem_Add, CHORDSONG_OT_SubItem_Remove
 from .config.open_keymap import CHORDSONG_OT_Open_Keymap
 from .config.open_prefs import CHORDSONG_OT_Open_Prefs
 from .recents import CHORDSONG_OT_Recents
@@ -47,6 +49,9 @@ __all__ = [
     "CHORDSONG_OT_Mapping_Convert",
     "CHORDSONG_OT_Mapping_Duplicate",
     "CHORDSONG_OT_Mapping_Remove",
+    "CHORDSONG_OT_Property_Mapping_Convert",
+    "CHORDSONG_OT_SubItem_Add",
+    "CHORDSONG_OT_SubItem_Remove",
     "CHORDSONG_OT_Open_Keymap",
     "CHORDSONG_OT_Open_Prefs",
     "CHORDSONG_OT_Recents",

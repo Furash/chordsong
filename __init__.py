@@ -21,7 +21,7 @@ bl_info = {
 
 import bpy
 
-from .ui import CHORDSONG_Preferences, CHORDSONG_PG_Group, CHORDSONG_PG_Mapping, CHORDSONG_PG_NerdIcon
+from .ui import CHORDSONG_Preferences, CHORDSONG_PG_Group, CHORDSONG_PG_Mapping, CHORDSONG_PG_NerdIcon, CHORDSONG_PG_SubItem
 from .operators import (
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_CheckConflicts,
@@ -43,12 +43,15 @@ from .operators import (
     CHORDSONG_OT_Mapping_Convert,
     CHORDSONG_OT_Mapping_Duplicate,
     CHORDSONG_OT_Mapping_Remove,
+    CHORDSONG_OT_Property_Mapping_Convert,
     CHORDSONG_OT_Open_Keymap,
     CHORDSONG_OT_Open_Prefs,
     CHORDSONG_OT_Recents,
     CHORDSONG_OT_Save_Config,
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
+    CHORDSONG_OT_SubItem_Add,
+    CHORDSONG_OT_SubItem_Remove,
     CHORDSONG_OT_TestFadingOverlay,
     CHORDSONG_OT_TestMainOverlay,
     cleanup_all_handlers,
@@ -58,6 +61,7 @@ from .operators import (
 
 _classes = (
     CHORDSONG_PG_NerdIcon,
+    CHORDSONG_PG_SubItem,
     CHORDSONG_PG_Group,
     CHORDSONG_PG_Mapping,
     CHORDSONG_Preferences,
@@ -81,12 +85,15 @@ _classes = (
     CHORDSONG_OT_Mapping_Convert,
     CHORDSONG_OT_Mapping_Duplicate,
     CHORDSONG_OT_Mapping_Remove,
+    CHORDSONG_OT_Property_Mapping_Convert,
     CHORDSONG_OT_Open_Keymap,
     CHORDSONG_OT_Open_Prefs,
     CHORDSONG_OT_Recents,
     CHORDSONG_OT_Save_Config,
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
+    CHORDSONG_OT_SubItem_Add,
+    CHORDSONG_OT_SubItem_Remove,
     CHORDSONG_OT_TestFadingOverlay,
     CHORDSONG_OT_TestMainOverlay,
 )

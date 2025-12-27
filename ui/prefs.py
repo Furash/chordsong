@@ -102,6 +102,21 @@ class CHORDSONG_PG_Group(PropertyGroup):
         default=False,
     )
 
+class CHORDSONG_PG_SubItem(PropertyGroup):
+    """Sub-item for multiple context actions."""
+    path: StringProperty(
+        name="Path",
+        description="Context path (e.g. space_data.overlay.show_face_orientation)",
+        default="",
+        update=_on_mapping_changed,
+    )
+    value: StringProperty(
+        name="Value",
+        description="Property value (Python expression, only for CONTEXT_PROPERTY)",
+        default="",
+        update=_on_mapping_changed,
+    )
+
 class CHORDSONG_PG_Mapping(PropertyGroup):
     """Mapping property group for chord-to-action mappings."""
 
@@ -148,6 +163,7 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
             ("OPERATOR", "Operator", "Blender operator ID", "SETTINGS", 0),
             ("PYTHON_FILE", "Script", "Execute a Python script file", "FILE_SCRIPT", 1),
             ("CONTEXT_TOGGLE", "Toggle", "Toggle a boolean property", "CHECKBOX_HLT", 2),
+            ("CONTEXT_PROPERTY", "Property", "Set a property to a specific value", "PROPERTIES", 3),
         ),
         default="OPERATOR",
         update=_on_mapping_changed,
@@ -167,7 +183,13 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     )
     context_path: StringProperty(
         name="Context Path",
-        description="Path to boolean property to toggle (e.g. 'space_data.overlay.show_face_orientation')",
+        description="Path to property to toggle or set (e.g. 'space_data.overlay.show_face_orientation')",
+        default="",
+        update=_on_mapping_changed,
+    )
+    property_value: StringProperty(
+        name="Property Value",
+        description="Value to set for the property (Python expression)",
         default="",
         update=_on_mapping_changed,
     )
@@ -190,6 +212,8 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         default="",
         update=_on_mapping_changed,
     )
+    # Collection for multiple actions (Toggles or Properties)
+    sub_items: CollectionProperty(type=CHORDSONG_PG_SubItem)
     enabled: BoolProperty(name="Enabled", default=True, update=_on_mapping_changed)
 
 class CHORDSONG_Preferences(AddonPreferences):
@@ -302,6 +326,22 @@ class CHORDSONG_Preferences(AddonPreferences):
         max=96,
         update=_on_prefs_changed,
     )
+    overlay_font_size_toggle: IntProperty(
+        name="Toggle Icon Size",
+        description="Font size for toggle switch icons in overlay",
+        default=12,
+        min=4,
+        max=48,
+        update=_on_prefs_changed,
+    )
+    overlay_toggle_offset_y: IntProperty(
+        name="Toggle Y Offset",
+        description="Vertical offset for toggle switch icons",
+        default=0,
+        min=-50,
+        max=50,
+        update=_on_prefs_changed,
+    )
 
     overlay_show_header: BoolProperty(
         name="Show Header",
@@ -354,6 +394,26 @@ class CHORDSONG_Preferences(AddonPreferences):
         min=0.0,
         max=1.0,
         default=(0.80, 0.80, 0.80, 0.70),
+        update=_on_prefs_changed,
+    )
+    overlay_color_toggle_on: FloatVectorProperty(
+        name="Toggle ON color",
+        description="Color for toggle indicator when state is ON",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(0.65, 0.80, 1.00, 0.40),
+        update=_on_prefs_changed,
+    )
+    overlay_color_toggle_off: FloatVectorProperty(
+        name="Toggle OFF color",
+        description="Color for toggle indicator when state is OFF",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(1.00, 1.00, 1.00, 0.20),
         update=_on_prefs_changed,
     )
     overlay_color_recents_hotkey: FloatVectorProperty(

@@ -20,8 +20,9 @@ class HistoryEntry:
     call_context: Optional[str] = None
     # Python file-specific field
     python_file: Optional[str] = None
-    # Context toggle-specific field
+    # Context toggle/property-specific field
     context_path: Optional[str] = None
+    property_value: Optional[str] = None
     execution_context: Optional[dict] = None
 
 class ChordHistory:
@@ -54,6 +55,9 @@ class ChordHistory:
             return entry1.python_file == entry2.python_file
         elif entry1.mapping_type == "CONTEXT_TOGGLE":
             return entry1.context_path == entry2.context_path
+        elif entry1.mapping_type == "CONTEXT_PROPERTY":
+            return (entry1.context_path == entry2.context_path and
+                    entry1.property_value == entry2.property_value)
 
         return False
 
@@ -92,6 +96,7 @@ def add_to_history(
     call_context: Optional[str] = None,
     python_file: Optional[str] = None,
     context_path: Optional[str] = None,
+    property_value: Optional[str] = None,
     execution_context: Optional[dict] = None,
 ):
     """Convenience function to add an entry to global history."""
@@ -105,6 +110,7 @@ def add_to_history(
         call_context=call_context,
         python_file=python_file,
         context_path=context_path,
+        property_value=property_value,
         execution_context=execution_context,
     )
     _global_history.add(entry)

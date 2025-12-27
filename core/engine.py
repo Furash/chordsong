@@ -104,6 +104,8 @@ class Candidate:
     group: str
     icon: str = ""
     is_final: bool = False  # True if this is the last token in the chord
+    mapping_type: str = "OPERATOR"
+    property_value: str = ""
     count: int = 1          # Number of mappings reachable through this token
     groups: tuple[str, ...] = () # Unique groups reachable through this token
 
@@ -223,7 +225,7 @@ def find_exact_mapping(mappings, buffer_tokens):
             return m
     return None
 
-def candidates_for_prefix(mappings, buffer_tokens):
+def candidates_for_prefix(mappings, buffer_tokens, context=None):
     """
     For the current prefix, list the next possible token(s) and labels.
     """
@@ -234,7 +236,8 @@ def candidates_for_prefix(mappings, buffer_tokens):
             continue
 
         # Skip chordsong.recents operator
-        if getattr(m, "mapping_type", "") == "OPERATOR":
+        mapping_type = get_str_attr(m, "mapping_type", "OPERATOR")
+        if mapping_type == "OPERATOR":
             operator = get_str_attr(m, "operator")
             if operator == "chordsong.recents":
                 continue
@@ -257,12 +260,42 @@ def candidates_for_prefix(mappings, buffer_tokens):
         label = get_str_attr(m, "label") or "(missing label)"
         group = get_str_attr(m, "group")
         icon = get_str_attr(m, "icon")
+        property_value = get_str_attr(m, "property_value")
+        
+        # Determine dynamic toggle state if possible
+        if context and mapping_type == "CONTEXT_TOGGLE":
+            try:
+                path = get_str_attr(m, "context_path")
+                # Very basic evaluation
+                if path:
+                    # Resolve path against context
+                    obj = context
+                    parts = path.split(".")
+                    for part in parts[:-1]:
+                        obj = getattr(obj, part)
+                    val = getattr(obj, parts[-1])
+                    # User icons: 󰨙 (off) and 󰨚 (on/switch)
+                    if bool(val):
+                        label = f"{label}  󰨚"
+                    else:
+                        label = f"{label}  󰨙"
+            except Exception:
+                # Fallback to switch icon
+                label = f"{label}  󰨚"
+        elif mapping_type == "CONTEXT_TOGGLE":
+             label = f"{label}  󰨚"
+        elif mapping_type == "CONTEXT_PROPERTY":
+            if property_value:
+                # Store it in label so layout can decide how to split it
+                # or better, just use a separator that layout/render understands
+                label = f"{label}::  {property_value}"
+
         # Check if this is the final token in the chord
         is_final = len(tokens) == len(bt) + 1
         # Track counts and keep first label per next token for minimal UI
         if nxt not in out:
             out[nxt] = {
-                "cand": Candidate(nxt, label, group, icon, is_final), 
+                "cand": Candidate(nxt, label, group, icon, is_final, mapping_type, property_value), 
                 "count": 1,
                 "groups": {group} if group else set()
             }
@@ -274,7 +307,7 @@ def candidates_for_prefix(mappings, buffer_tokens):
             # If we already have a non-final candidate, but found a final one, update the candidate
             # but keep the accumulated count and groups
             if not out[nxt]["cand"].is_final and is_final:
-                out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final)
+                out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final, mapping_type, property_value)
 
     # Convert back to Candidate list with updated counts
     result = []
@@ -286,6 +319,8 @@ def candidates_for_prefix(mappings, buffer_tokens):
             group=c.group,
             icon=c.icon,
             is_final=c.is_final,
+            mapping_type=c.mapping_type,
+            property_value=c.property_value,
             count=data["count"],
             groups=tuple(sorted(data["groups"]))
         ))

@@ -295,27 +295,61 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                 blf.size(0, body_size)
                 current_size = body_size
             
-            # Helper to draw text with specific alpha for the separator
+            # Helper to draw text with specific alpha for the separator or toggle icon
             def draw_part_with_alpha(txt, start_x):
-                # Check for separators that should be dimmed
-                sep = None
-                if "→" in txt: sep = "→"
-                elif ">" in txt: sep = ">"
-                elif "::" in txt: sep = "::"
+                # Check for separators or toggle icons that should be dimmed
+                # Use a specific order to avoid partial matches
+                separators = ["→", ">", "::", "  󰨚", "  󰨙"]
+                found_sep = None
+                for sep in separators:
+                    if sep in txt:
+                        found_sep = sep
+                        break
 
-                if sep:
-                    # Draw separator with 0.2 alpha
-                    blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3] * 0.2)
-                    blf.position(0, start_x, cy, 0)
-                    blf.draw(0, sep)
-                    
-                    # Spacing after separator
-                    sep_w, _ = blf.dimensions(0, sep + "  ")
-                    
-                    # Draw remaining text at full alpha
-                    blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
-                    blf.position(0, start_x + sep_w, cy, 0)
-                    blf.draw(0, txt.replace(sep, "", 1).strip())
+                if found_sep:
+                    indicator = found_sep.strip()
+                    if indicator in ("󰨚", "󰨙"):
+                        # Toggle icon - use specific color and size from prefs
+                        parts = txt.split(found_sep, 1)
+                        # Draw base text
+                        blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
+                        blf.size(0, body_size)
+                        blf.position(0, start_x, cy, 0)
+                        blf.draw(0, parts[0])
+                        
+                        # Use manual offset from prefs
+                        base_w, _ = blf.dimensions(0, parts[0])
+                        
+                        # Determine color based on state
+                        if indicator == "󰨚":
+                             toggle_color = p.overlay_color_toggle_on
+                        else:
+                             toggle_color = p.overlay_color_toggle_off
+                             
+                        toggle_size = max(int(p.overlay_font_size_toggle * scale_factor), 6)
+                        v_offset = int(p.overlay_toggle_offset_y * scale_factor)
+                        
+                        blf.size(0, toggle_size)
+                        blf.color(0, toggle_color[0], toggle_color[1], toggle_color[2], toggle_color[3])
+                        blf.position(0, start_x + base_w, cy + v_offset, 0)
+                        blf.draw(0, found_sep)
+                        
+                        # Reset size for subsequent calls in this row if any
+                        blf.size(0, body_size)
+                    else:
+                        # Prefix separator (like →) or ::
+                        # Draw separator with 0.2 alpha (or similar)
+                        blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3] * 0.2)
+                        blf.position(0, start_x, cy, 0)
+                        blf.draw(0, found_sep)
+                        
+                        # Spacing after separator
+                        sep_w, _ = blf.dimensions(0, found_sep + "  ")
+                        
+                        # Draw remaining text at full alpha
+                        blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
+                        blf.position(0, start_x + sep_w, cy, 0)
+                        blf.draw(0, txt.replace(found_sep, "", 1).strip())
                 else:
                     blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
                     blf.position(0, start_x, cy, 0)
@@ -380,7 +414,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         pad_y = int(p.overlay_offset_y * scale_factor)
 
         # Compute candidates from filtered mappings
-        cands = candidates_for_prefix(filtered_mappings, buffer_tokens)
+        cands = candidates_for_prefix(filtered_mappings, buffer_tokens, context=context)
         cands.sort(key=lambda c: (c.group.lower(), c.next_token))
         cands = cands[: p.overlay_max_items]
 

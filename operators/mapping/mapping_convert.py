@@ -144,6 +144,20 @@ class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
             # Auto-detect context based on operator
             m.context = self._detect_context_from_operator(operator_name, kwargs_dict)
 
+            # Suggest chord
+            try:
+                from ..context_menu.suggester import suggest_chord
+                # Determine group
+                group = m.group
+                if not group and "." in operator_name:
+                    group = operator_name.split(".")[0].replace("_", " ").title()
+                
+                m.chord = suggest_chord(group, m.label)
+                if not m.group and group:
+                    m.group = group
+            except Exception:
+                pass
+
             self.report({"INFO"}, f"Converted: {operator_name}")
             return {"FINISHED"}
         else:

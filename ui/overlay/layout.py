@@ -51,7 +51,24 @@ def build_overlay_rows(cands, has_buffer, p=None):
             rows.append({"kind": "item", "token": token, "label": label_base, "label_extra": label_extra, "icon": ""})
         else:
             # Single final chord, show its label
-            rows.append({"kind": "item", "token": token, "label": c.label, "label_extra": "", "icon": icon})
+            label = c.label
+            icon = c.icon
+            label_extra = ""
+
+            # Check for merged extra info (like property values set in engine.py)
+            if "::" in label:
+                parts = label.split("::", 1)
+                label = parts[0].strip()
+                label_extra = f":: {parts[1].strip()}"
+
+            rows.append({
+                "kind": "item", 
+                "token": token, 
+                "label": label, 
+                "label_extra": label_extra, 
+                "icon": icon,
+                "mapping_type": c.mapping_type
+            })
 
     # Footer items (always at bottom)
     footer = []

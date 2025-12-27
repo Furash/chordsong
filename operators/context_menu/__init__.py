@@ -43,8 +43,14 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
 
     mapping_type: StringProperty(
         name="Mapping Type",
-        description="Type of mapping (OPERATOR or CONTEXT_TOGGLE)",
+        description="Type of mapping (OPERATOR, CONTEXT_TOGGLE, or CONTEXT_PROPERTY)",
         default="OPERATOR",
+    )
+
+    property_value: StringProperty(
+        name="Value",
+        description="Value to set for the property",
+        default="",
     )
 
     chord: StringProperty(
@@ -89,6 +95,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             self.operator = ""
             self.kwargs = ""
             self.context_path = ""
+            self.property_value = ""
             self.mapping_type = "OPERATOR"
             self.chord = ""
             self.name = ""
@@ -130,18 +137,32 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                 if op_inst:
                     button_operator = op_inst
 
-            # 3. Check if it's a boolean property (for context toggle)
+            # 3. Check if it's a property (for context toggle or property set)
             if button_prop and button_pointer and not button_operator:
+                self.context_path = extract_context_path(button_prop, button_pointer)
+                self.name = button_prop.name or button_prop.identifier.replace("_", " ").title()
+                self.editor_context = detect_editor_context(context)
+
                 if button_prop.type == 'BOOLEAN':
                     self.mapping_type = "CONTEXT_TOGGLE"
-                    self.context_path = extract_context_path(button_prop, button_pointer)
-
-                    self.name = button_prop.name or button_prop.identifier.replace("_", " ").title()
                     self.group = "Toggle"
-                    self.chord = suggest_chord(self.group, self.name)
-                    self.editor_context = detect_editor_context(context)
+                else:
+                    self.mapping_type = "CONTEXT_PROPERTY"
+                    self.group = "Property"
+                    try:
+                        # Try to get current value from button_pointer if possible
+                        val = getattr(button_pointer, button_prop.identifier)
+                        # Special handling for mathutils types
+                        if hasattr(val, "to_tuple"):
+                            val = val.to_tuple()
+                        elif hasattr(val, "to_list"):
+                            val = val.to_list()
+                        self.property_value = repr(val)
+                    except Exception:
+                        self.property_value = ""
 
-                    return self._invoke_dialog(context)
+                self.chord = suggest_chord(self.group, self.name)
+                return self._invoke_dialog(context)
 
             # 4. Process found operator
             if self.operator:
@@ -258,7 +279,10 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
 
         col.prop(self, "name", text="Label")
         col.prop(self, "group", text="Group")
-        col.prop(self, "kwargs", text="Parameters")
+        if self.mapping_type == "CONTEXT_PROPERTY":
+            col.prop(self, "property_value", text="Value")
+        else:
+            col.prop(self, "kwargs", text="Parameters")
 
     def execute(self, context: bpy.types.Context):
         # If execute is called directly without going through invoke/dialog
@@ -287,6 +311,22 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             m.mapping_type = "CONTEXT_TOGGLE"
 
             msg = f"Added chord '{self.chord}' for toggle: {self.context_path}"
+        elif self.mapping_type == "CONTEXT_PROPERTY":
+            if not self.context_path:
+                self.report({'WARNING'}, "No context path specified")
+                return {"CANCELLED"}
+
+            m = p.mappings.add()
+            m.enabled = True
+            m.chord = self.chord
+            m.label = self.name if self.name else "Set Property"
+            m.group = self.group if self.group else "Property"
+            m.context = self.editor_context
+            m.context_path = self.context_path
+            m.property_value = self.property_value
+            m.mapping_type = "CONTEXT_PROPERTY"
+
+            msg = f"Added chord '{self.chord}' to set {self.context_path} to {self.property_value}"
         else:
             if not self.operator:
                 self.report({'WARNING'}, "No operator specified")

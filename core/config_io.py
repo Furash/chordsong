@@ -30,11 +30,25 @@ def dump_prefs(prefs) -> dict:
             mapping_dict["python_file"] = get_str_attr(m, "python_file")
         elif mapping_type == "CONTEXT_TOGGLE":
             mapping_dict["context_path"] = get_str_attr(m, "context_path")
+        elif mapping_type == "CONTEXT_PROPERTY":
+            mapping_dict["context_path"] = get_str_attr(m, "context_path")
+            mapping_dict["property_value"] = get_str_attr(m, "property_value")
         else:
             mapping_dict["operator"] = get_str_attr(m, "operator")
             mapping_dict["call_context"] = getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT"
             # Config format (v1): always a real JSON object.
             mapping_dict["kwargs"] = kwargs_obj
+
+        # Serialize sub_items if any exist
+        sub_items_list = []
+        for sub in getattr(m, "sub_items", []):
+            if sub.path.strip():
+                sub_items_list.append({
+                    "path": sub.path.strip(),
+                    "value": sub.value.strip(),
+                })
+        if sub_items_list:
+            mapping_dict["sub_items"] = sub_items_list
 
         mappings.append(mapping_dict)
 
@@ -62,10 +76,14 @@ def dump_prefs(prefs) -> dict:
             "font_size_body": int(getattr(prefs, "overlay_font_size_body", 12)),
             "font_size_footer": int(getattr(prefs, "overlay_font_size_footer", 12)),
             "font_size_fading": int(getattr(prefs, "overlay_font_size_fading", 24)),
+            "font_size_toggle": int(getattr(prefs, "overlay_font_size_toggle", 12)),
+            "toggle_offset_y": int(getattr(prefs, "overlay_toggle_offset_y", 0)),
             "color_chord": list(getattr(prefs, "overlay_color_chord", (0.65, 0.8, 1.0, 1.0))),
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
             "color_header": list(getattr(prefs, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))),
             "color_icon": list(getattr(prefs, "overlay_color_icon", (0.8, 0.8, 0.8, 0.7))),
+            "color_toggle_on": list(getattr(prefs, "overlay_color_toggle_on", (0.65, 0.8, 1.0, 0.4))),
+            "color_toggle_off": list(getattr(prefs, "overlay_color_toggle_off", (1.0, 1.0, 1.0, 0.2))),
             "color_recents_hotkey": list(getattr(prefs, "overlay_color_recents_hotkey", (0.65, 0.8, 1.0, 1.0))),
             "color_list_background": list(getattr(prefs, "overlay_list_background", (0.0, 0.0, 0.0, 0.35))),
             "color_header_background": list(getattr(prefs, "overlay_header_background", (0.0, 0.0, 0.0, 0.35))),
@@ -157,6 +175,8 @@ def apply_config(prefs, data: dict) -> list[str]:
             "footer_label_gap": "overlay_footer_label_gap",
             "offset_x": "overlay_offset_x",
             "offset_y": "overlay_offset_y",
+            "font_size_toggle": "overlay_font_size_toggle",
+            "toggle_offset_y": "overlay_toggle_offset_y",
         }
 
         # Float properties
@@ -184,6 +204,8 @@ def apply_config(prefs, data: dict) -> list[str]:
             "color_label": "overlay_color_label",
             "color_header": "overlay_color_header",
             "color_icon": "overlay_color_icon",
+            "color_toggle_on": "overlay_color_toggle_on",
+            "color_toggle_off": "overlay_color_toggle_off",
             "color_recents_hotkey": "overlay_color_recents_hotkey",
             "color_list_background": "overlay_list_background",
             "color_header_background": "overlay_header_background",
@@ -271,6 +293,14 @@ def apply_config(prefs, data: dict) -> list[str]:
                 or m.context_path
                 or "(missing label)"
             )
+        elif mapping_type == "CONTEXT_PROPERTY":
+            m.context_path = (item.get("context_path", "") or "").strip()
+            m.property_value = (item.get("property_value", "") or "").strip()
+            m.label = (
+                (item.get("label", "") or "").strip()
+                or m.context_path
+                or "(missing label)"
+            )
         else:
             m.operator = (item.get("operator", "") or "").strip()
             # Use call_context from JSON if specified, otherwise default to EXEC_DEFAULT
@@ -299,6 +329,15 @@ def apply_config(prefs, data: dict) -> list[str]:
                 m.kwargs_json = ", ".join(parts)
             else:
                 m.kwargs_json = ""
+
+        # Load sub_items
+        sub_items_data = item.get("sub_items", [])
+        if isinstance(sub_items_data, list):
+            for sub_data in sub_items_data:
+                if isinstance(sub_data, dict):
+                    sub = m.sub_items.add()
+                    sub.path = (sub_data.get("path", "") or "").strip()
+                    sub.value = (sub_data.get("value", "") or "").strip()
 
     # Backward compatibility: if no groups were in config, extract from mappings
     if groups_data is None:
