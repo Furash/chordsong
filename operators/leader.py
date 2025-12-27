@@ -460,39 +460,33 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                 def execute_toggle_delayed():
                     try:
-                        # Define the toggle function to execute with proper context
+                        # Define helpers for context execution
                         def do_toggle_path(path):
-                            # Navigate to the property using the path
-                            # e.g., "space_data.overlay.show_stats"
                             parts = path.split('.')
                             obj = bpy.context
-
-                            # Navigate to the parent object
-                            for i, part in enumerate(parts[:-1]):
+                            for part in parts[:-1]:
                                 next_obj = getattr(obj, part, None)
-                                if next_obj is None:
-                                    return None
+                                if next_obj is None: return None
                                 obj = next_obj
-
-                            # Get the property name
                             prop_name = parts[-1]
-
-                            # Toggle the boolean value
-                            if not hasattr(obj, prop_name):
-                                return None
-
+                            if not hasattr(obj, prop_name): return None
                             current_value = getattr(obj, prop_name)
-
-                            if not isinstance(current_value, bool):
-                                print(f"Chord Song: Property '{path}' is not a boolean (got {type(current_value).__name__})")
-                                return None
-
-                            # Toggle it
+                            if not isinstance(current_value, bool): return None
                             set_val = not current_value
                             setattr(obj, prop_name, set_val)
-
-                            # Return the new state for the overlay message
                             return set_val
+
+                        def do_set_path(path, value):
+                            parts = path.split('.')
+                            obj = bpy.context
+                            for part in parts[:-1]:
+                                next_obj = getattr(obj, part, None)
+                                if next_obj is None: return None
+                                obj = next_obj
+                            prop_name = parts[-1]
+                            if not hasattr(obj, prop_name): return None
+                            setattr(obj, prop_name, value)
+                            return value
 
                         # Collect all paths
                         paths = []
@@ -502,32 +496,40 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             if item.path.strip():
                                 paths.append(item.path.strip())
 
+                        # Execute state logic
+                        sync = getattr(m, "sync_toggles", False)
+                        results = []
+                        master_new_val = None
+
+                        def run_logic():
+                            nonlocal master_new_val
+                            for i, path in enumerate(paths):
+                                if i == 0:
+                                    master_new_val = do_toggle_path(path)
+                                    if master_new_val is not None:
+                                        results.append(master_new_val)
+                                else:
+                                    if sync and master_new_val is not None:
+                                        res = do_set_path(path, master_new_val)
+                                    else:
+                                        res = do_toggle_path(path)
+                                    if res is not None:
+                                        results.append(res)
+
                         # Validate context before using it (may be invalid after undo)
                         from ..utils.render import validate_viewport_context
                         valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-
-                        # Results for overlay
-                        results = []
 
                         # Execute with context override if available
                         if valid_ctx:
                             try:
                                 with bpy.context.temp_override(**valid_ctx):
-                                    for path in paths:
-                                        res = do_toggle_path(path)
-                                        if res is not None:
-                                            results.append(res)
+                                    run_logic()
                             except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                 # Context became invalid, fall back to default context
-                                for path in paths:
-                                    res = do_toggle_path(path)
-                                    if res is not None:
-                                        results.append(res)
+                                run_logic()
                         else:
-                            for path in paths:
-                                res = do_toggle_path(path)
-                                if res is not None:
-                                    results.append(res)
+                            run_logic()
                         
                         # Show fading overlay with multi-status if applicable
                         if results:

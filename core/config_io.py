@@ -24,6 +24,7 @@ def dump_prefs(prefs) -> dict:
             "group": get_str_attr(m, "group"),
             "context": getattr(m, "context", "VIEW_3D"),
             "mapping_type": mapping_type,
+            "sync_toggles": bool(getattr(m, "sync_toggles", False)),
         }
 
         if mapping_type == "PYTHON_FILE":
@@ -58,6 +59,7 @@ def dump_prefs(prefs) -> dict:
         groups.append({
             "name": (getattr(grp, "name", "") or "").strip(),
             "display_order": int(getattr(grp, "display_order", 0)),
+            "expanded": bool(getattr(grp, "expanded", False)),
         })
 
     return {
@@ -98,6 +100,7 @@ def dump_prefs(prefs) -> dict:
             "style": getattr(prefs, "overlay_folder_style", "GROUPS_FIRST"),
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
+            "ungrouped_expanded": bool(getattr(prefs, "ungrouped_expanded", False)),
         },
         "groups": groups,
         "mappings": mappings,
@@ -158,6 +161,9 @@ def apply_config(prefs, data: dict) -> list[str]:
         for key, attr in bool_props.items():
             if key in overlay:
                 setattr(prefs, attr, bool(overlay[key]))
+        
+        if "ungrouped_expanded" in overlay:
+            prefs.ungrouped_expanded = bool(overlay["ungrouped_expanded"])
 
         # Integer properties - use a loop to reduce duplication
         int_props = {
@@ -255,6 +261,7 @@ def apply_config(prefs, data: dict) -> list[str]:
                 grp = prefs.groups.add()
                 grp.name = (grp_item.get("name", "") or "").strip()
                 grp.display_order = int(grp_item.get("display_order", 0))
+                grp.expanded = bool(grp_item.get("expanded", False))
 
     # Mappings
     mappings = data.get("mappings", None)
@@ -278,6 +285,7 @@ def apply_config(prefs, data: dict) -> list[str]:
         # Handle mapping type (default to OPERATOR for backward compatibility)
         mapping_type = item.get("mapping_type", "OPERATOR")
         m.mapping_type = mapping_type
+        m.sync_toggles = bool(item.get("sync_toggles", False))
 
         if mapping_type == "PYTHON_FILE":
             m.python_file = (item.get("python_file", "") or "").strip()

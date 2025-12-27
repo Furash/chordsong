@@ -295,8 +295,11 @@ def draw_addon_preferences(prefs, _context, layout):
         box.separator()
 
         for idx, m in items:
+            # Wrap each mapping in its own box for clear visual separation
+            item_box = box.box()
+            
             # Main row with enabled, chord, label, and remove button
-            r = box.row(align=True)
+            r = item_box.row(align=True)
             r.prop(m, "enabled", text="")
             r.scale_x = 0.5
             r.prop(m, "chord", text="")
@@ -323,7 +326,7 @@ def draw_addon_preferences(prefs, _context, layout):
             op.index = idx
 
             # Second row with context and type selector and type-specific fields
-            row2 = box.row(align=True)
+            row2 = item_box.row(align=True)
             
             # Use a split to separate icons from the action area
             # This allows us to nudge the icons down slightly to align with the box contents
@@ -367,21 +370,33 @@ def draw_addon_preferences(prefs, _context, layout):
                 
             elif m.mapping_type == "CONTEXT_TOGGLE":
                 # Create a box for all toggles
-                toggle_area = r2.box()
                 
-                # First row
-                row1 = toggle_area.row(align=True)
-                row1.prop(m, "context_path", text="")
-                op = row1.operator("chordsong.subitem_add", text="Add Property", icon="ADD")
-                op.mapping_index = idx
-                
-                # Sub items
+                def draw_toggle_row_fixed(layout, path_ptr, path_prop, is_primary, m, idx, sub_idx=-1):
+                    row = layout.row(align=True)
+                    # Use a fixed split to align primary row and sub-items perfectly
+                    # Path column (approx 75%)
+                    p_split = row.split(factor=0.75, align=True)
+                    p_split.prop(path_ptr, path_prop, text="")
+                    
+                    # Remaining 25% for Icon + Button
+                    # Split that 25% into 12% for icon (~3% total) and 88% for button (~22% total)
+                    b_split = p_split.split(factor=0.12, align=True)
+                    
+                    # Sync toggles flag - shown on EVERY row, sharing the same state
+                    b_split.prop(m, "sync_toggles", text="", icon='LINKED' if m.sync_toggles else 'UNLINKED', toggle=True)
+
+                    if is_primary:
+                        op = b_split.operator("chordsong.subitem_add", text="Add Property", icon="ADD")
+                        op.mapping_index = idx
+                    else:
+                        rem = b_split.operator("chordsong.subitem_remove", text="Remove Property", icon="TRASH")
+                        rem.mapping_index = idx
+                        rem.item_index = sub_idx
+
+                # Draw rows using the fixed layout helper
+                draw_toggle_row_fixed(r2, m, "context_path", True, m, idx)
                 for i, item in enumerate(m.sub_items):
-                    row = toggle_area.row(align=True)
-                    row.prop(item, "path", text="")
-                    rem = row.operator("chordsong.subitem_remove", text="Remove Property", icon="TRASH")
-                    rem.mapping_index = idx
-                    rem.item_index = i
+                    draw_toggle_row_fixed(r2, item, "path", False, m, idx, i)
 
             elif m.mapping_type == "CONTEXT_PROPERTY":
                 # Create a common box for all property rows
@@ -438,10 +453,12 @@ def draw_addon_preferences(prefs, _context, layout):
 
             # Third row for parameters (only for operator type)
             if m.mapping_type == "OPERATOR":
-                r3 = box.row()
+                r3 = item_box.row()
                 r3.label(text="Parameters:")
                 r3.scale_x = 8
                 r3.prop(m, "kwargs_json", text="")
-                box.separator()
+            
+            # Extra spacing between item boxes
+            box.separator(factor=2.0)
 
     col.separator()

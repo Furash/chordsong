@@ -100,6 +100,7 @@ class CHORDSONG_PG_Group(PropertyGroup):
         name="Expanded",
         description="Whether this group is expanded in the UI",
         default=False,
+        update=_on_group_changed,
     )
 
 class CHORDSONG_PG_SubItem(PropertyGroup):
@@ -214,6 +215,12 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     )
     # Collection for multiple actions (Toggles or Properties)
     sub_items: CollectionProperty(type=CHORDSONG_PG_SubItem)
+    sync_toggles: BoolProperty(
+        name="Sync Toggles",
+        description="If enabled, all sub-item toggles will match the state of the primary toggle",
+        default=False,
+        update=_on_mapping_changed,
+    )
     enabled: BoolProperty(name="Enabled", default=True, update=_on_mapping_changed)
 
 class CHORDSONG_Preferences(AddonPreferences):
@@ -556,6 +563,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Ungrouped Expanded",
         description="Whether the Ungrouped section is expanded",
         default=False,
+        update=_on_prefs_changed,
     )
 
     def ensure_defaults(self):
