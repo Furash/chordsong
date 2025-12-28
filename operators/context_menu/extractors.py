@@ -35,7 +35,8 @@ def parse_operator_from_text(text):
     return None, None
 
 def parse_property_from_text(text):
-    """Parse property path and value from text like 'bpy.context.scene.render.engine = "CYCLES"'.
+    """Parse property path and value from text.
+    Handles 'bpy.context.xxx = yyy' or 'bpy.data.xxx = yyy'.
     
     Returns:
         Tuple (Path, Value) or (None, None)
@@ -43,13 +44,21 @@ def parse_property_from_text(text):
     if not text:
         return None, None
 
-    # Pattern to match bpy.context.XXX = YYY
-    # We strip 'bpy.context.' if it exists
-    pattern = r'^(?:bpy\.context\.)?([a-zA-Z0-9_\.]+)\s*=\s*(.*)$'
+    # Handle bpy.context.XXX = YYY or bpy.data.XXX = YYY
+    # We use a permissive regex that captures everything before the first equals sign
+    pattern = r'^(?:bpy\.(?:context|data)\.)?(.+?)\s*=\s*(.*)$'
     match = re.search(pattern, text)
     if match:
         path = match.group(1).strip()
         value = match.group(2).strip()
+        
+        # Normalize some common bpy.data paths to context-relative paths if possible
+        # e.g. 'scenes["Scene"].cycles.use_denoising' -> 'scene.cycles.use_denoising'
+        if path.startswith('scenes['):
+            path = re.sub(r'^scenes\[.+?\]\.', 'scene.', path)
+        elif path.startswith('worlds['):
+            path = re.sub(r'^worlds\[.+?\]\.', 'world.', path)
+
         return path, value
 
     return None, None
@@ -226,6 +235,8 @@ def extract_context_path(button_prop, button_pointer):
             path_parts = ["tool_settings", prop_name]
 
         # Detect RenderSettings
+        elif "Cycles" in rna_type_name and "RenderSettings" in rna_type_name:
+            path_parts = ["scene", "cycles", prop_name]
         elif "RenderSettings" in rna_type_name:
             path_parts = ["scene", "render", prop_name]
 
