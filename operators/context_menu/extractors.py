@@ -12,7 +12,8 @@ def parse_operator_from_text(text):
         return None, None
 
     # Pattern to match [bpy.ops.]module.operator_name(...)
-    pattern = r'(?:bpy\.ops\.)?([a-z0-9_]+)\.([a-z0-9_]+)\s*\((.*)\)'
+    # Use ^ and $ to ensure we match the full string and don't pick up properties
+    pattern = r'^(?:bpy\.ops\.)?([a-z0-9_]+)\.([a-z0-9_]+)\s*\((.*)\)$'
     match = re.search(pattern, text)
     if match:
         module = match.group(1)
@@ -21,20 +22,45 @@ def parse_operator_from_text(text):
         return f"{module}.{operator}", kwargs
 
     # Fallback for just the ID if no parentheses
-    pattern_no_args = r'(?:bpy\.ops\.)?([a-z0-9_]+)\.([a-z0-9_]+)'
+    pattern_no_args = r'^(?:bpy\.ops\.)?([a-z0-9_]+)\.([a-z0-9_]+)$'
     match = re.search(pattern_no_args, text)
     if match:
         module = match.group(1)
         operator = match.group(2)
+        # Final safety check: operators shouldn't be 'context' or 'data' if they don't have bpy.ops.
+        if module in ("context", "data", "app") and not text.startswith("bpy.ops."):
+            return None, None
         return f"{module}.{operator}", ""
 
     return None, None
 
-def extract_multiple_from_info_panel(context):
-    """Extract multiple operators from Info panel text or clipboard.
+def parse_property_from_text(text):
+    """Parse property path and value from text like 'bpy.context.scene.render.engine = "CYCLES"'.
     
     Returns:
-        List of (operator, kwargs) tuples.
+        Tuple (Path, Value) or (None, None)
+    """
+    if not text:
+        return None, None
+
+    # Pattern to match bpy.context.XXX = YYY
+    # We strip 'bpy.context.' if it exists
+    pattern = r'^(?:bpy\.context\.)?([a-zA-Z0-9_\.]+)\s*=\s*(.*)$'
+    match = re.search(pattern, text)
+    if match:
+        path = match.group(1).strip()
+        value = match.group(2).strip()
+        return path, value
+
+    return None, None
+
+def extract_multiple_from_info_panel(context):
+    """Extract multiple operators OR properties from Info panel text or clipboard.
+    
+    Returns:
+        List of dicts: 
+        For Operator: {'type': 'OPERATOR', 'operator': str, 'kwargs': str}
+        For Property: {'type': 'PROPERTY', 'path': str, 'value': str}
     """
     lines = []
     
@@ -46,7 +72,6 @@ def extract_multiple_from_info_panel(context):
     try:
         if hasattr(bpy.ops.info, "report_copy"):
             area = context.area
-            # Ensure we target the right area if possible
             if area and area.type == 'INFO':
                 with context.temp_override(area=area):
                     bpy.ops.info.report_copy()
@@ -65,20 +90,50 @@ def extract_multiple_from_info_panel(context):
     if not lines and old_clipboard:
         lines = old_clipboard.splitlines()
 
+    if not lines:
+        return []
+
     results = []
+    first_type = None
+
     for line in lines:
-        op, kwargs = parse_operator_from_text(line.strip())
-        if op:
-            results.append((op, kwargs))
+        line = line.strip()
+        if not line:
+            continue
+
+        # Try property first because operator pattern can be loose
+        prop_path, prop_val = parse_property_from_text(line)
+        op, kwargs = parse_operator_from_text(line)
+
+        if first_type is None:
+            if prop_path:
+                first_type = 'PROPERTY'
+                results.append({'type': 'PROPERTY', 'path': prop_path, 'value': prop_val})
+            elif op:
+                first_type = 'OPERATOR'
+                results.append({'type': 'OPERATOR', 'operator': op, 'kwargs': kwargs})
+        else:
+            if first_type == 'PROPERTY' and prop_path:
+                results.append({'type': 'PROPERTY', 'path': prop_path, 'value': prop_val})
+            elif first_type == 'OPERATOR' and op:
+                results.append({'type': 'OPERATOR', 'operator': op, 'kwargs': kwargs})
             
     return results
 
 def extract_from_info_panel(context):
-    """Try to extract operator from Info panel text or clipboard."""
+    """Try to extract operator/property from Info panel text or clipboard."""
     results = extract_multiple_from_info_panel(context)
-    if results:
-        return results[0]  # Return first for backward compatibility
-    return None, None
+    if not results:
+        return None, None
+
+    res = results[0]
+    if res['type'] == 'OPERATOR':
+        return res['operator'], res['kwargs']
+    else:
+        # For properties, return None for operator but we might need a more generic extractor
+        # existing extract_from_info_panel is used by CHORDSONG_OT_Context_Menu.invoke
+        # which expects (operator, kwargs).
+        return None, None
 
 def extract_from_button_pointer(button_pointer):
     """Try to extract operator logic from button pointer."""

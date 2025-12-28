@@ -89,6 +89,12 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
         default="",
     )
 
+    sub_items_json: StringProperty(
+        name="Sub-Items",
+        description="JSON string of additional properties/toggles",
+        default="",
+    )
+
     def _invoke_dialog(self, context):
         """Helper method to invoke the dialog with window-level context."""
         window_manager = context.window_manager
@@ -101,6 +107,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             self.operator = ""
             self.kwargs = ""
             self.sub_operators_json = ""
+            self.sub_items_json = ""
             self.context_path = ""
             self.property_value = ""
             self.mapping_type = "OPERATOR"
@@ -127,21 +134,41 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                             self.operator = f"{parts[0].lower()}.{parts[1].lower()}"
 
             # 1. Try to extract from Info Panel / Clipboard if no button context
-            if not button_operator and not self.operator:
+            if not button_operator and not self.operator and not button_prop:
                 from .extractors import extract_multiple_from_info_panel
                 results = extract_multiple_from_info_panel(context)
                 
                 if results:
-                    # Use the first one as primary
-                    self.operator, self.kwargs = results[0]
+                    import json
+                    first = results[0]
                     
-                    # Store others as JSON
-                    if len(results) > 1:
-                        import json
-                        self.sub_operators_json = json.dumps(results[1:])
+                    if first['type'] == 'OPERATOR':
+                        self.operator = first['operator']
+                        self.kwargs = first['kwargs']
+                        self.mapping_type = "OPERATOR"
+                        
+                        # Store others as JSON
+                        if len(results) > 1:
+                            self.sub_operators_json = json.dumps(results[1:])
+                    
+                    elif first['type'] == 'PROPERTY':
+                        self.context_path = first['path']
+                        self.property_value = first['value']
+                        
+                        # Guess if it's a toggle
+                        is_bool = self.property_value.lower() in ("true", "false")
+                        self.mapping_type = "CONTEXT_TOGGLE" if is_bool else "CONTEXT_PROPERTY"
+                        
+                        # Format label/group
+                        self.name = self.context_path.split(".")[-1].replace("_", " ").title()
+                        self.group = "Toggle" if is_bool else "Property"
+                        
+                        # Store others as JSON
+                        if len(results) > 1:
+                            self.sub_items_json = json.dumps(results[1:])
 
             # 2. Try to extract from button pointer (e.g. search menu items with no button_operator)
-            if not self.operator and button_pointer:
+            if not self.operator and not self.context_path and button_pointer:
                 op_id, op_inst, op_kwargs = extract_from_button_pointer(button_pointer)
                 if op_id:
                     self.operator = op_id
@@ -150,8 +177,8 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                 if op_inst:
                     button_operator = op_inst
 
-            # 3. Check if it's a property (for context toggle or property set)
-            if button_prop and button_pointer and not button_operator:
+            # 3. Check if it's a property (from UI interaction, not Info selection)
+            if button_prop and button_pointer and not button_operator and not self.context_path:
                 self.context_path = extract_context_path(button_prop, button_pointer)
                 self.name = button_prop.name or button_prop.identifier.replace("_", " ").title()
                 self.editor_context = detect_editor_context(context)
@@ -245,7 +272,13 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                 self.chord = suggest_chord(self.group, self.name)
                 return self._invoke_dialog(context)
 
-            # 5. Fallback: Show dialog for manual entry
+            # 5. Process found property (from Info selection)
+            if self.context_path:
+                self.editor_context = detect_editor_context(context)
+                self.chord = suggest_chord(self.group, self.name)
+                return self._invoke_dialog(context)
+
+            # 6. Fallback: Show dialog for manual entry
             self.mapping_type = "OPERATOR"
             return self._invoke_dialog(context)
 
@@ -263,8 +296,19 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
         layout = self.layout
 
         col = layout.column(align=True)
-        if self.mapping_type == "CONTEXT_TOGGLE":
-            col.label(text=f"Toggle: {self.context_path}", icon="CHECKBOX_HLT")
+        if self.mapping_type in ("CONTEXT_TOGGLE", "CONTEXT_PROPERTY"):
+            import json
+            sub_count = 0
+            if self.sub_items_json:
+                try:
+                    sub_count = len(json.loads(self.sub_items_json))
+                except Exception:
+                    pass
+            
+            if sub_count > 0:
+                col.label(text=f"Multiple {self.mapping_type.split('_')[-1].title()}s: {self.context_path} + {sub_count} more", icon="CHECKBOX_HLT")
+            else:
+                col.label(text=f"Path: {self.context_path}", icon="CHECKBOX_HLT")
         else:
             if self.operator:
                 import json
@@ -328,6 +372,19 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             m.context = self.editor_context
             m.context_path = self.context_path
             m.mapping_type = "CONTEXT_TOGGLE"
+            
+            # Handle additional items
+            if self.sub_items_json:
+                try:
+                    import json
+                    subs = json.loads(self.sub_items_json)
+                    for sub_data in subs:
+                        if sub_data['type'] == 'PROPERTY':
+                            sub = m.sub_items.add()
+                            sub.path = sub_data['path']
+                            sub.value = sub_data['value']
+                except Exception:
+                    pass
 
             msg = f"Added chord '{self.chord}' for toggle: {self.context_path}"
         elif self.mapping_type == "CONTEXT_PROPERTY":
@@ -344,6 +401,19 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             m.context_path = self.context_path
             m.property_value = self.property_value
             m.mapping_type = "CONTEXT_PROPERTY"
+            
+            # Handle additional items
+            if self.sub_items_json:
+                try:
+                    import json
+                    subs = json.loads(self.sub_items_json)
+                    for sub_data in subs:
+                        if sub_data['type'] == 'PROPERTY':
+                            sub = m.sub_items.add()
+                            sub.path = sub_data['path']
+                            sub.value = sub_data['value']
+                except Exception:
+                    pass
 
             msg = f"Added chord '{self.chord}' to set {self.context_path} to {self.property_value}"
         else:
@@ -352,6 +422,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                 return {"CANCELLED"}
 
             if not self.name or not self.group:
+                # Guess from ID
                 if "." in self.operator:
                     parts = self.operator.split(".")
                     if len(parts) == 2:
@@ -376,11 +447,12 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                 try:
                     import json
                     subs = json.loads(self.sub_operators_json)
-                    for sub_op_id, sub_kwargs in subs:
-                        sub = m.sub_operators.add()
-                        sub.operator = sub_op_id
-                        sub.kwargs_json = sub_kwargs
-                        sub.call_context = "EXEC_DEFAULT"
+                    for sub_data in subs:
+                        if sub_data['type'] == 'OPERATOR':
+                            sub = m.sub_operators.add()
+                            sub.operator = sub_data['operator']
+                            sub.kwargs_json = sub_data['kwargs']
+                            sub.call_context = "EXEC_DEFAULT"
                 except Exception as e:
                     print(f"Chord Song: Failed to parse sub-operators: {e}")
 
