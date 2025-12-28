@@ -667,94 +667,95 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 return {"FINISHED"}
 
             # Handle operator execution
-            op = (m.operator or "").strip()
-            if not op:
+            operators_to_run = []
+            
+            primary_op = (m.operator or "").strip()
+            if primary_op:
+                operators_to_run.append({
+                    "op": primary_op,
+                    "kwargs": parse_kwargs(getattr(m, "kwargs_json", "{}")),
+                    "call_ctx": (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+                })
+            
+            for sub in m.sub_operators:
+                sub_op = (sub.operator or "").strip()
+                if sub_op:
+                    operators_to_run.append({
+                        "op": sub_op,
+                        "kwargs": parse_kwargs(getattr(sub, "kwargs_json", "{}")),
+                        "call_ctx": (getattr(sub, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+                    })
+
+            if not operators_to_run:
                 self.report({"WARNING"}, f'Chord "{" ".join(self._buffer)}" has no operator')
                 self._finish(context)
                 return {"CANCELLED"}
 
-            kwargs = parse_kwargs(getattr(m, "kwargs_json", "{}"))
-            call_ctx = (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
-
-            # Capture viewport context BEFORE finishing modal (when we have valid context).
-            # This is safe because we're in modal() method, not in a draw handler.
-            # We'll use these captured values INSIDE the timer (when we're outside draw phase).
+            # Capture viewport context BEFORE finishing modal
             ctx_viewport = capture_viewport_context(context)
 
-            # Finish the modal operator FIRST to ensure clean state before calling other operators.
-            # This prevents blocking issues when opening preferences or other UI operations.
+            # Finish the modal operator FIRST
             self._finish(context)
 
             # Defer operator execution to next frame using a timer.
-            # The timer ensures we're completely outside the draw/render phase when executing.
             def execute_operator_delayed():
-                result_set = set()
                 try:
-                    mod_name, fn_name = op.split(".", 1)
-                    opmod = getattr(bpy.ops, mod_name)
-                    opfn = getattr(opmod, fn_name)
+                    # Validate context before using it
+                    from ..utils.render import validate_viewport_context
+                    valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
-                    # Helper to show overlay and add to history
-                    def show_success():
+                    success = False
+                    
+                    for op_data in operators_to_run:
+                        op = op_data["op"]
+                        kwargs = op_data["kwargs"]
+                        call_ctx = op_data["call_ctx"]
+                        
+                        mod_name, fn_name = op.split(".", 1)
+                        opmod = getattr(bpy.ops, mod_name)
+                        opfn = getattr(opmod, fn_name)
+
+                        result_set = set()
+                        if call_ctx == "INVOKE_DEFAULT":
+                            if valid_ctx:
+                                try:
+                                    with bpy.context.temp_override(**valid_ctx):
+                                        result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                    result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                            else:
+                                result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                        else:
+                            if valid_ctx:
+                                try:
+                                    with bpy.context.temp_override(**valid_ctx):
+                                        result_set = opfn('EXEC_DEFAULT', **kwargs)
+                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                    result_set = opfn('EXEC_DEFAULT', **kwargs)
+                            else:
+                                result_set = opfn('EXEC_DEFAULT', **kwargs)
+                                
+                        if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                            success = True
+
+                    if success:
                         _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                         add_to_history(
                             chord_tokens=chord_tokens,
                             label=label,
                             icon=icon,
                             mapping_type="OPERATOR",
-                            operator=op,
-                            kwargs=kwargs,
-                            call_context=call_ctx,
+                            operator=operators_to_run[0]["op"], # Log the primary operator
+                            kwargs=operators_to_run[0]["kwargs"],
+                            call_context=operators_to_run[0]["call_ctx"],
                             execution_context=ctx_viewport,
                         )
 
-                    # Validate context before using it (may be invalid after undo)
-                    from ..utils.render import validate_viewport_context
-                    valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-
-                    # Execute operator with captured context override.
-                    # Context was captured in modal() method (safe) but used in timer (outside draw).
-                    # Fading overlay is shown inside temp_override for correct space detection.
-                    # Wrap temp_override in try/except as context may become invalid between validation and use.
-                    if call_ctx == "INVOKE_DEFAULT":
-                        if valid_ctx:
-                            try:
-                                with bpy.context.temp_override(**valid_ctx):
-                                    result_set = opfn('INVOKE_DEFAULT', **kwargs)
-                                    if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-                                        show_success()
-                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                # Context became invalid, fall back to default context
-                                result_set = opfn('INVOKE_DEFAULT', **kwargs)
-                                if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-                                    show_success()
-                        else:
-                            result_set = opfn('INVOKE_DEFAULT', **kwargs)
-                            if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-                                show_success()
-                    else:
-                        if valid_ctx:
-                            try:
-                                with bpy.context.temp_override(**valid_ctx):
-                                    result_set = opfn('EXEC_DEFAULT', **kwargs)
-                                    if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-                                        show_success()
-                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                # Context became invalid, fall back to default context
-                                result_set = opfn('EXEC_DEFAULT', **kwargs)
-                                if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-                                    show_success()
-                        else:
-                            result_set = opfn('EXEC_DEFAULT', **kwargs)
-                            if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-                                show_success()
-
                 except Exception as e:
-                    # Log error for debugging
                     import traceback
-                    print(f"Chord Song: Failed to execute operator {op}: {e}")
+                    print(f"Chord Song: Failed to execute operators: {e}")
                     traceback.print_exc()
-                return None  # Run once
+                return None
 
             bpy.app.timers.register(execute_operator_delayed, first_interval=0.01)
             return {"FINISHED"}

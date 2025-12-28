@@ -112,10 +112,13 @@ class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
     bl_options = {"INTERNAL"}
 
     index: IntProperty(default=-1)
+    sub_index: IntProperty(default=-1)
 
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
         idx = int(self.index)
+        sub_idx = int(self.sub_index)
+
         if idx < 0 or idx >= len(p.mappings):
             self.report({"WARNING"}, "Invalid mapping index")
             return {"CANCELLED"}
@@ -125,8 +128,17 @@ class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
             self.report({"WARNING"}, "Can only convert operator mappings")
             return {"CANCELLED"}
 
+        # Target object: either the mapping itself or a sub-operator
+        target = m
+        if sub_idx >= 0:
+            if sub_idx < len(m.sub_operators):
+                target = m.sub_operators[sub_idx]
+            else:
+                self.report({"WARNING"}, "Invalid sub-operator index")
+                return {"CANCELLED"}
+
         # Get the current operator field (might contain full function call)
-        full_call = (m.operator or "").strip()
+        full_call = (target.operator or "").strip()
         if not full_call:
             self.report({"WARNING"}, "No function call to convert")
             return {"CANCELLED"}
@@ -134,29 +146,31 @@ class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
         operator_name, kwargs_string, kwargs_dict = extract_operator_and_kwargs(full_call)
 
         if operator_name:
-            m.operator = operator_name
+            target.operator = operator_name
             if kwargs_string:
-                m.kwargs_json = kwargs_string
+                target.kwargs_json = kwargs_string
 
-            # Generate a smart label based on operator type and parameters
-            m.label = self._generate_smart_label(operator_name, kwargs_dict)
+            # If this is the primary operator, update label and context
+            if sub_idx < 0:
+                # Generate a smart label based on operator type and parameters
+                m.label = self._generate_smart_label(operator_name, kwargs_dict)
 
-            # Auto-detect context based on operator
-            m.context = self._detect_context_from_operator(operator_name, kwargs_dict)
+                # Auto-detect context based on operator
+                m.context = self._detect_context_from_operator(operator_name, kwargs_dict)
 
-            # Suggest chord
-            try:
-                from ..context_menu.suggester import suggest_chord
-                # Determine group
-                group = m.group
-                if not group and "." in operator_name:
-                    group = operator_name.split(".")[0].replace("_", " ").title()
-                
-                m.chord = suggest_chord(group, m.label)
-                if not m.group and group:
-                    m.group = group
-            except Exception:
-                pass
+                # Suggest chord
+                try:
+                    from ..context_menu.suggester import suggest_chord
+                    # Determine group
+                    group = m.group
+                    if not group and "." in operator_name:
+                        group = operator_name.split(".")[0].replace("_", " ").title()
+                    
+                    m.chord = suggest_chord(group, m.label)
+                    if not m.group and group:
+                        m.group = group
+                except Exception:
+                    pass
 
             self.report({"INFO"}, f"Converted: {operator_name}")
             return {"FINISHED"}

@@ -30,87 +30,55 @@ def parse_operator_from_text(text):
 
     return None, None
 
+def extract_multiple_from_info_panel(context):
+    """Extract multiple operators from Info panel text or clipboard.
+    
+    Returns:
+        List of (operator, kwargs) tuples.
+    """
+    lines = []
+    
+    # Try to get text from Info Panel / Clipboard
+    wm = context.window_manager
+    old_clipboard = wm.clipboard
+    
+    # Method 1: Try to get selected report text by copying it
+    try:
+        if hasattr(bpy.ops.info, "report_copy"):
+            area = context.area
+            # Ensure we target the right area if possible
+            if area and area.type == 'INFO':
+                with context.temp_override(area=area):
+                    bpy.ops.info.report_copy()
+            else:
+                bpy.ops.info.report_copy()
+            
+            new_clipboard = wm.clipboard
+            if new_clipboard and new_clipboard != old_clipboard:
+                lines = new_clipboard.splitlines()
+    except Exception:
+        pass
+    finally:
+        wm.clipboard = old_clipboard
+
+    # Method 2: If no lines from copying, check current clipboard as fallback
+    if not lines and old_clipboard:
+        lines = old_clipboard.splitlines()
+
+    results = []
+    for line in lines:
+        op, kwargs = parse_operator_from_text(line.strip())
+        if op:
+            results.append((op, kwargs))
+            
+    return results
+
 def extract_from_info_panel(context):
     """Try to extract operator from Info panel text or clipboard."""
-    space = context.space_data
-    area = context.area
-
-    is_info_panel = False
-    if area and hasattr(area, 'type'):
-        if area.type in ('INFO', 'CONSOLE'):
-            is_info_panel = True
-    elif space and hasattr(space, 'type'):
-        if space.type in ('INFO', 'CONSOLE'):
-            is_info_panel = True
-
-    operator = None
-    kwargs = ""
-
-    if is_info_panel:
-        # Method 1: Try to get selected report text by copying it
-        try:
-            wm = context.window_manager
-            old_clipboard = wm.clipboard
-            
-            # Check if we can call report_copy safely
-            if hasattr(bpy.ops.info, "report_copy"):
-                # Use temp_override if area is provided, otherwise target the current context
-                try:
-                    if area:
-                        with context.temp_override(area=area):
-                            bpy.ops.info.report_copy()
-                    else:
-                        bpy.ops.info.report_copy()
-                    
-                    # If clipboard changed, it worked
-                    new_clipboard = wm.clipboard
-                    if new_clipboard and new_clipboard != old_clipboard:
-                        operator, kwargs = parse_operator_from_text(new_clipboard)
-                except Exception:
-                    pass
-            
-            # Restore clipboard immediately after trying
-            wm.clipboard = old_clipboard
-        except Exception:
-            pass
-
-        # Method 2: Try to access reports directly from Info area
-        if not operator and area and area.type == 'INFO':
-            try:
-                wm = context.window_manager
-                if hasattr(wm, 'reports'):
-                    for report in reversed(list(wm.reports.values())[-20:] if hasattr(wm.reports, 'values') else []):
-                        if hasattr(report, 'message'):
-                            operator, kwargs = parse_operator_from_text(report.message)
-                            if operator:
-                                break
-            except Exception:
-                pass
-
-        # Method 3: Check Info panel history (console history)
-        if not operator and space and hasattr(space, 'history'):
-            history = space.history
-            if history:
-                for entry in reversed(history[-10:]):
-                    if hasattr(entry, 'body'):
-                        operator, kwargs = parse_operator_from_text(entry.body)
-                        if operator:
-                            break
-                    elif isinstance(entry, str):
-                        operator, kwargs = parse_operator_from_text(entry)
-                        if operator:
-                            break
-
-    # Method 4: Try to get text from clipboard
-    if not operator:
-        try:
-            clipboard = context.window_manager.clipboard
-            if clipboard:
-                operator, kwargs = parse_operator_from_text(clipboard)
-        except Exception:
-            pass
-
-    return operator, kwargs
+    results = extract_multiple_from_info_panel(context)
+    if results:
+        return results[0]  # Return first for backward compatibility
+    return None, None
 
 def extract_from_button_pointer(button_pointer):
     """Try to extract operator logic from button pointer."""

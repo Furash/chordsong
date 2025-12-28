@@ -83,6 +83,12 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
         default="VIEW_3D",
     )
 
+    sub_operators_json: StringProperty(
+        name="Sub-Operators",
+        description="JSON string of additional operators for consecutive calls",
+        default="",
+    )
+
     def _invoke_dialog(self, context):
         """Helper method to invoke the dialog with window-level context."""
         window_manager = context.window_manager
@@ -94,6 +100,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             # Reset all properties
             self.operator = ""
             self.kwargs = ""
+            self.sub_operators_json = ""
             self.context_path = ""
             self.property_value = ""
             self.mapping_type = "OPERATOR"
@@ -121,11 +128,17 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
 
             # 1. Try to extract from Info Panel / Clipboard if no button context
             if not button_operator and not self.operator:
-                extracted, extracted_kwargs = extract_from_info_panel(context)
-                if extracted:
-                    self.operator = extracted
-                    if extracted_kwargs:
-                        self.kwargs = extracted_kwargs
+                from .extractors import extract_multiple_from_info_panel
+                results = extract_multiple_from_info_panel(context)
+                
+                if results:
+                    # Use the first one as primary
+                    self.operator, self.kwargs = results[0]
+                    
+                    # Store others as JSON
+                    if len(results) > 1:
+                        import json
+                        self.sub_operators_json = json.dumps(results[1:])
 
             # 2. Try to extract from button pointer (e.g. search menu items with no button_operator)
             if not self.operator and button_pointer:
@@ -254,7 +267,18 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             col.label(text=f"Toggle: {self.context_path}", icon="CHECKBOX_HLT")
         else:
             if self.operator:
-                col.label(text=f"Operator: {self.operator}", icon="SETTINGS")
+                import json
+                sub_count = 0
+                if self.sub_operators_json:
+                    try:
+                        sub_count = len(json.loads(self.sub_operators_json))
+                    except Exception:
+                        pass
+                
+                if sub_count > 0:
+                    col.label(text=f"Multiple Operators: {self.operator} + {sub_count} more", icon="SETTINGS")
+                else:
+                    col.label(text=f"Operator: {self.operator}", icon="SETTINGS")
             else:
                 col.label(text="Operator not detected automatically", icon="INFO")
                 col.label(text="Please enter the operator ID manually", icon="BLANK1")
@@ -285,11 +309,6 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             col.prop(self, "kwargs", text="Parameters")
 
     def execute(self, context: bpy.types.Context):
-        # If execute is called directly without going through invoke/dialog
-        if not self.chord and not self.operator:
-            # Check if this looks like a manual run without dialog
-            pass
-
         p = prefs(context)
 
         if not self.chord:
@@ -351,6 +370,19 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             m.call_context = "INVOKE_DEFAULT"
             m.kwargs_json = self.kwargs if self.kwargs else ""
             m.mapping_type = "OPERATOR"
+            
+            # Handle consecutive operators
+            if self.sub_operators_json:
+                try:
+                    import json
+                    subs = json.loads(self.sub_operators_json)
+                    for sub_op_id, sub_kwargs in subs:
+                        sub = m.sub_operators.add()
+                        sub.operator = sub_op_id
+                        sub.kwargs_json = sub_kwargs
+                        sub.call_context = "EXEC_DEFAULT"
+                except Exception as e:
+                    print(f"Chord Song: Failed to parse sub-operators: {e}")
 
             msg = f"Added chord '{self.chord}' for: {self.operator}"
 

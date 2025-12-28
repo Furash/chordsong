@@ -118,6 +118,34 @@ class CHORDSONG_PG_SubItem(PropertyGroup):
         update=_on_mapping_changed,
     )
 
+class CHORDSONG_PG_SubOperator(PropertyGroup):
+    """Sub-operator for consecutive operator calls."""
+    operator: StringProperty(
+        name="Operator",
+        description="Blender operator id, e.g. 'view3d.view_selected'",
+        default="",
+        update=_on_mapping_changed,
+    )
+    call_context: EnumProperty(
+        name="Call Context",
+        description="How to call the operator (invoke shows UI, exec runs immediately)",
+        items=(
+            ("EXEC_DEFAULT", "Exec", "Run the operator immediately"),
+            ("INVOKE_DEFAULT", "Invoke", "Invoke the operator (may show UI)"),
+        ),
+        default="EXEC_DEFAULT",
+        update=_on_mapping_changed,
+    )
+    kwargs_json: StringProperty(
+        name="Parameters",
+        description=(
+            "Python-like parameters: use_all_regions = False, mode = \"EDIT\"\n"
+            "Or full call: bpy.ops.mesh.primitive_cube_add(enter_editmode=False, location=(0,0,0))"
+        ),
+        default="",
+        update=_on_mapping_changed,
+    )
+
 class CHORDSONG_PG_Mapping(PropertyGroup):
     """Mapping property group for chord-to-action mappings."""
 
@@ -198,8 +226,8 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         name="Call Context",
         description="How to call the operator (invoke shows UI, exec runs immediately)",
         items=(
-            ("EXEC_DEFAULT", "Exec Default", "Run the operator immediately"),
-            ("INVOKE_DEFAULT", "Invoke Default", "Invoke the operator (may show UI)"),
+            ("EXEC_DEFAULT", "Exec", "Run the operator immediately"),
+            ("INVOKE_DEFAULT", "Invoke", "Invoke the operator (may show UI)"),
         ),
         default="EXEC_DEFAULT",
         update=_on_mapping_changed,
@@ -215,6 +243,8 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     )
     # Collection for multiple actions (Toggles or Properties)
     sub_items: CollectionProperty(type=CHORDSONG_PG_SubItem)
+    # Collection for multiple consecutive operator calls
+    sub_operators: CollectionProperty(type=CHORDSONG_PG_SubOperator)
     sync_toggles: BoolProperty(
         name="Sync Toggles",
         description="If enabled, all sub-item toggles will match the state of the primary toggle",

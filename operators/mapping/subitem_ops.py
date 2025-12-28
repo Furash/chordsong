@@ -15,10 +15,10 @@ class CHORDSONG_OT_SubItem_Add(bpy.types.Operator):
             return {'CANCELLED'}
             
         m = prefs.mappings[self.mapping_index]
-        item = m.sub_items.add()
-        
-        # If this is the first sub-item being added, maybe we want to move the main path into it?
-        # For now, let's just keep them separate or the user can manage.
+        if m.mapping_type == "OPERATOR":
+            m.sub_operators.add()
+        else:
+            m.sub_items.add()
         
         _on_mapping_changed(self, context)
         return {'FINISHED'}
@@ -38,10 +38,15 @@ class CHORDSONG_OT_SubItem_Remove(bpy.types.Operator):
             return {'CANCELLED'}
             
         m = prefs.mappings[self.mapping_index]
-        if self.item_index < 0 or self.item_index >= len(m.sub_items):
-            return {'CANCELLED'}
-            
-        m.sub_items.remove(self.item_index)
+        
+        if m.mapping_type == "OPERATOR":
+            if self.item_index < 0 or self.item_index >= len(m.sub_operators):
+                return {'CANCELLED'}
+            m.sub_operators.remove(self.item_index)
+        else:
+            if self.item_index < 0 or self.item_index >= len(m.sub_items):
+                return {'CANCELLED'}
+            m.sub_items.remove(self.item_index)
         
         _on_mapping_changed(self, context)
         return {'FINISHED'}

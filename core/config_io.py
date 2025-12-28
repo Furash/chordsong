@@ -5,16 +5,22 @@ import json
 import bpy  # type: ignore
 from .engine import parse_kwargs, get_str_attr, get_leader_key_type, set_leader_key_in_keymap
 
-CONFIG_VERSION = 1
+CONFIG_VERSION = 2
+
+def _ensure_json_serializable(obj):
+    """Recursively convert sets to lists to ensure JSON serializability."""
+    if isinstance(obj, dict):
+        return {k: _ensure_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_ensure_json_serializable(i) for i in obj]
+    elif isinstance(obj, set):
+        return [_ensure_json_serializable(i) for i in list(obj)]
+    return obj
 
 def dump_prefs(prefs) -> dict:
     """Serialize addon preferences to a JSON-serializable dict."""
     mappings = []
     for m in getattr(prefs, "mappings", []):
-        kwargs_json = get_str_attr(m, "kwargs_json")
-        # Parse Python-like syntax to dict for JSON serialization
-        kwargs_obj = parse_kwargs(kwargs_json)
-
         mapping_type = getattr(m, "mapping_type", "OPERATOR")
         mapping_dict = {
             "enabled": bool(getattr(m, "enabled", True)),
@@ -24,23 +30,41 @@ def dump_prefs(prefs) -> dict:
             "group": get_str_attr(m, "group"),
             "context": getattr(m, "context", "VIEW_3D"),
             "mapping_type": mapping_type,
-            "sync_toggles": bool(getattr(m, "sync_toggles", False)),
         }
 
         if mapping_type == "PYTHON_FILE":
             mapping_dict["python_file"] = get_str_attr(m, "python_file")
         elif mapping_type == "CONTEXT_TOGGLE":
+            mapping_dict["sync_toggles"] = bool(getattr(m, "sync_toggles", False))
             mapping_dict["context_path"] = get_str_attr(m, "context_path")
         elif mapping_type == "CONTEXT_PROPERTY":
             mapping_dict["context_path"] = get_str_attr(m, "context_path")
             mapping_dict["property_value"] = get_str_attr(m, "property_value")
         else:
-            mapping_dict["operator"] = get_str_attr(m, "operator")
-            mapping_dict["call_context"] = getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT"
-            # Config format (v1): always a real JSON object.
-            mapping_dict["kwargs"] = kwargs_obj
+            # Consolidate all operators into a single list
+            operators_list = []
+            
+            # 1. Primary operator
+            primary_op = get_str_attr(m, "operator")
+            if primary_op:
+                operators_list.append({
+                    "operator": primary_op,
+                    "call_context": getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT",
+                    "kwargs": parse_kwargs(get_str_attr(m, "kwargs_json")),
+                })
+            
+            # 2. Sub-operators
+            for sub in getattr(m, "sub_operators", []):
+                if sub.operator.strip():
+                    operators_list.append({
+                        "operator": sub.operator.strip(),
+                        "call_context": sub.call_context,
+                        "kwargs": parse_kwargs(sub.kwargs_json),
+                    })
+            
+            mapping_dict["operators"] = operators_list
 
-        # Serialize sub_items if any exist
+        # Serialize sub_items (for toggles/properties)
         sub_items_list = []
         for sub in getattr(m, "sub_items", []):
             if sub.path.strip():
@@ -51,7 +75,7 @@ def dump_prefs(prefs) -> dict:
         if sub_items_list:
             mapping_dict["sub_items"] = sub_items_list
 
-        mappings.append(mapping_dict)
+        mappings.append(_ensure_json_serializable(mapping_dict))
 
     # Serialize groups
     groups = []
@@ -113,6 +137,22 @@ def _enum_items_as_set(prefs, prop_name: str) -> set:
     except Exception:
         return set()
 
+def _kwargs_dict_to_str(kwargs_dict: dict) -> str:
+    """Convert dict to Python-like syntax: key = value, key2 = value2"""
+    if not kwargs_dict:
+        return ""
+    parts = []
+    for key, value in kwargs_dict.items():
+        if isinstance(value, str):
+            parts.append(f'{key} = "{value}"')
+        elif isinstance(value, bool):
+            parts.append(f"{key} = {str(value)}")
+        elif value is None:
+            parts.append(f"{key} = None")
+        else:
+            parts.append(f"{key} = {value}")
+    return ", ".join(parts)
+
 def apply_config(prefs, data: dict) -> list[str]:
     """
     Apply config dict to preferences.
@@ -122,9 +162,9 @@ def apply_config(prefs, data: dict) -> list[str]:
     if not isinstance(data, dict):
         raise ValueError("Config root must be a JSON object")
 
-    version = data.get("version", None)
-    if version not in (None, CONFIG_VERSION):
-        warnings.append(f"Unsupported config version: {version} (expected {CONFIG_VERSION})")
+    config_version = data.get("version", None)
+    if config_version not in (None, 1, 2):
+        warnings.append(f"Unsupported config version: {config_version} (current {CONFIG_VERSION})")
 
     # Scripts folder
     if "scripts_folder" in data:
@@ -137,7 +177,6 @@ def apply_config(prefs, data: dict) -> list[str]:
         leader_key = data.get("leader_key", "SPACE")
         if isinstance(leader_key, str):
             # Validate it's a reasonable key type
-            # Common key types that make sense for a leader key
             valid_keys = {
                 "SPACE", "ACCENT_GRAVE", "QUOTE", "COMMA", "SEMI_COLON",
                 "PERIOD", "SLASH", "BACK_SLASH", "EQUAL", "MINUS",
@@ -148,10 +187,8 @@ def apply_config(prefs, data: dict) -> list[str]:
             else:
                 warnings.append(f'Unknown leader_key "{leader_key}", keeping current')
 
-    # Overlay
     overlay = data.get("overlay", {})
     if isinstance(overlay, dict):
-        # Boolean properties
         bool_props = {
             "enabled": "overlay_enabled",
             "fading_enabled": "overlay_fading_enabled",
@@ -165,7 +202,6 @@ def apply_config(prefs, data: dict) -> list[str]:
         if "ungrouped_expanded" in overlay:
             prefs.ungrouped_expanded = bool(overlay["ungrouped_expanded"])
 
-        # Integer properties - use a loop to reduce duplication
         int_props = {
             "max_items": "overlay_max_items",
             "column_rows": "overlay_column_rows",
@@ -184,180 +220,109 @@ def apply_config(prefs, data: dict) -> list[str]:
             "font_size_toggle": "overlay_font_size_toggle",
             "toggle_offset_y": "overlay_toggle_offset_y",
         }
-
-        # Float properties
-        float_props = {
-            "line_height": "overlay_line_height",
-        }
-
-        for key, attr in float_props.items():
-            if key in overlay:
-                try:
-                    setattr(prefs, attr, float(overlay[key]))
-                except Exception:
-                    warnings.append(f"Invalid overlay.{key}, keeping current")
-
         for key, attr in int_props.items():
             if key in overlay:
-                try:
-                    setattr(prefs, attr, int(overlay[key]))
-                except Exception:
-                    warnings.append(f"Invalid overlay.{key}, keeping current")
+                try: setattr(prefs, attr, int(overlay[key]))
+                except: pass
 
-        # Color properties - use a loop
+        float_props = {"line_height": "overlay_line_height"}
+        for key, attr in float_props.items():
+            if key in overlay:
+                try: setattr(prefs, attr, float(overlay[key]))
+                except: pass
+
         color_props = {
-            "color_chord": "overlay_color_chord",
-            "color_label": "overlay_color_label",
-            "color_header": "overlay_color_header",
-            "color_icon": "overlay_color_icon",
-            "color_toggle_on": "overlay_color_toggle_on",
-            "color_toggle_off": "overlay_color_toggle_off",
+            "color_chord": "overlay_color_chord", "color_label": "overlay_color_label",
+            "color_header": "overlay_color_header", "color_icon": "overlay_color_icon",
+            "color_toggle_on": "overlay_color_toggle_on", "color_toggle_off": "overlay_color_toggle_off",
             "color_recents_hotkey": "overlay_color_recents_hotkey",
             "color_list_background": "overlay_list_background",
             "color_header_background": "overlay_header_background",
             "color_footer_background": "overlay_footer_background",
         }
-
         for key, attr in color_props.items():
             if key in overlay:
                 v = overlay[key]
                 if isinstance(v, (list, tuple)) and len(v) == 4:
-                    try:
-                        setattr(prefs, attr, tuple(float(x) for x in v))
-                    except Exception:
-                        warnings.append(f"Invalid overlay.{key}, keeping current")
-                else:
-                    warnings.append(f"Invalid overlay.{key}, keeping current")
+                    setattr(prefs, attr, tuple(float(x) for x in v))
 
-        # Position enum
-        pos = overlay.get("position", None)
-        if isinstance(pos, str):
-            valid = _enum_items_as_set(prefs, "overlay_position")
-            if pos in valid:
-                prefs.overlay_position = pos
-            else:
-                warnings.append(f'Unknown overlay.position "{pos}", keeping current')
+        pos = overlay.get("position", "TOP_LEFT")
+        if pos in _enum_items_as_set(prefs, "overlay_position"):
+            prefs.overlay_position = pos
 
-        # Folder/Overlay style enum
-        style = overlay.get("style", None)
-        if isinstance(style, str):
-            valid = _enum_items_as_set(prefs, "overlay_folder_style")
-            if style in valid:
-                prefs.overlay_folder_style = style
-            else:
-                warnings.append(f'Unknown overlay.style "{style}", keeping current')
+        style = overlay.get("style", "GROUPS_FIRST")
+        if style in _enum_items_as_set(prefs, "overlay_folder_style"):
+            prefs.overlay_folder_style = style
 
-    # Groups - Load groups before mappings for proper validation
     groups_data = data.get("groups", None)
-    if groups_data is not None:
-        if not isinstance(groups_data, list):
-            warnings.append("groups must be a list, skipping")
-        else:
-            prefs.groups.clear()
-            for i, grp_item in enumerate(groups_data):
-                if not isinstance(grp_item, dict):
-                    warnings.append(f"Skipping group #{i} (not an object)")
-                    continue
+    if isinstance(groups_data, list):
+        prefs.groups.clear()
+        for grp_item in groups_data:
+            if isinstance(grp_item, dict):
                 grp = prefs.groups.add()
                 grp.name = (grp_item.get("name", "") or "").strip()
                 grp.display_order = int(grp_item.get("display_order", 0))
                 grp.expanded = bool(grp_item.get("expanded", False))
 
-    # Mappings
     mappings = data.get("mappings", None)
-    if mappings is None:
-        return warnings
     if not isinstance(mappings, list):
-        raise ValueError("mappings must be a list")
+        return warnings
 
     prefs.mappings.clear()
     for i, item in enumerate(mappings):
-        if not isinstance(item, dict):
-            warnings.append(f"Skipping mapping #{i} (not an object)")
-            continue
+        if not isinstance(item, dict): continue
         m = prefs.mappings.add()
         m.enabled = bool(item.get("enabled", True))
         m.chord = (item.get("chord", "") or "").strip()
         m.icon = (item.get("icon", "") or "").strip()
         m.group = (item.get("group", "") or "").strip()
         m.context = item.get("context", "VIEW_3D")
-
-        # Handle mapping type (default to OPERATOR for backward compatibility)
-        mapping_type = item.get("mapping_type", "OPERATOR")
-        m.mapping_type = mapping_type
+        m.mapping_type = item.get("mapping_type", "OPERATOR")
         m.sync_toggles = bool(item.get("sync_toggles", False))
+        m.label = (item.get("label", "") or "").strip()
 
-        if mapping_type == "PYTHON_FILE":
+        if m.mapping_type == "PYTHON_FILE":
             m.python_file = (item.get("python_file", "") or "").strip()
-            m.label = (
-                (item.get("label", "") or "").strip()
-                or m.python_file
-                or "(missing label)"
-            )
-        elif mapping_type == "CONTEXT_TOGGLE":
+        elif m.mapping_type == "CONTEXT_TOGGLE":
             m.context_path = (item.get("context_path", "") or "").strip()
-            m.label = (
-                (item.get("label", "") or "").strip()
-                or m.context_path
-                or "(missing label)"
-            )
-        elif mapping_type == "CONTEXT_PROPERTY":
+        elif m.mapping_type == "CONTEXT_PROPERTY":
             m.context_path = (item.get("context_path", "") or "").strip()
             m.property_value = (item.get("property_value", "") or "").strip()
-            m.label = (
-                (item.get("label", "") or "").strip()
-                or m.context_path
-                or "(missing label)"
-            )
         else:
-            m.operator = (item.get("operator", "") or "").strip()
-            # Use call_context from JSON if specified, otherwise default to EXEC_DEFAULT
-            m.call_context = (item.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
-            m.label = (
-                (item.get("label", "") or "").strip()
-                or m.operator
-                or "(missing label)"
-            )
-            # Config format (v1): require "kwargs" object (no legacy support).
-            if "kwargs" in item and not isinstance(item["kwargs"], dict):
-                raise ValueError("mappings[].kwargs must be an object")
-            kwargs_dict = item.get("kwargs", {})
-            # Convert dict to Python-like syntax: key = value, key2 = value2
-            if kwargs_dict:
-                parts = []
-                for key, value in kwargs_dict.items():
-                    if isinstance(value, str):
-                        parts.append(f'{key} = "{value}"')
-                    elif isinstance(value, bool):
-                        parts.append(f"{key} = {str(value)}")
-                    elif value is None:
-                        parts.append(f"{key} = None")
+            # Check for version 2 format (consolidated list)
+            operators = item.get("operators", [])
+            if isinstance(operators, list) and operators:
+                for idx, op_data in enumerate(operators):
+                    if not isinstance(op_data, dict): continue
+                    op_id = (op_data.get("operator", "") or "").strip()
+                    op_ctx = (op_data.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+                    op_kwargs = _kwargs_dict_to_str(op_data.get("kwargs", {}))
+                    if idx == 0:
+                        m.operator = op_id
+                        m.call_context = op_ctx
+                        m.kwargs_json = op_kwargs
                     else:
-                        parts.append(f"{key} = {value}")
-                m.kwargs_json = ", ".join(parts)
+                        sub = m.sub_operators.add()
+                        sub.operator = op_id
+                        sub.call_context = op_ctx
+                        sub.kwargs_json = op_kwargs
             else:
-                m.kwargs_json = ""
+                # Backward compatibility (Version 1)
+                m.operator = (item.get("operator", "") or "").strip()
+                m.call_context = (item.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+                m.kwargs_json = _kwargs_dict_to_str(item.get("kwargs", {}))
+                for sub_data in item.get("sub_operators", []):
+                    if isinstance(sub_data, dict):
+                        sub = m.sub_operators.add()
+                        sub.operator = (sub_data.get("operator", "") or "").strip()
+                        sub.call_context = (sub_data.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+                        sub.kwargs_json = _kwargs_dict_to_str(sub_data.get("kwargs", {}))
 
-        # Load sub_items
-        sub_items_data = item.get("sub_items", [])
-        if isinstance(sub_items_data, list):
-            for sub_data in sub_items_data:
-                if isinstance(sub_data, dict):
-                    sub = m.sub_items.add()
-                    sub.path = (sub_data.get("path", "") or "").strip()
-                    sub.value = (sub_data.get("value", "") or "").strip()
-
-    # Backward compatibility: if no groups were in config, extract from mappings
-    if groups_data is None:
-        unique_groups = set()
-        for m in prefs.mappings:
-            group_name = (getattr(m, "group", "") or "").strip()
-            if group_name:
-                unique_groups.add(group_name)
-
-        for group_name in sorted(unique_groups):
-            grp = prefs.groups.add()
-            grp.name = group_name
+        for sub_data in item.get("sub_items", []):
+            if isinstance(sub_data, dict):
+                sub = m.sub_items.add()
+                sub.path = (sub_data.get("path", "") or "").strip()
+                sub.value = (sub_data.get("value", "") or "").strip()
 
     return warnings
 

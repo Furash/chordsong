@@ -21,7 +21,14 @@ bl_info = {
 
 import bpy
 
-from .ui import CHORDSONG_Preferences, CHORDSONG_PG_Group, CHORDSONG_PG_Mapping, CHORDSONG_PG_NerdIcon, CHORDSONG_PG_SubItem
+from .ui import (
+    CHORDSONG_Preferences,
+    CHORDSONG_PG_Group,
+    CHORDSONG_PG_Mapping,
+    CHORDSONG_PG_NerdIcon,
+    CHORDSONG_PG_SubItem,
+    CHORDSONG_PG_SubOperator,
+)
 from .operators import (
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_CheckConflicts,
@@ -62,6 +69,7 @@ from .operators import (
 _classes = (
     CHORDSONG_PG_NerdIcon,
     CHORDSONG_PG_SubItem,
+    CHORDSONG_PG_SubOperator,
     CHORDSONG_PG_Group,
     CHORDSONG_PG_Mapping,
     CHORDSONG_Preferences,

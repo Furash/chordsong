@@ -197,14 +197,17 @@ def draw_addon_preferences(prefs, _context, layout):
     row.scale_y = 1.5
     op = row.operator("chordsong.mapping_add", text="Add New Chord", icon="ADD")
     op.context = prefs.mapping_context_tab
-    row.operator("chordsong.group_cleanup", text="", icon="BRUSH_DATA")
-    row.operator("chordsong.group_fold_all", text="", icon="TRIA_UP")
-    row.operator("chordsong.group_unfold_all", text="", icon="TRIA_DOWN")
     
-    row = col.row(align=True)
-    row.scale_y = 1.5
+    # row = col.row(align=True)
+    # row.scale_y = 1.5
+    row.separator()
     op = row.operator("chordsong.group_add", text="Add New Group", icon="ADD")
     op.name = "New Group"
+    row.separator()
+    row.operator("chordsong.group_cleanup", text="", icon="BRUSH_DATA")
+    row.separator()
+    row.operator("chordsong.group_fold_all", text="", icon="TRIA_UP")
+    row.operator("chordsong.group_unfold_all", text="", icon="TRIA_DOWN")
 
     # Grouped UI boxes with foldable sections
     from ..core.engine import get_str_attr
@@ -437,26 +440,72 @@ def draw_addon_preferences(prefs, _context, layout):
                 for i, item in enumerate(m.sub_items):
                     draw_prop_row(prop_area, item, "path", item, "value", False, i)
             else:
-                # Standard operator row
-                row_op = r2.row(align=True)
-                row_op.scale_x = 1.1
-                row_op.prop(m, "operator", text="")
+                # Group all operators and their parameters in a common box
+                op_area = r2.box()
                 
-                sub = row_op.row(align=True)
-                sub.separator()
-                sub.scale_x = 0.9
-                sub.alignment = 'LEFT'
-                op_convert = sub.operator("chordsong.mapping_convert", text="Convert", emboss=True)
-                op_convert.index = idx
-                sub.separator()
-                sub.prop(m, "call_context", text="")
+                # Layout helper for operator rows within the box
+                def draw_op_row(layout, m_ptr, op_prop, ctx_prop, kwargs_prop, is_primary, sub_idx=-1):
+                    # Outer column for the operator block
+                    op_block = layout.column(align=True)
+                    
+                    # Split for Inputs (Left) vs Controls (Right)
+                    # Use a fixed factor (0.7) to give more room for names and params
+                    master_split = op_block.split(factor=0.7, align=True)
+                    
+                    # 1. LEFT PORTION: The "What" (Operator ID & Parameters)
+                    inputs_col = master_split.column(align=True)
+                    
+                    # To align the Operator field with the Parameters field, we use a gutter split
+                    # factor 0.2 is enough for the "Operator:" and "Parameters:" text
+                    gutter_f = 0.2
+                    
+                    # Row 1: Operator ID
+                    id_row = inputs_col.row(align=True)
+                    id_split = id_row.split(factor=gutter_f, align=True)
+                    id_split.alignment = 'RIGHT'
+                    id_split.label(text="Operator:") 
+                    id_split.prop(m_ptr, op_prop, text="")
+                    
+                    # Row 2: Parameters
+                    p_row = inputs_col.row(align=True)
+                    p_split = p_row.split(factor=gutter_f, align=True)
+                    p_split.alignment = 'RIGHT'
+                    p_split.label(text="Parameters:")
+                    p_split.prop(m_ptr, kwargs_prop, text="")
+                    
+                    # 2. RIGHT PORTION: The "How" (Invoke, Add/Del, Convert)
+                    controls_row = master_split.row(align=True)
+                    
+                    # Split 1: Context Enum (Exec/Invoke)
+                    # We give it a fixed width via split.
+                    ctx_split = controls_row.split(factor=0.4, align=True)
+                    ctx_split.prop(m_ptr, ctx_prop, text="")
+                    
+                    # Remaining space split in half for the two buttons
+                    btns_split = ctx_split.split(factor=0.5, align=True)
+                    
+                    if is_primary:
+                        op_add = btns_split.operator("chordsong.subitem_add", text="Add", icon="ADD")
+                        op_add.mapping_index = idx
+                    else:
+                        rem = btns_split.operator("chordsong.subitem_remove", text="Del", icon="TRASH")
+                        rem.mapping_index = idx
+                        rem.item_index = sub_idx
+                    
+                    # Convert button
+                    conv = btns_split.operator("chordsong.mapping_convert", text="Convert")
+                    conv.index = idx
+                    conv.sub_index = sub_idx
+                    
+                    # Visual separation
+                    layout.separator(factor=0.4)
 
-            # Third row for parameters (only for operator type)
-            if m.mapping_type == "OPERATOR":
-                r3 = item_box.row()
-                r3.label(text="Parameters:")
-                r3.scale_x = 8
-                r3.prop(m, "kwargs_json", text="")
+                # Draw the primary operator row
+                draw_op_row(op_area, m, "operator", "call_context", "kwargs_json", True)
+
+                # Draw all sub-operator rows
+                for i, sub_op in enumerate(m.sub_operators):
+                    draw_op_row(op_area, sub_op, "operator", "call_context", "kwargs_json", False, i)
             
             # Extra spacing between item boxes
             box.separator(factor=2.0)
