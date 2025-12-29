@@ -22,10 +22,11 @@ class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
         name="Context",
         description="Editor context for the new chord",
         items=(
-            ("VIEW_3D", "3D View", "3D View editor"),
-            ("GEOMETRY_NODE", "Geometry Nodes", "Geometry Nodes editor"),
-            ("SHADER_EDITOR", "Shader Editor", "Shader Editor"),
-            ("IMAGE_EDITOR", "UV Editor", "UV Editor"),
+            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)"),
+            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)"),
+            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor"),
+            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor"),
+            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor"),
         ),
         default="VIEW_3D",
     )

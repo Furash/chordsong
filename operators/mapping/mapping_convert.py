@@ -155,9 +155,6 @@ class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
                 # Generate a smart label based on operator type and parameters
                 m.label = self._generate_smart_label(operator_name, kwargs_dict)
 
-                # Auto-detect context based on operator
-                m.context = self._detect_context_from_operator(operator_name, kwargs_dict)
-
                 # Suggest chord
                 try:
                     from ..context_menu.suggester import suggest_chord
@@ -197,6 +194,10 @@ class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
             # Default node operations to Geometry Nodes
             # (user can change if needed)
             return "GEOMETRY_NODE"
+
+        # Edit mode operators
+        if len(parts) >= 1 and parts[0] in ('mesh', 'curve', 'armature', 'lattice', 'metaball', 'surface', 'font'):
+            return "VIEW_3D_EDIT"
 
         # Default to 3D View for all other operators
         return "VIEW_3D"

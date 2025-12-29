@@ -246,6 +246,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if space:
             space_type = space.type
             if space_type == 'VIEW_3D':
+                if context.mode and context.mode.startswith('EDIT'):
+                    return "VIEW_3D_EDIT"
                 return "VIEW_3D"
             elif space_type == 'IMAGE_EDITOR':
                 return "IMAGE_EDITOR"

@@ -261,7 +261,11 @@ def detect_editor_context(context, operator=None):
     # Based on current space
     space = context.space_data
     if space:
-        if space.type == 'NODE_EDITOR':
+        if space.type == 'VIEW_3D':
+            if context.mode and context.mode.startswith('EDIT'):
+                return "VIEW_3D_EDIT"
+            return "VIEW_3D"
+        elif space.type == 'NODE_EDITOR':
             if hasattr(space, 'tree_type'):
                 if space.tree_type == 'GeometryNodeTree':
                     return "GEOMETRY_NODE"

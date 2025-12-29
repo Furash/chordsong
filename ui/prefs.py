@@ -177,7 +177,8 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         name="Context",
         description="Editor context where this chord mapping is active",
         items=(
-            ("VIEW_3D", "3D View", "Active in 3D View editor"),
+            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)"),
+            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)"),
             ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor"),
             ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor"),
             ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor"),
@@ -271,7 +272,8 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Mapping Context Tab",
         description="Select the editor context for chord mappings",
         items=(
-            ("VIEW_3D", "3D View", "3D View editor chord mappings"),
+            ("VIEW_3D", "3D View (Object)", "3D View (Object Mode) chord mappings"),
+            ("VIEW_3D_EDIT", "3D View (Edit)", "3D View (Edit Modes) chord mappings"),
             ("GEOMETRY_NODE", "Geometry Nodes", "Geometry Nodes editor chord mappings"),
             ("SHADER_EDITOR", "Shader Editor", "Shader Editor chord mappings"),
             ("IMAGE_EDITOR", "UV Editor", "UV Editor chord mappings"),

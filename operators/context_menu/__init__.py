@@ -75,10 +75,11 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
         name="Editor Context",
         description="Editor context where this chord mapping will be active",
         items=(
-            ("VIEW_3D", "3D View", "Active in 3D View editor", "VIEW3D", 0),
-            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor", "GEOMETRY_NODES", 1),
-            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor", "NODE_MATERIAL", 2),
-            ("IMAGE_EDITOR", "Image Editor", "Active in Image Editor", "IMAGE_COL", 3),
+            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)", "OBJECT_DATAMODE", 0),
+            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)", "EDITMODE_HLT", 1),
+            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor", "GEOMETRY_NODES", 2),
+            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor", "NODE_MATERIAL", 3),
+            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor", "IMAGE_COL", 4),
         ),
         default="VIEW_3D",
     )
