@@ -79,15 +79,9 @@ def draw_overlay_header(p, region_w, y, header_text, header_size, body_size, cho
     return new_y, bg_y1
 
 def draw_list_background(p, region_w, top_y, bottom_y, scale_factor=1.0):
-    """Draw the background for the list area with a subtle border."""
-    # Use a slightly lighter/darker color for the border to give it a premium look
+    """Draw the background for the list area."""
     bg = p.overlay_list_background
-    border_color = (1.0, 1.0, 1.0, 0.1 * bg[3]) # Subtle white border
-    
-    # Thickness based on scale factor
-    thickness = max(1, int(1 * scale_factor))
-    
-    draw_rect(0, bottom_y, region_w, top_y, bg, border_color=border_color, border_thickness=thickness)
+    draw_rect(0, bottom_y, region_w, top_y, bg)
 
 def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_size, scale_factor, icon_size, max_token_w, max_label_w):
     """Draw the overlay footer background and items."""
