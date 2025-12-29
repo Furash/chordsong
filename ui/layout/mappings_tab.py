@@ -9,7 +9,7 @@ def draw_mappings_tab(prefs, context, layout):
     """Draw the Mappings tab content."""
     col = layout.column()
     
-    # Keymap section
+    # Leader Key section
     kc = context.window_manager.keyconfigs.addon
     if kc:
         km = kc.keymaps.get("3D View")
@@ -21,8 +21,8 @@ def draw_mappings_tab(prefs, context, layout):
                     break
 
             if kmi:
-                box = col.box()
-                split = box.split(factor=0.5)
+                leader_box = col.box()
+                split = leader_box.split(factor=0.5)
 
                 # Leader Key section
                 leader_col = split.column()
@@ -42,11 +42,12 @@ def draw_mappings_tab(prefs, context, layout):
                 conflict_row.label(text="Conflict Checker:")
                 conflict_row.scale_y = 1.5
                 conflict_row.operator("chordsong.check_conflicts", text="Check for Conflicts", icon="ERROR")
+                leader_box.separator()
 
-                box.separator()
+    col.separator()
 
     # Context sub-tabs
-    row = col.row(align=False)
+    row = col.row(align=True)
     row.prop_enum(prefs, "mapping_context_tab", "VIEW_3D", icon="OBJECT_DATAMODE")
     row.prop_enum(prefs, "mapping_context_tab", "VIEW_3D_EDIT", icon="EDITMODE_HLT")
     row.prop_enum(prefs, "mapping_context_tab", "GEOMETRY_NODE", icon="GEOMETRY_NODES")
@@ -68,6 +69,9 @@ def draw_mappings_tab(prefs, context, layout):
     row.separator()
     row.operator("chordsong.group_fold_all", text="", icon="TRIA_UP")
     row.operator("chordsong.group_unfold_all", text="", icon="TRIA_DOWN")
+    
+    col.separator()
+
 
     # Filter mappings by selected context tab
     current_context = prefs.mapping_context_tab
@@ -94,7 +98,7 @@ def draw_mappings_tab(prefs, context, layout):
         is_expanded, expand_data, expand_prop = _get_group_expansion_state(prefs, group_name)
 
         # Foldable header row
-        header = box.row(align=True)
+        header = col.row(align=True)
         
         # Split: Label (Left) | Buttons (Right)
         split = header.split(factor=0.6)
@@ -130,11 +134,11 @@ def draw_mappings_tab(prefs, context, layout):
         if not is_expanded:
             continue
 
-        box.separator()
+        col.separator()
         for idx, m in items:
-            draw_mapping_item(prefs, m, idx, box)
+            draw_mapping_item(prefs, m, idx, col)
             # Extra spacing between item boxes
-            box.separator(factor=2.0)
+            col.separator(factor=2.0)
 
     col.separator()
 

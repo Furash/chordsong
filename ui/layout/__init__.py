@@ -23,5 +23,4 @@ def draw_addon_preferences(prefs, context, layout):
     if prefs.prefs_tab == "UI":
         draw_ui_tab(prefs, col)
     else:
-        # MAPPINGS tab
         draw_mappings_tab(prefs, context, col)
