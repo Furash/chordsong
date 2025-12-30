@@ -17,6 +17,8 @@ class CHORDSONG_OT_SubItem_Add(bpy.types.Operator):
         m = prefs.mappings[self.mapping_index]
         if m.mapping_type == "OPERATOR":
             m.sub_operators.add()
+        elif m.mapping_type == "PYTHON_FILE":
+            m.script_params.add()
         else:
             m.sub_items.add()
         
@@ -43,6 +45,10 @@ class CHORDSONG_OT_SubItem_Remove(bpy.types.Operator):
             if self.item_index < 0 or self.item_index >= len(m.sub_operators):
                 return {'CANCELLED'}
             m.sub_operators.remove(self.item_index)
+        elif m.mapping_type == "PYTHON_FILE":
+            if self.item_index < 0 or self.item_index >= len(m.script_params):
+                return {'CANCELLED'}
+            m.script_params.remove(self.item_index)
         else:
             if self.item_index < 0 or self.item_index >= len(m.sub_items):
                 return {'CANCELLED'}

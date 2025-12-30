@@ -58,6 +58,10 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
 
     def draw_callback():
         try:
+            # Only draw in the area where the chord was executed
+            if bpy.context.area != state["area"]:
+                return
+
             # Respect UI settings in calculate_scale_factor (called inside draw_fading_overlay)
             p = prefs(bpy.context)
             still_active = draw_fading_overlay(
@@ -73,36 +77,30 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
         except Exception:
             _cleanup_fading_overlay()
 
+
     state["draw_handles"] = {}
     for st in supported_types:
         handle = st.draw_handler_add(draw_callback, (), "WINDOW", "POST_PIXEL")
         state["draw_handles"][st] = handle
 
-    # Helper function to tag all relevant areas for redraw
-    def tag_all_views():
-        try:
-            for window in bpy.context.window_manager.windows:
-                for area in window.screen.areas:
-                    # Tag 3D View, Node Editor, and Image Editor areas
-                    if area.type in {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR'}:
-                        area.tag_redraw()
-        except Exception:
-            # Fallback: try the stored area
-            if state["area"]:
-                try:
-                    state["area"].tag_redraw()
-                except Exception:
-                    pass
+    # Helper function to tag only the target area for redraw
+    def tag_target_view():
+        if state["area"]:
+            try:
+                state["area"].tag_redraw()
+            except Exception:
+                pass
 
     # Immediately tag for redraw
-    tag_all_views()
+    tag_target_view()
 
     # Set up a timer to periodically redraw while fading
     def redraw_timer():
         if state["active"]:
-            tag_all_views()
+            tag_target_view()
             return 0.03  # Redraw every 30ms for smooth fade
         return None
+
 
     # Register timer with immediate first redraw
     bpy.app.timers.register(redraw_timer, first_interval=0.0)
@@ -120,20 +118,13 @@ def _cleanup_fading_overlay():
                 pass
         state["draw_handles"] = {}
 
-    # Tag all relevant areas for redraw to clear the overlay
-    try:
-        for window in bpy.context.window_manager.windows:
-            for area in window.screen.areas:
-                # Tag 3D View, Node Editor, and Image Editor areas
-                if area.type in {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR'}:
-                    area.tag_redraw()
-    except Exception:
-        # Fallback: try the stored area
-        if state["area"]:
-            try:
-                state["area"].tag_redraw()
-            except Exception:
-                pass
+    # Tag only the target area for redraw to clear the overlay
+    if state["area"]:
+        try:
+            state["area"].tag_redraw()
+        except Exception:
+            pass
+
 
 def cleanup_all_handlers():
     """Clean up all draw handlers and timers. Called on addon unregister."""
@@ -383,6 +374,17 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 # Capture viewport context BEFORE finishing modal (when we have valid context)
                 ctx_viewport = capture_viewport_context(context)
 
+                # Parse arguments for the script
+                # Combine primary kwargs_json and all additional script_params
+                all_kwargs_str = getattr(m, "kwargs_json", "") or ""
+                for sp in getattr(m, "script_params", []):
+                    if sp.value.strip():
+                        if all_kwargs_str and not all_kwargs_str.strip().endswith(","):
+                            all_kwargs_str += ", "
+                        all_kwargs_str += sp.value.strip()
+
+                script_args = parse_kwargs(all_kwargs_str)
+
                 # Finish modal before executing script
                 self._finish(context)
 
@@ -402,21 +404,30 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         from ..utils.render import validate_viewport_context
                         valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
+                        # Prepare execution globals
+                        # We pass 'args' dictionary to the script
+                        exec_globals = {
+                            "bpy": bpy,
+                            "context": bpy.context,
+                            "args": script_args,
+                            "__file__": python_file,
+                            "__name__": "__main__",
+                        }
+
                         # Execute in Blender's context with captured viewport context
-                        # Wrap temp_override in try/except as context may become invalid between validation and use.
                         if valid_ctx:
                             try:
                                 with bpy.context.temp_override(**valid_ctx):
-                                    exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
+                                    exec(compile(script_text, python_file, 'exec'), exec_globals)  # pylint: disable=exec-used
                                     # Show fading overlay on success (inside temp_override for correct space detection)
                                     _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                             except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                 # Context became invalid, fall back to default context
-                                exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
+                                exec(compile(script_text, python_file, 'exec'), exec_globals)  # pylint: disable=exec-used
                                 # Show fading overlay on success
                                 _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                         else:
-                            exec(compile(script_text, python_file, 'exec'))  # pylint: disable=exec-used
+                            exec(compile(script_text, python_file, 'exec'), exec_globals)  # pylint: disable=exec-used
                             # Show fading overlay on success
                             _show_fading_overlay(bpy.context, chord_tokens, label, icon)
 
@@ -427,8 +438,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             icon=icon,
                             mapping_type="PYTHON_FILE",
                             python_file=python_file,
+                            kwargs=script_args,
                             execution_context=ctx_viewport,
                         )
+
 
                     except Exception as e:
                         import traceback

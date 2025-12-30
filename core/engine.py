@@ -340,25 +340,8 @@ def parse_kwargs(kwargs_json: str) -> dict:
     # Try Python-like format: key = value, key2 = value2
     try:
         import ast
-        import re
 
-        # If it's a full bpy.ops call, extract just the part inside ()
-        k_strip = kwargs_json.strip()
-        if "(" in k_strip and k_strip.endswith(")") and not k_strip.startswith("("):
-            # Stricter check: must look like a function call and not just property assignments
-            # A full call shouldn't have an '=' before the first '('
-            first_paren = k_strip.find("(")
-            prefix = k_strip[:first_paren].strip()
-            
-            # If it's a full call, the prefix should be a valid python identifier/path
-            # and there should be no '=' in the prefix (which would mean it's an assignment)
-            if "=" not in prefix and "." in prefix:
-                if any(prefix.startswith(p) for p in ("bpy.", "ops.", "bpy.ops.")) or " " not in prefix:
-                    inner_match = re.search(r'\((.*)\)', k_strip)
-                    if inner_match:
-                        kwargs_json = inner_match.group(1)
-
-        # Parse Python-like assignment format
+        # Parse Python-like assignment format: key = value, key2 = value2
         result = {}
         # Split by commas, but respect quoted strings and nested brackets/parens
         parts = []

@@ -182,7 +182,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
             if button_prop and button_pointer and not button_operator and not self.context_path:
                 self.context_path = extract_context_path(button_prop, button_pointer)
                 self.name = button_prop.name or button_prop.identifier.replace("_", " ").title()
-                self.editor_context = detect_editor_context(context)
+                self.editor_context = detect_editor_context(context, kwargs=self.kwargs)
 
                 if button_prop.type == 'BOOLEAN':
                     self.mapping_type = "CONTEXT_TOGGLE"
@@ -214,7 +214,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
                         self.group = parts[0].replace("_", " ").title()
                         self.name = parts[1].replace("_", " ").title()
 
-                self.editor_context = detect_editor_context(context, self.operator)
+                self.editor_context = detect_editor_context(context, self.operator, self.kwargs)
 
                 # Refine info if we have the button_operator instance
                 if button_operator:
@@ -275,7 +275,7 @@ class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
 
             # 5. Process found property (from Info selection)
             if self.context_path:
-                self.editor_context = detect_editor_context(context)
+                self.editor_context = detect_editor_context(context, kwargs=self.kwargs)
                 self.chord = suggest_chord(self.group, self.name)
                 return self._invoke_dialog(context)
 

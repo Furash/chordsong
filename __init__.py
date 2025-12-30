@@ -28,6 +28,7 @@ from .ui import (
     CHORDSONG_PG_NerdIcon,
     CHORDSONG_PG_SubItem,
     CHORDSONG_PG_SubOperator,
+    CHORDSONG_PG_ScriptParam,
 )
 from .operators import (
     CHORDSONG_OT_ApplyConflictFix,
@@ -70,6 +71,7 @@ _classes = (
     CHORDSONG_PG_NerdIcon,
     CHORDSONG_PG_SubItem,
     CHORDSONG_PG_SubOperator,
+    CHORDSONG_PG_ScriptParam,
     CHORDSONG_PG_Group,
     CHORDSONG_PG_Mapping,
     CHORDSONG_Preferences,

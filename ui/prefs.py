@@ -54,11 +54,13 @@ def _on_prefs_changed(self, _context):
         pass
 
 def _on_mapping_changed(_self, context):
-    # Called when a mapping item changes; fetch prefs via context.
     try:
         prefs = context.preferences.addons[_addon_root_pkg()].preferences
         prefs.ensure_defaults()
         _autosave_now(prefs)
+        
+        # Sync groups after a short delay to avoid crashing during rapid typing/redraws
+        prefs.sync_groups_delayed()
     except Exception:
         pass
 
@@ -146,6 +148,23 @@ class CHORDSONG_PG_SubOperator(PropertyGroup):
         update=_on_mapping_changed,
     )
 
+class CHORDSONG_PG_ScriptParam(PropertyGroup):
+    """Parameter row for Python script mappings."""
+    value: StringProperty(
+        name="Value",
+        description="Python-like parameter string: mode='ADD', factor=1.0",
+        default="",
+        update=_on_mapping_changed,
+    )
+
+def _group_search_callback(self, context, edit_text):
+    try:
+        pkg = _addon_root_pkg()
+        prefs = context.preferences.addons[pkg].preferences
+        return sorted([g.name for g in prefs.groups])
+    except Exception:
+        return []
+
 class CHORDSONG_PG_Mapping(PropertyGroup):
     """Mapping property group for chord-to-action mappings."""
 
@@ -172,6 +191,7 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         description="Optional category used to group items in UI and overlay",
         default="",
         update=_on_mapping_changed,
+        search=_group_search_callback,
     )
     context: EnumProperty(
         name="Context",
@@ -246,6 +266,8 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     sub_items: CollectionProperty(type=CHORDSONG_PG_SubItem)
     # Collection for multiple consecutive operator calls
     sub_operators: CollectionProperty(type=CHORDSONG_PG_SubOperator)
+    # Collection for multiple script parameters
+    script_params: CollectionProperty(type=CHORDSONG_PG_ScriptParam)
     sync_toggles: BoolProperty(
         name="Sync Toggles",
         description="If enabled, all sub-item toggles will match the state of the primary toggle",
@@ -606,8 +628,9 @@ class CHORDSONG_Preferences(AddonPreferences):
         # Populate nerd icons
         self._populate_nerd_icons()
 
-        # Sync groups from mappings
-        self._sync_groups_from_mappings()
+        # Do NOT call sync_groups_delayed here!
+        # Calling it in ensure_defaults causes it to run on every access, 
+        # leading to startup crashes and performance issues.
 
         if self.mappings:
             return
@@ -629,8 +652,32 @@ class CHORDSONG_Preferences(AddonPreferences):
         add("s r", "Run Active Script", "Script", "text.run_script", "{}", "VIEW_3D")
         add("k c", "Open Preferences", "Chord Song", "chordsong.open_prefs", "{}", "VIEW_3D")
 
-        # Sync groups after adding default mappings
-        self._sync_groups_from_mappings()
+        # Trigger initial sync after defaults are added
+        self.sync_groups_delayed()
+
+    # Static variable to hold the timer function for debouncing
+    _sync_timer_fn = None
+
+    def sync_groups_delayed(self, remove_unused=False):
+        """Schedule a group sync to run outside of the current UI/Draw cycle (Debounced)."""
+        # Remove old timer if it exists to avoid piling up
+        if CHORDSONG_Preferences._sync_timer_fn:
+            if bpy.app.timers.is_registered(CHORDSONG_Preferences._sync_timer_fn):
+                bpy.app.timers.unregister(CHORDSONG_Preferences._sync_timer_fn)
+        
+        def run_sync():
+            try:
+                # We need to re-fetch prefs since self might be invalid if reloaded
+                module_pkg = __package__.split(".", maxsplit=1)[0]
+                prefs = bpy.context.preferences.addons[module_pkg].preferences
+                prefs._sync_groups_from_mappings(remove_unused=remove_unused)
+            except Exception:
+                pass
+            CHORDSONG_Preferences._sync_timer_fn = None
+            return None
+
+        CHORDSONG_Preferences._sync_timer_fn = run_sync
+        bpy.app.timers.register(run_sync, first_interval=0.1)
 
     def _populate_nerd_icons(self):
         """Populate the nerd_icons collection with Blender/3D-relevant Nerd Font icons."""
@@ -642,42 +689,71 @@ class CHORDSONG_Preferences(AddonPreferences):
             icon_item.name = name
             icon_item.icon = icon_char
 
-    def _sync_groups_from_mappings(self):
+    def _sync_groups_from_mappings(self, remove_unused=False):
         """
-        Extract unique groups from mappings and populate groups collection.
-
-        Also removes duplicate groups.
+        Sync the groups collection with all groups found in mappings.
+        Ensures that manually created groups and typed group names are both preserved.
         """
-        # First, remove duplicate groups from the groups collection
-        seen_names = set()
-        indices_to_remove = []
-
-        for idx, grp in enumerate(self.groups):
-            name = grp.name.strip() if grp.name else ""
-            if not name or name in seen_names:
-                # Empty name or duplicate - mark for removal
-                indices_to_remove.append(idx)
-            else:
-                seen_names.add(name)
-
-        # Remove duplicates in reverse order to maintain indices
-        for idx in reversed(indices_to_remove):
-            self.groups.remove(idx)
-
-        # Get unique group names from mappings
-        unique_groups = set()
+        # 1. Collect all names used in mappings
+        used_names = set()
         for m in self.mappings:
-            group_name = (getattr(m, "group", "") or "").strip()
-            if group_name:
-                unique_groups.add(group_name)
+            name = (getattr(m, "group", "") or "").strip()
+            if name:
+                used_names.add(name)
+        
+        # 2. Collect current names in the groups collection
+        existing_names = {grp.name for grp in self.groups if grp.name}
+        
+        # 3. Determine changes
+        to_add = used_names - existing_names
+        to_remove = set()
+        if remove_unused:
+            to_remove = existing_names - used_names
+        
+        # 4. Apply changes surgically
+        has_changes = False
+        
+        # Removing first (reverse order to preserve indices)
+        if to_remove:
+            for i in range(len(self.groups) - 1, -1, -1):
+                if self.groups[i].name in to_remove:
+                    self.groups.remove(i)
+                    has_changes = True
 
-        # Get existing group names (after duplicate removal)
-        existing_groups = {grp.name for grp in self.groups}
-
-        # Add new groups that don't exist yet
-        for group_name in sorted(unique_groups - existing_groups):
+        # Adding missing ones
+        for name in to_add:
             grp = self.groups.add()
-            grp.name = group_name
+            grp.name = name
+            has_changes = True
+
+        # 5. Full rebuild (sorting) only if we had changes or explicitly requested
+        if remove_unused or has_changes:
+            self._sort_groups()
+
+    def _sort_groups(self):
+        """Rebuild the groups collection in alphabetical order."""
+        if not self.groups:
+            return
+            
+        data = []
+        for grp in self.groups:
+            data.append({"name": grp.name, "expanded": grp.expanded})
+        
+        # Case-insensitive sort
+        data.sort(key=lambda x: x["name"].lower())
+        
+        # Final set of names to check if we actually need to clear
+        current_order = [grp.name for grp in self.groups]
+        sorted_order = [item["name"] for item in data]
+        
+        if current_order == sorted_order:
+            return # Already sorted, avoid clear()
+            
+        self.groups.clear()
+        for item in data:
+            grp = self.groups.add()
+            grp.name = item["name"]
+            grp.expanded = item["expanded"]
 
     def draw(self, context: bpy.types.Context):
         """Draw preferences UI."""

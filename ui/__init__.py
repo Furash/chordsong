@@ -10,6 +10,7 @@ from .prefs import (
     CHORDSONG_PG_NerdIcon,
     CHORDSONG_PG_SubItem,
     CHORDSONG_PG_SubOperator,
+    CHORDSONG_PG_ScriptParam,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "CHORDSONG_PG_NerdIcon",
     "CHORDSONG_PG_SubItem",
     "CHORDSONG_PG_SubOperator",
+    "CHORDSONG_PG_ScriptParam",
 ]

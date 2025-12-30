@@ -34,6 +34,15 @@ def dump_prefs(prefs) -> dict:
 
         if mapping_type == "PYTHON_FILE":
             mapping_dict["python_file"] = get_str_attr(m, "python_file")
+            # Store parameters as a list of strings to preserve UI rows
+            params = [get_str_attr(m, "kwargs_json")]
+            for sp in getattr(m, "script_params", []):
+                params.append(sp.value)
+            mapping_dict["params"] = params
+            
+            # Also keep 'kwargs' for compatibility/readability
+            all_str = ", ".join([p for p in params if p.strip()])
+            mapping_dict["kwargs"] = parse_kwargs(all_str)
         elif mapping_type == "CONTEXT_TOGGLE":
             mapping_dict["sync_toggles"] = bool(getattr(m, "sync_toggles", False))
             mapping_dict["context_path"] = get_str_attr(m, "context_path")
@@ -283,6 +292,17 @@ def apply_config(prefs, data: dict) -> list[str]:
 
         if m.mapping_type == "PYTHON_FILE":
             m.python_file = (item.get("python_file", "") or "").strip()
+            # Restore parameters from list or dictionary
+            params = item.get("params", [])
+            if isinstance(params, list) and params:
+                m.kwargs_json = params[0]
+                m.script_params.clear()
+                for p_val in params[1:]:
+                    sp = m.script_params.add()
+                    sp.value = p_val
+            else:
+                # Fallback to old format
+                m.kwargs_json = _kwargs_dict_to_str(item.get("kwargs", {}))
         elif m.mapping_type == "CONTEXT_TOGGLE":
             m.context_path = (item.get("context_path", "") or "").strip()
         elif m.mapping_type == "CONTEXT_PROPERTY":

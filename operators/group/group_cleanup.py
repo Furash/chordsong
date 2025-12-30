@@ -20,24 +20,48 @@ class CHORDSONG_OT_Group_Cleanup(bpy.types.Operator):
         """Execute group cleanup."""
         p = prefs(context)
 
-        # Count duplicates before cleanup
-        seen_names = set()
-        duplicate_count = 0
+        # 1. Identify used group names
+        used_names = set()
+        for m in p.mappings:
+            name = (getattr(m, "group", "") or "").strip()
+            if name:
+                used_names.add(name)
 
+        # 2. Categorize groups for detailed reporting
+        empty_groups = []
+        duplicate_groups = []
+        seen_names = set()
+        
         for grp in p.groups:
             name = grp.name.strip() if grp.name else ""
-            if not name or name in seen_names:
-                duplicate_count += 1
-            else:
-                seen_names.add(name)
+            if not name:
+                # Completely empty name property
+                empty_groups.append("(nameless)")
+                continue
 
-        # Trigger sync which will remove duplicates
-        p._sync_groups_from_mappings()  # pylint: disable=protected-access
+            if name in seen_names:
+                duplicate_groups.append(name)
+            elif name not in used_names:
+                empty_groups.append(name)
+            
+            seen_names.add(name)
 
-        if duplicate_count > 0:
-            self.report({"INFO"}, f"Removed {duplicate_count} duplicate group(s)")
+        # 3. Trigger the actual sync via a delayed timer for stability
+        p.sync_groups_delayed(remove_unused=True)
+
+        # 4. Construct detailed report
+        messages = []
+        if duplicate_groups:
+            messages.append(f"Merged duplicates: {', '.join(set(duplicate_groups))}")
+        if empty_groups:
+            messages.append(f"Removed empty: {', '.join(set(empty_groups))}")
+
+        if messages:
+            report_str = " | ".join(messages)
+            self.report({"INFO"}, report_str)
+            print(f"CHORD SONG CLEANUP: {report_str}")
         else:
-            self.report({"INFO"}, "No duplicate groups found")
+            self.report({"INFO"}, "No empty or duplicate groups found")
 
         from ..common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)

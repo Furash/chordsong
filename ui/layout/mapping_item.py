@@ -17,8 +17,8 @@ def draw_mapping_item(prefs, m, idx, layout):
     r.prop(m, "label", text="")
     r.separator()
 
-    # Group selection with searchable dropdown
-    r.prop_search(m, "group", prefs, "groups", icon="FILE_FOLDER", text="")
+    # Group selection with searchable dropdown (now supports new group creation)
+    r.prop(m, "group", text="", icon="FILE_FOLDER")
 
     r.separator()
 
@@ -71,71 +71,156 @@ def draw_mapping_item(prefs, m, idx, layout):
     r2 = r2_split.column()
 
     if m.mapping_type == "PYTHON_FILE":
-        # For script, we don't need a box, but we need horizontal alignment
-        script_row = r2.row(align=True)
-        script_row.prop(m, "python_file", text="")
-        script_row.separator()
-        op = script_row.operator("chordsong.script_select", text="Select Script", icon="FILEBROWSER", emboss=True)
-        op.mapping_index = idx
-        
+        _draw_python_mapping(r2, m, idx)
     elif m.mapping_type == "CONTEXT_TOGGLE":
         _draw_toggle_mapping(r2, m, idx)
-
     elif m.mapping_type == "CONTEXT_PROPERTY":
         _draw_property_mapping(r2, m, idx)
     else:
         _draw_operator_mapping(r2, m, idx)
 
+def _draw_python_mapping(layout, m, idx):
+    """Draw rows for a Python script mapping."""
+    area = layout.box()
+    
+    gutter_f = 0.2
+    master_f = 0.7
+    ctx_f = 0.4
+    
+    def draw_row(label, ptr, prop, btn_op=None, btn_label=None, btn_icon=None, btn_idx=-1):
+        row_block = area.column(align=True)
+        master_split = row_block.split(factor=master_f, align=True)
+        
+        # Left side: Labeled input
+        inputs = master_split.column(align=True)
+        row = inputs.row(align=True)
+        split = row.split(factor=gutter_f, align=True)
+        split.alignment = 'RIGHT'
+        split.label(text=label)
+        split.prop(ptr, prop, text="")
+        
+        # Right side: Controls (aligned in the 'Invoke' slot for tidiness)
+        controls = master_split.row(align=True)
+        ctx = controls.split(factor=ctx_f, align=True)
+        
+        if btn_op:
+            op = ctx.operator(btn_op, text=btn_label, icon=btn_icon)
+            op.mapping_index = idx
+            if btn_idx != -1:
+                op.item_index = btn_idx
+        else:
+            ctx.label(text="")
+            
+        # Placeholder splits to maintain consistent alignment with Operator types
+        rem = ctx.split(factor=0.5, align=True)
+        rem.label(text="")
+        rem.label(text="")
+        
+        row_block.separator(factor=0.4)
+
+    # Main Script Row
+    draw_row("Script:", m, "python_file", "chordsong.script_select", "Select", "FILE_SCRIPT")
+    
+    # Parameters Rows
+    draw_row("Parameters:", m, "kwargs_json", "chordsong.subitem_add", "", "ADD")
+    for i, p in enumerate(m.script_params):
+        draw_row("", p, "value", "chordsong.subitem_remove", "", "TRASH", i)
+
+
 def _draw_toggle_mapping(layout, m, idx):
     """Draw rows for a context toggle mapping."""
-    def draw_toggle_row_fixed(layout, path_ptr, path_prop, is_primary, m, idx, sub_idx=-1):
-        row = layout.row(align=True)
-        p_split = row.split(factor=0.75, align=True)
-        p_split.prop(path_ptr, path_prop, text="")
+    area = layout.box()
+    
+    def draw_row(ptr, prop, is_primary, sub_idx=-1):
+        op_block = area.column(align=True)
+        master_split = op_block.split(factor=0.7, align=True)
         
-        b_split = p_split.split(factor=0.12, align=True)
-        b_split.prop(m, "sync_toggles", text="", icon='LINKED' if m.sync_toggles else 'UNLINKED', toggle=True)
-
+        inputs_col = master_split.column(align=True)
+        gutter_f = 0.2
+        
+        row = inputs_col.row(align=True)
+        split = row.split(factor=gutter_f, align=True)
+        split.alignment = 'RIGHT'
+        split.label(text="Property:")
+        split.prop(ptr, prop, text="")
+        
+        # Right side
+        controls_row = master_split.row(align=True)
+        ctx_split = controls_row.split(factor=0.4, align=True)
         if is_primary:
-            op = b_split.operator("chordsong.subitem_add", text="Add Property", icon="ADD")
+            ctx_split.prop(m, "sync_toggles", text="", icon='LINKED' if m.sync_toggles else 'UNLINKED', toggle=True)
+        else:
+            ctx_split.label(text="")
+            
+        btns_split = ctx_split.split(factor=0.5, align=True)
+        if is_primary:
+            op = btns_split.operator("chordsong.subitem_add", text="Add", icon="ADD")
             op.mapping_index = idx
         else:
-            rem = b_split.operator("chordsong.subitem_remove", text="Remove Property", icon="TRASH")
-            rem.mapping_index = idx
-            rem.item_index = sub_idx
+            op = btns_split.operator("chordsong.subitem_remove", text="Del", icon="TRASH")
+            op.mapping_index = idx
+            op.item_index = sub_idx
+        
+        btns_split.label(text="") # Placeholder for 'Convert'
+        
+        op_block.separator(factor=0.4)
 
-    draw_toggle_row_fixed(layout, m, "context_path", True, m, idx)
+    draw_row(m, "context_path", True)
     for i, item in enumerate(m.sub_items):
-        draw_toggle_row_fixed(layout, item, "path", False, m, idx, i)
+        draw_row(item, "path", False, i)
+
+
 
 def _draw_property_mapping(layout, m, idx):
     """Draw rows for a context property mapping."""
-    prop_area = layout.box()
+    area = layout.box()
     
-    def draw_prop_row(layout, path_ptr, path_prop, val_ptr, val_prop, is_primary, sub_idx=-1):
-        row = layout.row(align=True)
-        path_split = row.split(factor=0.35, align=True)
-        path_split.prop(path_ptr, path_prop, text="")
+    def draw_row(path_ptr, path_prop, val_ptr, val_prop, is_primary, sub_idx=-1):
+        op_block = area.column(align=True)
+        master_split = op_block.split(factor=0.7, align=True)
         
-        val_split = path_split.split(factor=0.5, align=True)
-        val_split.prop(val_ptr, val_prop, text="Value")
+        inputs_col = master_split.column(align=True)
+        gutter_f = 0.2
         
-        btn_row = val_split.row(align=True)
-        conv = btn_row.operator("chordsong.property_mapping_convert", text="Convert", icon="SOLO_ON")
+        # Path
+        row1 = inputs_col.row(align=True)
+        split1 = row1.split(factor=gutter_f, align=True)
+        split1.alignment = 'RIGHT'
+        split1.label(text="Property:")
+        split1.prop(path_ptr, path_prop, text="")
+        
+        # Value
+        row2 = inputs_col.row(align=True)
+        split2 = row2.split(factor=gutter_f, align=True)
+        split2.alignment = 'RIGHT'
+        split2.label(text="Value:")
+        split2.prop(val_ptr, val_prop, text="")
+        
+        # Right side
+        controls_row = master_split.row(align=True)
+        ctx_split = controls_row.split(factor=0.4, align=True)
+        ctx_split.label(text="") # Placeholder
+        
+        btns_split = ctx_split.split(factor=0.5, align=True)
+        if is_primary:
+            op = btns_split.operator("chordsong.subitem_add", text="Add", icon="ADD")
+            op.mapping_index = idx
+        else:
+            op = btns_split.operator("chordsong.subitem_remove", text="Del", icon="TRASH")
+            op.mapping_index = idx
+            op.item_index = sub_idx
+            
+        conv = btns_split.operator("chordsong.property_mapping_convert", text="Convert")
         conv.index = idx
         conv.sub_index = sub_idx
+        
+        op_block.separator(factor=0.4)
 
-        if is_primary:
-            op_add = btn_row.operator("chordsong.subitem_add", text="Add", icon="ADD")
-            op_add.mapping_index = idx
-        else:
-            rem = btn_row.operator("chordsong.subitem_remove", text="Remove", icon="TRASH")
-            rem.mapping_index = idx
-            rem.item_index = sub_idx
-    
-    draw_prop_row(prop_area, m, "context_path", m, "property_value", True)
+    draw_row(m, "context_path", m, "property_value", True)
     for i, item in enumerate(m.sub_items):
-        draw_prop_row(prop_area, item, "path", item, "value", False, i)
+        draw_row(item, "path", item, "value", False, i)
+
+
 
 def _draw_operator_mapping(layout, m, idx):
     """Draw rows for an operator mapping."""

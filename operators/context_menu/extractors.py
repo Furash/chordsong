@@ -247,15 +247,31 @@ def extract_context_path(button_prop, button_pointer):
 
     return ".".join(path_parts)
 
-def detect_editor_context(context, operator=None):
+def detect_editor_context(context, operator=None, kwargs=None):
     """Auto-detect editor context based on current editor or operator prefix."""
     # Based on operator prefix
     if operator and "." in operator:
         parts = operator.split(".")
         if len(parts) == 2:
-            if parts[0].lower() in ["uv", "image"]:
+            module = parts[0].lower()
+            if module in ["uv", "image"]:
                 return "IMAGE_EDITOR"
-            elif parts[0].lower() == "node":
+            elif module == "node":
+                # Check kwargs for hints (e.g. type='ShaderNodeMath')
+                if kwargs:
+                    if "ShaderNode" in kwargs:
+                        return "SHADER_EDITOR"
+                    if "GeometryNode" in kwargs:
+                        return "GEOMETRY_NODE"
+                
+                # Try based on current space if available
+                space = context.space_data
+                if space and space.type == 'NODE_EDITOR':
+                    if hasattr(space, 'tree_type') and space.tree_type == 'GeometryNodeTree':
+                        return "GEOMETRY_NODE"
+                    return "SHADER_EDITOR"
+                
+                # Default for node module if we really can't tell
                 return "GEOMETRY_NODE"
 
     # Based on current space

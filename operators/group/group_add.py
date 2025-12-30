@@ -43,6 +43,9 @@ class CHORDSONG_OT_Group_Add(bpy.types.Operator):
         grp = p.groups.add()
         grp.name = name
 
+        # Immediately sync and sort (Unreal-style) - delayed for stability
+        p.sync_groups_delayed()
+
         from ..common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)
 
