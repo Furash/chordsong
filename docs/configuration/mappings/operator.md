@@ -1,38 +1,38 @@
-## Operator Mapping
+# Operator Mappings
 
-You can map any blender operator to a chord if it's path starts with `bpy.ops.`.
-There are three ways to add an operator mapping:
+The **Operator Mappings** allow you to bind standard Blender commands to chord sequences.
 
-1. Use the right mouse menu on any operator in the 3D View, Shader Editor, UV Editor or Geometry Nodes editor.
+## Adding Operators
 
-    ![Add Chord RMB](../../scr/add_chord_rmb.png){ width="240" }
+There are three primary ways to capture operators:
 
-2. Use the "Add Mapping" button in the Chord Song preferences panel.
+1. **Context Menu (RMB)**: Right-click any button or menu item in Blender and select **Add Chord Mapping**.
+2. **Preferences Panel**: Use the **Add Mapping** button in the Chord Song preferences to manually define an operator ID.
+3. **Info Panel**: Select one or more rows of operator history in Blender's Info Editor, right-click, and select **Extract to Chord Mapping**.
 
-    ![Add Mapping](../../scr/add_chord.gif){ width="640" }
+## Chaining Multiple Operators
 
-3. Extract from the Info panel - select operator history text and use the context menu. See [Info Panel workflow](../../features/info.md) for details.
+Chord Song allows you to execute a sequence of operators with a single chord. This is ideal for complex macros (e.g., "Duplicate > Move > Rename").
 
-### Overview
+### Setting up a Chain:
+1. Set the **Mapping Type** to **Operator**.
+2. Use the **+** (Add) button next to the operator field to add **Sub-Operators**.
+3. Operators are executed in descending order.
 
-Operator mappings execute Blender operators when their chord sequence is triggered.
+```python
+# Example of a chained execution flow:
+# 1. Duplicate the object
+# 2. Shade it smooth
+# 3. Enter Edit mode
+bpy.ops.object.duplicate()
+bpy.ops.object.shade_smooth()
+bpy.ops.object.editmode_toggle()
+```
 
-### Creating Operator Mappings
+## Configuration Properties
 
-<!-- TODO: Explain how to create operator mappings -->
-
-### Operator ID
-
-<!-- TODO: Explain operator ID format (e.g., object.shade_smooth) -->
-
-### Operator Arguments
-
-<!-- TODO: Explain how to pass arguments/kwargs to operators -->
-
-### Common Operators
-
-<!-- TODO: Provide examples of common operator mappings -->
-
-### Finding Operator IDs
-
-<!-- TODO: Explain how to discover operator IDs (context menu, info panel, etc.) -->
+| Property | Description |
+| :--- | :--- |
+| **Operator ID** | The path starting with `bpy.ops` (e.g., `mesh.subdivide`). |
+| **Parameters** | A Python-style dictionary for arguments (e.g., `number_cuts=2`). |
+| **Call Context** | `Exec` runs the command immediately; `Invoke` may open a secondary UI or tool-setting popup. |

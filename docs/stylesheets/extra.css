@@ -29,10 +29,14 @@
     background-color: #111317 !important;
 }
 
-/* Center logo and text in sidebar */
+/* Global sidebar header styling */
 .md-nav__title {
     background-color: #111317 !important;
     color: #ffffff !important;
+}
+
+/* Center logo and text in sidebar - ONLY for the main drawer title */
+label.md-nav__title[for="__drawer"] {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -44,14 +48,24 @@
     line-height: normal !important;
     letter-spacing: -0.02em !important;
     height: auto !important;
+    white-space: normal !important;
 }
 
-/* Ensure the back arrow in nested menus is also white */
+/* Hide redundant overlapping titles and logo block in the sidebar navigation on desktop */
+@media screen and (min-width: 76.25em) {
+
+    .md-nav__title,
+    label.md-nav__title[for="__drawer"] {
+        display: none !important;
+    }
+}
+
+/* Ensure the back arrow in nested menus is white */
 .md-nav__title .md-nav__icon {
     color: #ffffff !important;
 }
 
-.md-nav__title .md-logo {
+label.md-nav__title[for="__drawer"] .md-logo {
     display: block !important;
     position: static !important;
     margin: 0 0 0.5rem 0 !important;
@@ -87,11 +101,15 @@
     background-color: #111317 !important;
 }
 
-/* Keep header text colors persistent across themes */
+/* Keep header text colors and font weight persistent across themes */
 .md-header__title,
 [data-md-color-scheme="slate"] .md-header__title,
 [data-md-color-scheme="default"] .md-header__title {
     color: rgba(255, 255, 255, 0.87) !important;
+}
+
+.md-header__topic .md-ellipsis {
+    font-weight: 500 !important;
 }
 
 .md-header__button,
@@ -165,11 +183,25 @@
     color: rgba(255, 255, 255, 1) !important;
 }
 
-/* Increase font size of inline code */
+/* Increase font size of inline code and admonitions */
 .md-typeset :not(pre)>code {
-    font-size: 1.2em;
+    font-size: 1.25em;
     color: #c6682d;
 }
+
+.md-typeset .admonition,
+.md-typeset details {
+    font-size: 1em;
+}
+
+.md-typeset table {
+    font-size: 1em;
+}
+
+td, th {
+    text-align: left;
+    font-size: 1.2em;
+  }
 
 /* Swap logo based on theme using CSS */
 .logo-container {
@@ -275,7 +307,7 @@ label.md-nav__title[for="__toc"] {
 
 .download-card__title {
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 1.1rem;
     margin-bottom: 0.15rem;
     text-align: center;
 }

@@ -11,15 +11,30 @@ from ..common import prefs
 
 def _get_target_groups(self, context):
     """Get list of target groups for reassignment."""
-    p = prefs(context)
-    items = [
-        ("", "None (Clear Group)", "Remove group from mappings but keep the chords"),
-        ("__DELETE__", "Delete Mappings", "Permanently delete all mappings in this group", "TRASH", 0),
-    ]
+    try:
+        p = prefs(context)
+        # All items must have the same tuple length (5-tuples with icon and number)
+        items = [
+            ("__CLEAR__", "None (Clear Group)", "Moves mappings to Ungrouped", "X", 0),
+            ("__DELETE__", "Delete Mappings", "Permanently delete all mappings in this group", "TRASH", 1),
+        ]
 
-    for idx, grp in enumerate(p.groups):
-        if idx != self.index:
-            items.append((grp.name, grp.name, f"Reassign to {grp.name}"))
+        # Safely get the index to exclude
+        exclude_index = getattr(self, "index", -1)
+        
+        # Add all other groups (must also be 5-tuples)
+        if hasattr(p, "groups") and p.groups:
+            item_num = 2  # Start after the two special options
+            for idx, grp in enumerate(p.groups):
+                if idx != exclude_index and grp.name and grp.name.strip():
+                    items.append((grp.name, grp.name, f"Reassign to {grp.name}", "FOLDER", item_num))
+                    item_num += 1
+    except Exception:
+        # Fallback to just the basic options
+        items = [
+            ("__CLEAR__", "None (Clear Group)", "Moves mappings to Ungrouped", "X", 0),
+            ("__DELETE__", "Delete Mappings", "Permanently delete all mappings in this group", "TRASH", 1)
+        ]
 
     return items
 
@@ -54,7 +69,13 @@ class CHORDSONG_OT_Group_Remove(bpy.types.Operator):
         count = sum(1 for m in p.mappings if m.group == group_name)
 
         if count > 0:
+            # Ensure target_group is initialized with a valid value
+            # Get the items first to ensure they're available
+            items = _get_target_groups(self, context)
+            if items and items[0][0] == "__CLEAR__":
+                self.target_group = "__CLEAR__"
             return context.window_manager.invoke_props_dialog(self)
+        # For empty groups, execute directly with default clear action
         return self.execute(context)
 
     def draw(self, context):
@@ -80,7 +101,8 @@ class CHORDSONG_OT_Group_Remove(bpy.types.Operator):
             return {"CANCELLED"}
 
         group_name = p.groups[self.index].name
-        target = self.target_group
+        # Use getattr with default in case property wasn't initialized
+        target = getattr(self, "target_group", "__CLEAR__")
 
         count = 0
         if target == "__DELETE__":
@@ -94,8 +116,14 @@ class CHORDSONG_OT_Group_Remove(bpy.types.Operator):
             for i in reversed(to_remove):
                 p.mappings.remove(i)
                 count += 1
+        elif target == "__CLEAR__":
+            # Clear group assignment (make mappings Ungrouped)
+            for m in p.mappings:
+                if m.group == group_name:
+                    m.group = ""
+                    count += 1
         else:
-            # Reassign or clear group
+            # Reassign to another group
             for m in p.mappings:
                 if m.group == group_name:
                     m.group = target
@@ -108,10 +136,10 @@ class CHORDSONG_OT_Group_Remove(bpy.types.Operator):
 
         if target == "__DELETE__":
             msg = f"Removed group {group_name} and deleted {count} mappings"
-        elif target:
-            msg = f"Removed group {group_name} and reassigned {count} mappings to {target}"
-        else:
+        elif target == "__CLEAR__":
             msg = f"Removed group {group_name} and cleared group from {count} mappings"
+        else:
+            msg = f"Removed group {group_name} and reassigned {count} mappings to {target}"
 
         self.report({"INFO"}, msg)
         return {"FINISHED"}

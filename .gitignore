@@ -208,3 +208,4 @@ cython_debug/
 # AI
 *.ai
 *.psd
+.agent/

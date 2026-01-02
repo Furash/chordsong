@@ -3,27 +3,43 @@
     <img src="logo/chordsong_logo_inv.png" alt="Logo" class="logo-light">
 </div>
 
-Welcome to **Chord Song**, a Blender add-on that brings `<Leader>` key functionality and chord-based mappings to your workflow.
-Inspired by [which-key.nvim](https://github.com/folke/which-key.nvim) for Neovim.
 
-## Overview
 
-Chord Song allows you to call operators, execute scripts, and set properties using short, memorable key sequences (chords) preceded by a leader key. This significantly reduces the need for complex hotkey combinations and pie menus.
+**Chord Song** is an efficiency-focused Blender add-on that introduces `<Leader>` key functionality and chord-based mappings. Inspired by Neovim addon `which-key.nvim`, it allows you to trigger operators, execute custom Python scripts, and modify properties using short, memorable key sequences known as `chords`.
+
+### Why Chords?
+Traditional hotkey systems suffer from "keybind exhaustion," where users must memorize awkward combinations like `Ctrl+Alt+Shift+F12`. Chord Song solves this by:
+
+- Reducing cognitive load: Use intuitive sequences (e.g., `m c` for **M**esh > **C**ube).
+- Conserving hotkey real estate: A single leader key (e.g., `Space`) opens up dozens of unique combinations.
+- Providing visual feedback: The dynamic overlay shows available options as you type, eliminating the need for perfect memory.
 
 ## Key Features
 
-- **Leader Key System**: Trigger actions with a single prefix key (default: `Space`).
-- **Chord Mappings**: Define intuitive sequences like `m c` for "Mesh > Cube" or `f r a` for "File > Recover Autosave".
-- **Right Click to add chord mappings**: Use the right mouse menu on any operator or property to add a chord mapping. You can even add multiple properties or operators from the Info panel history.
-- **Dynamic Overlay**: Minimalist overlay shows available chords as you type.
-- **Context aware**: Mappings are restricted to specific Blender contexts (3D View Object, 3D View Edit, Shader Editor, UV Editor and Geometry Nodes).
-- **Smart Recents**: Quick access to the most recently used chords by pressing the leader key twice. Press the leader key again to execute the most recent chord.
-- **Python Script Support**: Map chords directly to your own Python scripts with custom arguments passed as a dictionary.
+- **Leader Key System**: Initiate actions with a `<Leader>` key *(default: `Space`).*
+- **Context Awareness**: Mappings dynamically filter based on your active editor (e.g., 3D View, UV, Shader Editor).
+- **Smart Recents**: Double-tap the leader key to access your most recent actions.
+- **Mapping System**: Bind chords to Operators, Properties, Toggles, or external Python files.
+- **Right-Click Integration**: Instantly add any Blender UI element to your chord library via the context menu. Including Info panel history.
 
+## Quick Start Guide
 
-## Getting Started
+To get started with Chord Song, follow these steps:
 
-Get the latest release from the following sources:
+### 1. Project Prerequisites (Required for Icons)
+Chord Song uses **Nerd Font** icons to provide visual cues in the overlay. Without this, icons will appear as missing character boxes.
+
+**Installation Steps:**
+
+1. Download a [Nerd Font](https://www.nerdfonts.com/font-downloads) (e.g., Ubuntu Nerd Font).
+2. Install the font on your operating system.
+3. In Blender, navigate to **Edit > Preferences > Interface > Text Rendering**.
+4. Set the **Interface Font** to your installed Nerd Font.
+
+![Text Rendering](scr/text_rendering.png){ width="640" }
+
+### 2. Download the Add-on
+Choose your preferred platform to download the latest `.zip` release:
 
 <!-- markdownlint-disable -->
 <div class="download-grid">
@@ -43,6 +59,7 @@ Get the latest release from the following sources:
             <path fill="currentColor" d="M93.293.778c-3.243 0-6.413 2.805-6.777 6.858V1.112h-4.657v19.671h4.714v-9.521c0-2.667 1.979-6.43 6.72-6.43zm49.485 16.856V4.157h2.731c3.641 0 6.599 2.174 6.599 6.63s-2.958 6.847-6.599 6.847zm-4.665 3.152h7.965c4.892 0 10.922-3.043 10.922-9.999 0-6.847-6.03-9.673-10.922-9.673h-7.965zm-17.889-9.78c0-3.587 1.934-6.521 5.12-6.521 3.072 0 4.779 2.934 4.779 6.52 0 3.587-1.707 6.522-4.779 6.522-3.186 0-5.12-2.935-5.12-6.521m-4.779.217c0 5.869 3.186 9.999 8.192 9.999 3.641 0 5.803-2.282 6.941-5.978v5.543h4.664V1.116h-4.664v5.216C129.554 2.855 127.392.79 123.979.79c-5.12 0-8.534 4.456-8.534 10.433M9.216 21.222C3.413 21.222 0 16.766 0 11.223 0 5.463 3.755.79 10.923.79c7.395 0 9.898 4.782 10.012 7.499h-5.347c-.114-1.522-1.48-3.804-4.78-3.804-3.526 0-5.802 2.934-5.802 6.52 0 3.587 2.276 6.522 5.803 6.522 3.186 0 4.551-2.391 5.12-4.782h-5.12v-1.957h10.743v10H16.84v-6.304c-.341 2.282-1.82 6.738-7.623 6.738Zm21.892-.002c-4.437 0-7.168-2.825-7.168-8.477V1.114h4.779v11.63c0 2.934 1.479 4.347 3.982 4.347 4.892 0 6.713-5.76 6.713-9.782V1.114h4.778v19.672h-4.664v-7.282c-.91 4.021-3.414 7.717-8.42 7.717ZM72.741.778c-4.077 0-6.649 3.762-7.488 7.24-.144-4.66-2.544-7.24-6.383-7.24-3.318 0-6.396 2.826-7.195 7.297V1.113h-4.658v19.672h4.718v-7.052c0-1.749.763-8.924 5.512-8.924 3.077 0 3.398 2.651 3.398 6.275v9.701h4.716v-7.052c0-1.749.794-8.924 5.544-8.924 3.074 0 3.392 2.651 3.392 6.275v9.701h4.722V9.15c.022-5.582-2.042-8.37-6.278-8.37Zm30.674 0C97.306.778 93.168 5.353 93.168 11c0 6.221 3.936 10.22 10.247 10.22 6.108 0 10.32-4.574 10.32-10.22 0-6.222-4.013-10.222-10.32-10.222m0 16.96c-3.556 0-5.86-2.875-5.86-6.738s2.312-6.74 5.86-6.74c3.547 0 5.766 2.876 5.766 6.74 0 3.863-2.221 6.739-5.766 6.739Z"/>
         </svg>
     </div>
+    <div class="download-card__title" style="color: #c4642b;">Buy me a coffee</div>
 </a>
 
 <a href="https://extensions.blender.org/add-ons/chordsong" class="download-card" target="_blank">
@@ -57,20 +74,21 @@ Get the latest release from the following sources:
 </div>
 <!-- markdownlint-enable -->
 
+### 3. Installation
+1. In Blender go to **Edit > Preferences > Extensions**.
+2. Click **Install...** and select the downloaded `.zip` file.
+3. Search for "Chord Song" and ensure the checkbox is enabled.
 
-### Installation
+After installation, proceed to the [Chord Mappings](concepts/chord.md) to define your first sequence.
 
-1. Download the latest release as a `.zip` file.
-2. In Blender, go to **Edit > Preferences > Extensions**.
-3. Click **Install...** and select the downloaded zip file.
-4. Enable **Chord Song** add-on in the Blender preferences.
+## Security & Safety
 
-### Prerequisites
+**Python Script Execution:**
 
-1. Download and install Nerd Font for icons support. https://www.nerdfonts.com/font-downloads
-2. In Blender, go to **Edit > Preferences > Interface > Text Rendering**.
-3. Select the Nerd Font you installed in the **Interface Font** dropdown.
+Chord Song allows for the execution of arbitrary Python scripts via chord mappings. 
 
-    ![Text Rendering](scr/text_rendering.png){ width="640" }
+- **Identify Your Scripts**: Only map chords to `.py` files you have written or audited.
+- **Permission Boundary**: The add-on executes scripts within the standard Blender Python environment.
 
-After installation, proceed to the [configuration section](configuration/mappings.md).
+Always review the source code of any script before adding it to your library.
+

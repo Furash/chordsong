@@ -20,7 +20,7 @@ Because Chord Song executes an action as soon as an exact match is found, pressi
 
 ### Duplicate Mappings
 
-Duplicate conflicts occur when the exact same key sequence is assigned to multiple actions in the same **[Context](../concepts/chord_mappings.md#context)**.
+Duplicate conflicts occur when the exact same key sequence is assigned to multiple actions in the same **[Context](../concepts/chord.md#context)**.
 
 **Example:**
 - Mapping A: `f r` → Action: "Reset Factory Settings"

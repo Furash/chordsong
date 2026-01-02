@@ -57,6 +57,17 @@ def normalize_token(event_type: str, shift: bool = False, ctrl: bool = False, al
             "COMMA": ",", "PERIOD": ".",
             "SLASH": "/", "BACK_SLASH": "\\",
             "GRAVE_ACCENT": "grave", "ACCENT_GRAVE": "grave",
+            "NUM_LOCK": "numlock", "CAPS_LOCK": "capslock",
+            # Arrows
+            "UP_ARROW": "up", "DOWN_ARROW": "down",
+            "LEFT_ARROW": "left", "RIGHT_ARROW": "right",
+            # Navigation
+            "PAGE_UP": "pageup", "PAGE_DOWN": "pagedown",
+            "HOME": "home", "END": "end",
+            "INSERT": "insert", "DEL": "delete",
+            # Function keys
+            "F1": "f1", "F2": "f2", "F3": "f3", "F4": "f4", "F5": "f5", "F6": "f6",
+            "F7": "f7", "F8": "f8", "F9": "f9", "F10": "f10", "F11": "f11", "F12": "f12",
             # Numpad Operators
             "NUMPAD_SLASH": "n/", "NUMPAD_ASTERISK": "n*",
             "NUMPAD_MINUS": "n-", "NUMPAD_PLUS": "n+",
@@ -146,7 +157,13 @@ def _get_token_parts(token: str) -> tuple[set[str], str]:
         else:
             break
             
-    return found_mods, res[i:]
+    base = res[i:]
+    # If base is a single uppercase letter, it implies a shift modifier
+    if len(base) == 1 and base.isupper():
+        found_mods.add('+')
+        base = base.lower()
+            
+    return found_mods, base
 
 def tokens_match(mapping_token: str, pressed_token: str) -> bool:
     """Check if a mapping token matches a pressed token, handling AHK modifiers and order."""

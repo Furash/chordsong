@@ -1,29 +1,35 @@
-# Leader Key System
+The **Leader Key** is the prefix that activates Chord Song's listening mode. Instead of using complex `Ctrl+Alt` combinations, you press a single prefix key (default: `Space`) to begin a chord sequence.
 
-The leader key is the foundation of Chord Song's interaction model.
+!!! warning "Key Interception"
+    When you assign a key as the **Leader Key**, it is effectively "stolen" from Blender. This means the key will no longer perform its original function (e.g., if you use `Space`, you can no longer use it to play the animation or open the search menu).
 
-It acts as a prefix that activates Chord Song's chord capture mode. Pressing the leader key opens the overlay and begins listening for chord sequences. 
+!!! tip "Conflict Prevention"
+    If you use `Space` as your leader key, make sure to disable Blender's default mapping for Play/Search, or rebind the leader to a less critical key like `/`, `Q`, or `F1`.
 
-Pressing the leader key again will open the Recents menu. 
+## Interaction Model
 
-Pressing the leader third time will execute the most recent chord.
+The leader key supports a three-state multi-tap system:
 
-## How It Works
+- **Single Tap**: Opens the overlay and starts listening for a chord (e.g., `Space > M > C`).
+- **Double Tap**: Opens the **Recents** list, showing your most frequently used actions.
+- **Triple Tap**: Instantly repeats the **Most Recent Action** without opening any menus.
 
-<!-- TODO: Explain the leader key activation flow -->
+## Navigating the Overlay
 
-## Setting the Leader Key
+Once the overlay is active, you can use the following keys to manage your chord sequence:
 
-The leader key is the starting key for all chord sequences.
+| Key | Action |
+| :--- | :--- |
+| **Backspace** | Deletes the last token and goes back one level in the sequence. |
+| **Esc / Right-Click** | Cancels the chord capture and closes the overlay. |
 
-1. Go to the Chord Song preferences.
-2. Find the **Leader Key** setting.
-3. Click to map a key you want to use (e.g., `SPACE`, `CAPS_LOCK`, `Q`).
+## Setup & Configuration
 
-## Default Behavior
+You can customize the leader key in the add-on preferences
 
-<!-- TODO: Describe default leader key (SPACE) -->
+1. Navigate to **Edit > Preferences > Extensions > Chord Song**.
+2. Locate the **Leader Key** property.
+3. Click the button to capture a new key (good choices: `Space`, `Q`, `/`).
 
-## Leader Key Sequences
+![Leader Key Configuration](../scr/leader_key.png)
 
-<!-- TODO: Explain special sequences like <leader><leader> for recents -->

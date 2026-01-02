@@ -53,7 +53,7 @@ nav:
   - Home: index.md
   - Concepts:
     - Leader Key: concepts/leader_key.md
-    - Chord Mappings: concepts/chord_mappings.md
+    - Chords: concepts/chord.md
     - Groups: concepts/groups.md
     - Contexts: concepts/contexts.md
   - Configuration:
