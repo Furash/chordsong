@@ -11,7 +11,7 @@ There are several ways to create chord mappings:
 
 ## Mapping Types
 
-- [Operator Mapping](configuration/mappings/operator.md)
-- [Property Mapping](configuration/mappings/property.md)
-- [Toggle Mapping](configuration/mappings/toggle.md)
-- [Script Mapping](configuration/mappings/script.md)
+- [Operator Mapping](mappings/operator.md)
+- [Property Mapping](mappings/property.md)
+- [Toggle Mapping](mappings/toggle.md)
+- [Script Mapping](mappings/script.md)
