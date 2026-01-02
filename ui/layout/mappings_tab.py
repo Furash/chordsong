@@ -124,10 +124,15 @@ def draw_mappings_tab(prefs, context, layout):
         op.context = prefs.mapping_context_tab
         row_right.separator()
         
-        # Delete group button
+        # Rename and Delete group buttons
         if group_name != "Ungrouped":
             group_idx = _get_group_index(prefs, group_name)
             if group_idx is not None:
+                # Rename group button
+                op = row_right.operator("chordsong.group_rename", text="", icon="EVENT_A", emboss=False)
+                op.index = group_idx
+                row_right.separator()
+                # Delete group button
                 op = row_right.operator("chordsong.group_remove", text="", icon="TRASH", emboss=False)
                 op.index = group_idx
 

@@ -99,6 +99,7 @@ class CHORDSONG_PG_Group(PropertyGroup):
         name="Display Order",
         description="Order in which groups are displayed",
         default=0,
+        options={'HIDDEN'},
     )
     expanded: BoolProperty(
         name="Expanded",

@@ -1,23 +1,36 @@
-## Context Toggles
+# Toggle Mappings
 
-Map chords to context-aware toggle actions.
+**Toggle Mappings** allow you to flip properties (On/Off) using chords (e.g., toggle `space_data.overlay.show_wireframe`).
 
-### Overview
+Unlike [Property Mappings](property.md), toggle mappings flip the state each time they're activated rather than setting a fixed value.
 
-Context toggles provide dynamic state-aware actions that show their current state in the overlay.
+## Adding Toggles
 
-### Creating Context Toggles
+- **Preferences**: Manually add and edit toggle mappings in the Chord Song tab.
+- **Context Menu**: Right-click any checkbox or boolean property in Blender's UI and select **Add Chord Mapping**.
+- **Info Panel**: Extract toggle actions from Blender's history for batch creation.
 
-<!-- TODO: Explain how to create context toggle mappings -->
+## Chaining & "Sync Toggles"
 
-### Toggle Paths
+You can bind multiple toggles to a single chord to create "Presets" (e.g., one chord that toggles text and statistics at once).
 
-<!-- TODO: Explain context path syntax -->
+<!-- markdownlint-disable MD033 -->
+<img src="../../scr/toggle_presets.png" alt="Toggle Presets">
+<!-- markdownlint-enable MD033 -->
 
-### Dynamic Icons
+## Toggle State Overlay
 
-<!-- TODO: Explain how toggle state affects icon display -->
+The state of the toggle is displayed in the overlay.
+<!-- markdownlint-disable MD033 -->
+<img src="../../scr/toggle_overlay.png" alt="Toggle State Overlay" width="400">
+<!-- markdownlint-enable MD033 -->
 
-### Use Cases
+### The "Checker Board" Problem
 
-<!-- TODO: Provide examples of useful context toggles -->
+When multiple toggles are bound to one chord, they can get out of sync (e.g., Text is ON but Statistics is OFF). Pressing the chord would flip both, keeping them out of sync indefinitely.
+
+### The Sync Solution
+
+Enable the **Sync** button (chain icon) on a mapping with multiple toggles to solve this:
+
+- **Enabled**: When pressed, all sub-toggles will match the state of the **primary** (first) toggle. On the first press, everything "snaps" to a unified state (all ON or all OFF), preventing the checker board effect.

@@ -1,3 +1,5 @@
+# Chords
+
 A chord is a sequence of one or more key tokens (e.g., `m c` or `f r a`).
 
 | Component | Description |
@@ -11,7 +13,7 @@ A chord is a sequence of one or more key tokens (e.g., `m c` or `f r a`).
 
 ## Chord Syntax
 
-Chord Song uses a simple syntax for defining key sequences. 
+Chord Song uses a simple syntax for defining key sequences.
 Each chord is a space-separated list of **tokens**. The sequence always begins after you press the [Leader Key](leader_key.md), which intercepts all subsequent input.
 
 !!! note "Input Interception"
@@ -48,7 +50,7 @@ For special keys that aren't letters or numbers, use these aliases:
 | `enter` | Enter / Return |
 | `esc` | Escape |
 | `grave` | Grave (`` ` ``) / Tilde key |
-| `up`, `down`, `left`, `right`| Arrow keys |
+| `up`, `down`, `left`, `right` | Arrow keys |
 | `home`, `end`, `insert`, `delete` | Navigation keys |
 | `pageup`, `pagedown` | Page scrolling keys |
 | `f1` - `f12` | Function keys |
@@ -72,5 +74,3 @@ Numpad keys are prefixed with `n` to distinguish them from the main row numbers.
     **Side Sensitivity**: If you define a mapping with `^a`, it will match both Left and Right `Ctrl`. If you specify `>^a`, it will **only** match the `Right Ctrl`.
 
     **Case Sensitivity**: Uppercase characters are treated as having an implicit `Shift` modifier (e.g., `C` is shorthand for `+c`), while lowercase characters (e.g., `c`) represent the key without Shift. This means `c` and `C` can be used for different mappings.
-
-

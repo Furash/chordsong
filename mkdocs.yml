@@ -37,6 +37,9 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
+extra_javascript:
+  - javascripts/image-preview.js
+
 markdown_extensions:
   - admonition
   - pymdownx.details
@@ -62,13 +65,13 @@ nav:
     - Property: configuration/mappings/property.md
     - Toggle: configuration/mappings/toggle.md
     - Script: configuration/mappings/script.md
-    - Overlay: configuration/overlay.md
     - Autosave: configuration/autosave.md
     - Import & Export: configuration/import_export.md
   - Features:
-    - Overview: features.md
+    - Context Menu: features/context_menu.md
     - Info Panel: features/info.md
     - Recents: features/recents.md
     - Conflict Detection: features/conflicts.md
-    - Context Menu: features/context_menu.md
-  - Customization: customization.md
+  - Customization:
+    - Overview: customization.md
+    - Overlay: customization/overlay.md

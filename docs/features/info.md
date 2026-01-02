@@ -1,21 +1,16 @@
 # Adding Chords from Info Panel
 
-Use Blender's Info panel to quickly create chord mappings from operator history.
+Create chord mappings from Blender's operator history.
 
-## Overview
-
-The Info panel displays Python code for every operator call and property assignment in Blender. Chord Song can extract this information to automatically create mappings, allowing you to batch-create multiple chord mappings at once.
-
-## Accessing the Info Panel
-
-1. Open Blender's **Info** editor (Window > Toggle System Console, or add an Info editor area).
-2. The Info panel shows Python code for all operations you perform in Blender.
+<!-- markdownlint-disable MD033 -->
+<img src="../scr/info_panel.png" alt="Info Panel" width="500">
+<!-- markdownlint-enable MD033 -->
 
 ## Workflow
 
 ### Step 1: Perform Actions
 
-Execute operators or change properties in Blender. Each action appears in the Info panel as Python code:
+Execute operators or change properties. Each action appears in the Info panel:
 
 **Operators:**
 ```
@@ -32,63 +27,23 @@ bpy.context.space_data.overlay.show_wireframes = False
 
 ### Step 2: Select Text in Info Panel
 
-1. In the Info panel, select one or more lines containing operators or properties.
-2. Right-click on the selected text.
-3. Choose **"Add Chord Mapping"** from the context menu.
+1. Select one or more lines in the Info panel.
+2. Right-click and choose **"Add Chord Mapping"**.
+
+<!-- markdownlint-disable MD033 -->
+<img src="../scr/add_info.png" alt="Add Chord Info Panel" width="500">
+<!-- markdownlint-enable MD033 -->
 
 ### Step 3: Configure the Mapping
 
-The Chord Song dialog will appear with:
-- **Operator/Property**: Automatically extracted from the selected text
-- **Editor Context**: Auto-detected based on the current editor
-- **Label**: Auto-generated from the operator/property name
-- **Group**: Auto-suggested based on the mapping type
+- **Enter Chord**: The sequence of keys that will trigger the mapping.
+- **Editor Context**: Context in which the mapping will be active.
+- **Label**: Chord name.
+- **Group**: Chord group.
+- **Parameters**: Operator parameters.
 
-You can then:
-- Enter your desired chord sequence
-- Adjust the label and group
-- Modify the editor context if needed
-- Add operator arguments or property values
+Enter your chord sequence and adjust settings as needed.
 
 ## Batch Creation
 
-When you select multiple lines in the Info panel:
-
-- **Multiple Operators**: All selected operators are extracted. The first becomes the primary mapping, and others are stored as sub-items that can be converted to separate mappings.
-- **Multiple Properties**: All selected properties are extracted. The first becomes the primary mapping, and others are stored as sub-items.
-
-## Supported Formats
-
-### Operators
-
-Chord Song recognizes these operator formats:
-- `bpy.ops.module.operator_name()`
-- `module.operator_name()`
-- `module.operator_name(arg="value")`
-
-### Properties
-
-Chord Song recognizes these property formats:
-- `bpy.context.path.to.property = value`
-- `bpy.data.path.to.property = value`
-- `path.to.property = value`
-
-## Tips
-
-- **Select Multiple Lines**: Hold Shift and drag to select multiple operations for batch creation
-- **Copy to Clipboard**: You can also copy text to the clipboard and use the context menu - Chord Song will read from the clipboard
-- **Mixed Types**: If you select both operators and properties, Chord Song will process them separately based on the first item's type
-- **Auto-Detection**: The system automatically detects whether a property is a boolean (toggle) or other value type
-
-## Example Workflow
-
-1. Perform several operations: Add a cube, shade smooth, enable wireframes
-2. Open Info panel and see:
-   ```
-   bpy.ops.mesh.primitive_cube_add()
-   bpy.ops.object.shade_smooth()
-   bpy.context.space_data.overlay.show_wireframes = True
-   ```
-3. Select all three lines, right-click, choose "Add Chord Mapping"
-4. For each item, enter a chord (e.g., `c`, `s`, `w`) and configure as needed
-5. All mappings are created automatically with proper context detection
+Selecting multiple lines extracts all operators or properties. The first becomes the primary mapping; others are stored as sub-items. If a mix of operators and properties is detected, whichever type is detected first will filter out the other type, i.e. if the first line is an operator, the properties/toggles will be ignored and vice versa.

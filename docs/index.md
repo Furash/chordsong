@@ -16,11 +16,11 @@ Traditional hotkey systems suffer from "keybind exhaustion," where users must me
 
 ## Key Features
 
+- **Context Menu Integration**: Right-click any Blender UI element to instantly add it to your chord library. Works with operators, properties, toggles, and Info panel history.
 - **Leader Key System**: Initiate actions with a `<Leader>` key *(default: `Space`).*
 - **Context Awareness**: Mappings dynamically filter based on your active editor (e.g., 3D View, UV, Shader Editor).
 - **Smart Recents**: Double-tap the leader key to access your most recent actions.
 - **Mapping System**: Bind chords to Operators, Properties, Toggles, or external Python files.
-- **Right-Click Integration**: Instantly add any Blender UI element to your chord library via the context menu. Including Info panel history.
 
 ## Quick Start Guide
 

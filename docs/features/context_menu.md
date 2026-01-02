@@ -1,23 +1,28 @@
 # Context Menu Integration
 
-Create mappings directly from Blender's context menu.
-
-## Overview
-
-Chord Song integrates with Blender's context menu to suggest and create chord mappings.
+Create mappings from Blender's context menu.
 
 ## Accessing the Context Menu
 
-<!-- TODO: Explain how to access Chord Song context menu -->
+Right-click any UI element to create a mapping.
 
-## Creating Mappings from Context Menu
+<!-- markdownlint-disable MD033 -->
+<img src="../scr/add_chord_rmb.png" alt="Context Menu" width="200">
+<!-- markdownlint-enable MD033 -->
 
-<!-- TODO: Explain the mapping creation flow -->
+The pop up will appear with the following fields
 
-## Chord Suggestions
+<!-- markdownlint-disable MD033 -->
+<img src="../scr/add_chord_rmb_menu.png" alt="Add Chord Popup">
+<!-- markdownlint-enable MD033 -->
 
-<!-- TODO: Explain automatic chord suggestion based on labels -->
 
-## Supported Actions
+- **Enter Chord**: The sequence of keys that will trigger the mapping.
+- **Editor Context**: Context in which the mapping will be active.
+- **Label**: Chord name.
+- **Group**: Chord group.
+- **Parameters**: Operator parameters.
 
-<!-- TODO: Explain what actions can be mapped via context menu -->
+!!! note "Parameters Automatic Detection"
+    If the operator is detected successfully, the parameters will be filled automatically. The non-conflicting chord will be also suggested based on the operator name.
+

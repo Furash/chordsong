@@ -1,9 +1,7 @@
 # Recents System
 
-Pressing the leader key twice will open the Recents menu.
+Double-tap the leader key to open the Recents menu. Execute items by pressing number or letter keys.
 
-The items here are the most recently used chords and can be executed by pressing the number or letter keys.
-
-The most recent chord can be executed by pressing the leader key again.
+Triple-tap the leader key to repeat the most recent action.
 
 ![Recents](../scr/recents.png){ width="640" }

@@ -189,6 +189,15 @@ label.md-nav__title[for="__drawer"] .md-logo {
     color: #c6682d;
 }
 
+/* Increase font size of code blocks */
+.md-typeset pre {
+    font-size: 1.1em;
+}
+
+.md-typeset pre code {
+    font-size: 1.1em;
+}
+
 .md-typeset .admonition,
 .md-typeset details {
     font-size: 1em;

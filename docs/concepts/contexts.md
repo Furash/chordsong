@@ -1,22 +1,31 @@
 # Contexts
 
-Contexts determine where chord mappings are active.
+Contexts control which Blender editor a chord mapping is active in.
 
-## Overview
+Each mapping can be assigned to a specific context.
 
-Each mapping can be assigned to a specific Blender editor context. This allows you to have different chord sets for different workflows.
+<!-- markdownlint-disable MD033 -->
+<img src="../scr/context_selector.png" alt="Context Selector" width="600">
+<!-- markdownlint-enable MD033 -->
+
+Switching a context will immediately send the chord to the new context's tab.
+
+<!-- markdownlint-disable MD033 -->
+<img src="../scr/context_switch.gif" alt="Context Switch" width="600">
+<!-- markdownlint-enable MD033 -->
 
 ## Available Contexts
 
-- **3D View (Object)**
-- **3D View (Edit)**
+- **3D View (Object Mode)**
+- **3D View (Edit Mode)**
 - **Geometry Nodes**
 - **Shader Editor**
 - **UV Editor**
 
 ## Context Detection
 
-The context is detected automatically based on the mouse position.
+The context is detected automatically based on the current mouse cursor position.
 
-To have identical chord in multiple contexts, you have to duplicate the mapping and change it's context.
-But same chord can be mapped to different operators in multiple contexts.
+!!! note "Context Duplication"
+    To have identical chord in multiple contexts, you have to duplicate the mapping and change it's context.
+    But same chord can be mapped to different operators in multiple contexts.

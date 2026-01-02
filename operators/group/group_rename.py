@@ -20,6 +20,7 @@ class CHORDSONG_OT_Group_Rename(bpy.types.Operator):
         name="Group Index",
         description="Index of the group to rename",
         default=-1,
+        options={'HIDDEN'},
     )
 
     new_name: StringProperty(
