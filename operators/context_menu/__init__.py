@@ -481,7 +481,7 @@ def button_context_menu_draw(self, context):
     layout.separator()
     # Force INVOKE_DEFAULT to ensure the dialog shows up, especially in Info/Console panels
     layout.operator_context = 'INVOKE_DEFAULT'
-    layout.operator(CHORDSONG_OT_Context_Menu.bl_idname, text="Add Chord Mapping", icon="EVENT_K")
+    layout.operator(CHORDSONG_OT_Context_Menu.bl_idname, text="Add Chord Mapping", icon="EVENT_C")
 
 def register_context_menu():
     """Register the context menu hook."""

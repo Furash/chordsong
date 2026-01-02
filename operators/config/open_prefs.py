@@ -17,10 +17,13 @@ class CHORDSONG_OT_Open_Prefs(bpy.types.Operator):
 
     def execute(self, context: bpy.types.Context):
         try:
-            # Use provided name or fall back to current package (chordsong)
+            # Use provided name or fall back to current extension package
             target = self.addon
             if not target:
-                target = __package__.split(".")[0]
+                # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
+                # We need the first 3 parts: bl_ext.repo.addon_id
+                parts = __package__.split(".")
+                target = ".".join(parts[:3])
 
             # Open preferences and show the specific addon
             bpy.ops.preferences.addon_show(module=target)

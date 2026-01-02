@@ -1,5 +1,6 @@
 import bpy
 from ...ui.prefs import _on_mapping_changed
+from ..common import prefs
 
 class CHORDSONG_OT_SubItem_Add(bpy.types.Operator):
     """Add a new sub-action to this mapping"""
@@ -10,11 +11,11 @@ class CHORDSONG_OT_SubItem_Add(bpy.types.Operator):
     mapping_index: bpy.props.IntProperty()
     
     def execute(self, context):
-        prefs = context.preferences.addons["chordsong"].preferences
-        if self.mapping_index < 0 or self.mapping_index >= len(prefs.mappings):
+        prefs_obj = prefs(context)
+        if self.mapping_index < 0 or self.mapping_index >= len(prefs_obj.mappings):
             return {'CANCELLED'}
             
-        m = prefs.mappings[self.mapping_index]
+        m = prefs_obj.mappings[self.mapping_index]
         if m.mapping_type == "OPERATOR":
             m.sub_operators.add()
         elif m.mapping_type == "PYTHON_FILE":
@@ -35,11 +36,11 @@ class CHORDSONG_OT_SubItem_Remove(bpy.types.Operator):
     item_index: bpy.props.IntProperty()
     
     def execute(self, context):
-        prefs = context.preferences.addons["chordsong"].preferences
-        if self.mapping_index < 0 or self.mapping_index >= len(prefs.mappings):
+        prefs_obj = prefs(context)
+        if self.mapping_index < 0 or self.mapping_index >= len(prefs_obj.mappings):
             return {'CANCELLED'}
             
-        m = prefs.mappings[self.mapping_index]
+        m = prefs_obj.mappings[self.mapping_index]
         
         if m.mapping_type == "OPERATOR":
             if self.item_index < 0 or self.item_index >= len(m.sub_operators):

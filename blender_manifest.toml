@@ -1,0 +1,43 @@
+schema_version = "1.0.0"
+
+id = "chordsong"
+version = "1.0.0"
+name = "Chord Song"
+tagline = "Vim-like <Leader> key implementation for Blender"
+maintainer = "Cyrill Vitkovskiy"
+type = "add-on"
+
+blender_version_min = "5.0.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+
+website = "https://furash.github.io/chordsong/"
+
+tags = ["Interface", "Keymap", "Productivity"]
+
+[build]
+paths = [
+    "__init__.py",
+    "core/",
+    "operators/",
+    "ui/",
+    "utils/",
+    "LICENSE",
+    "README.md",
+    "sample_scripts/",
+]
+paths_exclude_pattern = [
+    "__pycache__/",
+    "*.pyc",
+    "*.pyo",
+    "*.pyd",
+    "*.md",
+    ".git/",
+    ".github/",
+    ".vscode/",
+    "docs/",
+    "sample_scripts/",
+    "mkdocs.yml",
+    "requirements.txt",
+    ".gitignore",
+]

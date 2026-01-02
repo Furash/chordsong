@@ -58,12 +58,32 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
 
     def draw_callback():
         try:
-            # Only draw in the area where the chord was executed
-            if bpy.context.area != state["area"]:
+            # Check if fading overlay is still active
+            if not state["active"]:
                 return
 
+            # Only draw in the area where the chord was executed (if area is still valid)
+            # If the stored area is None or invalid, try to draw anyway
+            stored_area = state.get("area")
+            current_area = bpy.context.area
+            
+            if stored_area is not None:
+                # Check if stored area is still valid by checking if it's in the window manager
+                try:
+                    # Try to access a property to see if the area is still valid
+                    _ = stored_area.type
+                    # If we get here, area is valid - check if it matches current area
+                    if current_area != stored_area:
+                        return
+                except (AttributeError, ReferenceError):
+                    # Stored area is invalid, clear it and continue drawing
+                    state["area"] = None
+            
             # Respect UI settings in calculate_scale_factor (called inside draw_fading_overlay)
             p = prefs(bpy.context)
+            if not p:
+                return
+            
             still_active = draw_fading_overlay(
                 bpy.context, p,
                 state["chord_text"],
@@ -83,13 +103,34 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
         handle = st.draw_handler_add(draw_callback, (), "WINDOW", "POST_PIXEL")
         state["draw_handles"][st] = handle
 
-    # Helper function to tag only the target area for redraw
+    # Helper function to tag the target area for redraw
     def tag_target_view():
-        if state["area"]:
+        stored_area = state.get("area")
+        if stored_area:
             try:
-                state["area"].tag_redraw()
-            except Exception:
-                pass
+                # Check if area is still valid
+                _ = stored_area.type
+                stored_area.tag_redraw()
+            except (AttributeError, ReferenceError):
+                # Area is invalid, clear it and tag all relevant areas
+                state["area"] = None
+                tag_all_views()
+        else:
+            # No stored area, tag all relevant areas
+            tag_all_views()
+    
+    # Helper function to tag all relevant areas for redraw
+    def tag_all_views():
+        try:
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type in {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}:
+                        try:
+                            area.tag_redraw()
+                        except Exception:
+                            pass
+        except Exception:
+            pass
 
     # Immediately tag for redraw
     tag_target_view()

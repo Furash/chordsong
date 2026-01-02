@@ -1,0 +1,278 @@
+:root {
+    --md-primary-fg-color: #111317;
+    --md-primary-fg-color--light: #111317;
+    --md-primary-fg-color--dark: #111317;
+
+    --md-accent-fg-color: #ff4081;
+    --md-primary-bg-color: #2d3037;
+}
+
+/* Force header background color to #111317 */
+.md-header {
+    background-color: #111317 !important;
+}
+
+.md-header__inner {
+    background-color: #111317 !important;
+}
+
+/* For both light and dark schemes */
+[data-md-color-scheme="slate"] .md-header,
+[data-md-color-scheme="default"] .md-header {
+    background-color: #111317 !important;
+}
+
+[data-md-color-scheme="slate"] .md-header__inner,
+[data-md-color-scheme="default"] .md-header__inner {
+    background-color: #111317 !important;
+}
+
+/* Force tabs background color to #111317 */
+.md-tabs {
+    background-color: #111317 !important;
+}
+
+.md-tabs__inner {
+    background-color: #111317 !important;
+}
+
+/* For both light and dark schemes */
+[data-md-color-scheme="slate"] .md-tabs,
+[data-md-color-scheme="default"] .md-tabs {
+    background-color: #111317 !important;
+}
+
+[data-md-color-scheme="slate"] .md-tabs__inner,
+[data-md-color-scheme="default"] .md-tabs__inner {
+    background-color: #111317 !important;
+}
+
+/* Keep header text colors persistent across themes */
+.md-header__title,
+[data-md-color-scheme="slate"] .md-header__title,
+[data-md-color-scheme="default"] .md-header__title {
+    color: rgba(255, 255, 255, 0.87) !important;
+}
+
+.md-header__button,
+[data-md-color-scheme="slate"] .md-header__button,
+[data-md-color-scheme="default"] .md-header__button {
+    color: rgba(255, 255, 255, 0.87) !important;
+}
+
+.md-header__button:hover,
+[data-md-color-scheme="slate"] .md-header__button:hover,
+[data-md-color-scheme="default"] .md-header__button:hover {
+    color: rgba(255, 255, 255, 1) !important;
+}
+
+/* Keep tab text colors persistent */
+.md-tabs__link,
+[data-md-color-scheme="slate"] .md-tabs__link,
+[data-md-color-scheme="default"] .md-tabs__link {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.md-tabs__link--active,
+[data-md-color-scheme="slate"] .md-tabs__link--active,
+[data-md-color-scheme="default"] .md-tabs__link--active {
+    color: rgba(255, 255, 255, 1) !important;
+}
+
+.md-tabs__link:hover,
+[data-md-color-scheme="slate"] .md-tabs__link:hover,
+[data-md-color-scheme="default"] .md-tabs__link:hover {
+    color: rgba(255, 255, 255, 1) !important;
+}
+
+/* Keep search text colors persistent */
+.md-search__input,
+[data-md-color-scheme="slate"] .md-search__input,
+[data-md-color-scheme="default"] .md-search__input {
+    color: rgba(255, 255, 255, 0.87) !important;
+}
+
+.md-search__input::placeholder,
+[data-md-color-scheme="slate"] .md-search__input::placeholder,
+[data-md-color-scheme="default"] .md-search__input::placeholder {
+    color: rgba(255, 255, 255, 0.54) !important;
+}
+
+/* Keep search icon color persistent */
+.md-search__icon,
+[data-md-color-scheme="slate"] .md-search__icon,
+[data-md-color-scheme="default"] .md-search__icon {
+    color: rgba(255, 255, 255, 0.87) !important;
+}
+
+.md-search__icon svg,
+[data-md-color-scheme="slate"] .md-search__icon svg,
+[data-md-color-scheme="default"] .md-search__icon svg {
+    fill: rgba(255, 255, 255, 0.87) !important;
+    color: rgba(255, 255, 255, 0.87) !important;
+}
+
+.md-search__icon:hover,
+[data-md-color-scheme="slate"] .md-search__icon:hover,
+[data-md-color-scheme="default"] .md-search__icon:hover {
+    color: rgba(255, 255, 255, 1) !important;
+}
+
+.md-search__icon:hover svg,
+[data-md-color-scheme="slate"] .md-search__icon:hover svg,
+[data-md-color-scheme="default"] .md-search__icon:hover svg {
+    fill: rgba(255, 255, 255, 1) !important;
+    color: rgba(255, 255, 255, 1) !important;
+}
+
+/* Increase font size of inline code */
+.md-typeset :not(pre) > code {
+    font-size: 1.2em;
+    color: #c6682d;
+}
+
+/* Swap logo based on theme using CSS */
+.logo-container {
+    position: relative;
+    display: block;
+    width: 500px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.logo-container img {
+    display: block;
+}
+
+/* Show dark logo in dark mode */
+[data-md-color-scheme="slate"] .logo-light,
+[data-md-color-scheme]:not([data-md-color-scheme="default"]) .logo-light {
+    display: none;
+}
+
+[data-md-color-scheme="slate"] .logo-dark,
+[data-md-color-scheme]:not([data-md-color-scheme="default"]) .logo-dark {
+    display: block;
+}
+
+/* Show light logo in light mode */
+[data-md-color-scheme="default"] .logo-dark {
+    display: none;
+}
+
+[data-md-color-scheme="default"] .logo-light {
+    display: block;
+}
+
+/* ===== LEFT SIDEBAR STYLING ===== */
+/* Let Material handle default styling - only keep essential overrides */
+
+/* Hide TOC title/label */
+.md-nav__title[for="__toc"],
+label.md-nav__title[for="__toc"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Download sources grid */
+.download-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.download-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    border-radius: 8px;
+    background: var(--md-default-bg-color);
+    border: 1px solid var(--md-default-fg-color--lighter);
+    transition: all 0.3s ease;
+    text-decoration: none;
+    color: inherit;
+}
+
+.download-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-color: var(--md-accent-fg-color);
+    text-decoration: none;
+    color: inherit;
+}
+
+.download-card__icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 2rem;
+    overflow: visible;
+}
+
+.download-card__icon svg {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    overflow: visible;
+}
+
+.download-card:hover .download-card__icon {
+    opacity: 1;
+}
+
+.download-card__title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.15rem;
+    text-align: center;
+}
+
+.download-card__subtitle {
+    font-size: 0.8rem;
+    color: var(--md-default-fg-color--light);
+    text-align: center;
+}
+
+[data-md-color-scheme="slate"] .download-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-md-color-scheme="slate"] .download-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--md-accent-fg-color);
+}
+
+/* Replace ¶ symbol with ❰ for permalinks */
+.md-typeset .headerlink,
+.md-typeset a.headerlink {
+    font-size: 0 !important;
+    line-height: 0 !important;
+}
+
+.md-typeset .headerlink::after,
+.md-typeset a.headerlink::after {
+    content: "❰" !important;
+    font-size: 1.2rem !important;
+    line-height: 1 !important;
+    opacity: 1 !important;
+    margin-left: 0.25rem !important;
+}
+
+.md-typeset .headerlink:hover::after,
+.md-typeset a.headerlink:hover::after {
+    opacity: 1 !important;
+}

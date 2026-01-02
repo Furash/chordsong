@@ -22,8 +22,10 @@ from .layout import draw_addon_preferences
 from .nerd_icons import NERD_ICONS
 
 def _addon_root_pkg() -> str:
-    # This module lives under "chordsong.ui", but AddonPreferences bl_idname must be "chordsong".
-    return __package__.split(".", maxsplit=1)[0]
+    # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
+    # We need the first 3 parts: bl_ext.repo.addon_id
+    parts = __package__.split(".")
+    return ".".join(parts[:3])
 
 def default_config_path() -> str:
     """
@@ -668,7 +670,9 @@ class CHORDSONG_Preferences(AddonPreferences):
         def run_sync():
             try:
                 # We need to re-fetch prefs since self might be invalid if reloaded
-                module_pkg = __package__.split(".", maxsplit=1)[0]
+                # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
+                parts = __package__.split(".")
+                module_pkg = ".".join(parts[:3])
                 prefs = bpy.context.preferences.addons[module_pkg].preferences
                 prefs._sync_groups_from_mappings(remove_unused=remove_unused)
             except Exception:

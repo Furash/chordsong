@@ -4,15 +4,17 @@ Chord Song Blender Add-on.
 Vim-like <Leader> chord launcher with which-key style overlay.
 """
 
-bl_info = {
-    "name": "Chord Song",
-    "author": "Cyrill Vitkovskiy",
-    "version": (1, 0, 0),
-    "blender": (5, 0, 0),
-    "location": "Preferences > Add-ons > Chord Song",
-    "description": "Vim-like <Leader> key implementation for Blender",
-    "category": "Interface",
-}
+# bl_info is kept for backward compatibility and to avoid performance warnings.
+# Extension metadata is primarily defined in blender_manifest.toml (Blender 4.2+).
+# bl_info = {
+#     "name": "Chord Song",
+#     "author": "Cyrill Vitkovskiy",
+#     "version": (1, 0, 0),
+#     "blender": (5, 0, 0),
+#     "location": "Preferences > Add-ons > Chord Song",
+#     "description": "Vim-like <Leader> key implementation for Blender",
+#     "category": "Interface",
+# }
 
 # pyright: reportMissingImports=false
 # pyright: reportMissingModuleSource=false

@@ -4,16 +4,13 @@ from ..ui.overlay.render import draw_fading_overlay, draw_overlay
 from ..utils.render import DrawHandlerManager
 
 def prefs(context):
-    """Get addon preferences."""
-    try:
-        package_name = __package__.split(".")[0] if __package__ else "chordsong"
-        return context.preferences.addons[package_name].preferences
-    except (KeyError, AttributeError):
-        # Fallback search
-        for name, addon in context.preferences.addons.items():
-            if "chordsong" in name:
-                return addon.preferences
-        return None
+    """Get addon preferences for extension workflow."""
+    # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
+    # We need the first 3 parts: bl_ext.repo.addon_id
+    pkg = __package__ or "bl_ext.user_default.chordsong"
+    parts = pkg.split(".")
+    package_name = ".".join(parts[:3])
+    return context.preferences.addons[package_name].preferences
 
 # Global storage for the fading test handler
 _fading_test_handler = None

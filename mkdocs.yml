@@ -1,0 +1,74 @@
+site_name: Chord Song
+site_description: Blender vim-like <Leader> key experiment
+site_author: Cyrill Vitkovskiy
+site_url: https://furash.github.io/chordsong/
+
+dev_addr: 127.0.0.1:8000
+use_directory_urls: false
+
+theme:
+  name: material
+  logo: logo/chordsong_logo_header.png
+  favicon: logo/chordsong_icon.png
+  font:
+    text: "Ubuntu"
+    code: "Ubuntu Mono"
+  palette:
+    - scheme: slate
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.left
+    - search.suggest
+    - search.share
+    - content.tabs.link
+    - toc.follow
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+
+nav:
+  - Home: index.md
+  - Concepts:
+    - Leader Key: concepts/leader_key.md
+    - Chord Mappings: concepts/chord_mappings.md
+    - Groups: concepts/groups.md
+    - Contexts: concepts/contexts.md
+  - Configuration:
+    - Mappings: configuration/mappings.md
+    - Operator: configuration/mappings/operator.md
+    - Property: configuration/mappings/property.md
+    - Toggle: configuration/mappings/toggle.md
+    - Script: configuration/mappings/script.md
+    - Overlay: configuration/overlay.md
+    - Autosave: configuration/autosave.md
+    - Import & Export: configuration/import_export.md
+  - Features:
+    - Overview: features.md
+    - Info Panel: features/info.md
+    - Recents: features/recents.md
+    - Conflict Detection: features/conflicts.md
+    - Context Menu: features/context_menu.md
+  - Customization: customization.md
