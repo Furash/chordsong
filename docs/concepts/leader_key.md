@@ -6,7 +6,7 @@ It acts as a prefix that activates Chord Song's chord capture mode. Pressing the
 
 Pressing the leader key again will open the Recents menu. 
 
-Pressing the leader key again will execute the most recent chord.
+Pressing the leader third time will execute the most recent chord.
 
 ## How It Works
 

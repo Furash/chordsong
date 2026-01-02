@@ -18,13 +18,53 @@
 
 /* For both light and dark schemes */
 [data-md-color-scheme="slate"] .md-header,
-[data-md-color-scheme="default"] .md-header {
+[data-md-color-scheme="default"] .md-header,
+[data-md-color-scheme="slate"] .md-nav__title,
+[data-md-color-scheme="default"] .md-nav__title {
     background-color: #111317 !important;
 }
 
 [data-md-color-scheme="slate"] .md-header__inner,
 [data-md-color-scheme="default"] .md-header__inner {
     background-color: #111317 !important;
+}
+
+/* Center logo and text in sidebar */
+.md-nav__title {
+    background-color: #111317 !important;
+    color: #ffffff !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: center !important;
+    padding: 1rem 1rem !important;
+    font-weight: 500 !important;
+    font-size: 1.1rem !important;
+    line-height: normal !important;
+    letter-spacing: -0.02em !important;
+    height: auto !important;
+}
+
+/* Ensure the back arrow in nested menus is also white */
+.md-nav__title .md-nav__icon {
+    color: #ffffff !important;
+}
+
+.md-nav__title .md-logo {
+    display: block !important;
+    position: static !important;
+    margin: 0 0 0.5rem 0 !important;
+    width: 60% !important;
+    height: auto !important;
+}
+
+.md-nav__title .md-logo img {
+    display: block !important;
+    margin: 0 auto !important;
+    height: auto !important;
+    width: 100% !important;
+    max-width: none !important;
 }
 
 /* Force tabs background color to #111317 */
@@ -126,7 +166,7 @@
 }
 
 /* Increase font size of inline code */
-.md-typeset :not(pre) > code {
+.md-typeset :not(pre)>code {
     font-size: 1.2em;
     color: #c6682d;
 }
