@@ -7,7 +7,7 @@ def draw_config_section(prefs, layout):
     box = layout.box()
     header = box.row()
     header.alignment = 'CENTER'
-    header.label(text="  C O N F I G  ")
+    header.label(text="  C O N F I G ")
     
     r = box.row()
     r.scale_x = 0.4
