@@ -1,7 +1,7 @@
 The **Leader Key** is the prefix that activates Chord Song's listening mode. Instead of using complex `Ctrl+Alt` combinations, you press a single prefix key (default: `Space`) to begin a chord sequence.
 
 !!! warning "Key Interception"
-    When you assign a key as the **Leader Key**, it is effectively "stolen" from Blender. This means the key will no longer perform its original function (e.g., if you use `Space`, you can no longer use it to play the animation or open the search menu).
+    When a key is set as the **Leader Key**, you can no longer use it as the first chord. e.g., if you set `Q` you can no longer use it to start a chord like `Q M`. But it can still be used as second or third token in a chord e.g. `M Q`.
 
 !!! tip "Conflict Prevention"
     If you use `Space` as your leader key, make sure to disable Blender's default mapping for Play/Search, or rebind the leader to a less critical key like `/`, `Q`, or `F1`.
