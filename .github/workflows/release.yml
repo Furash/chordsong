@@ -27,43 +27,103 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Blender Extension Builder
-        run: pip install blender-extension-builder
+      - name: Install Dependencies
+        run: pip install tomli
 
-      - name: Build Blender Add-on
-        run: build-blender-extension -m blender_manifest.toml
-
-      - name: Get Version from Manifest
-        id: get_version
+      - name: Build Blender Add-on from Manifest
+        id: build
         run: |
-          pip install tomli
-          VERSION=$(python -c "import tomli; f=open('blender_manifest.toml','rb'); m=tomli.load(f); print(m['version'])")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Built version: $VERSION"
-
-      - name: Prepare Release Asset
-        id: prepare_asset
-        run: |
-          cd dist
-          ZIP_FILE=$(ls *.zip | head -n 1)
-          NEW_NAME="chordsong-${{ steps.get_version.outputs.version }}.zip"
-          mv "$ZIP_FILE" "$NEW_NAME"
-          echo "asset_path=dist/$NEW_NAME" >> $GITHUB_OUTPUT
-          echo "asset_name=$NEW_NAME" >> $GITHUB_OUTPUT
+          python << 'EOF'
+          import tomli
+          import zipfile
+          import os
+          import fnmatch
+          
+          # Read manifest
+          with open('blender_manifest.toml', 'rb') as f:
+              manifest = tomli.load(f)
+          
+          addon_id = manifest['id']
+          version = manifest['version']
+          build_config = manifest.get('build', {})
+          paths = build_config.get('paths', [])
+          exclude_patterns = build_config.get('paths_exclude_pattern', [])
+          
+          # Create dist directory
+          os.makedirs('dist', exist_ok=True)
+          
+          def should_exclude(rel_path):
+              """Check if file should be excluded based on patterns."""
+              for pattern in exclude_patterns:
+                  if pattern.endswith('/'):
+                      # Directory pattern - check if path starts with or contains it
+                      pattern_dir = pattern.rstrip('/')
+                      if rel_path.startswith(pattern_dir + '/') or rel_path == pattern_dir:
+                          return True
+                      # Check if any part of the path matches
+                      path_parts = rel_path.split('/')
+                      if pattern_dir in path_parts:
+                          return True
+                  else:
+                      # File pattern - use fnmatch
+                      if fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(os.path.basename(rel_path), pattern):
+                          return True
+              return False
+          
+          # Create ZIP file
+          zip_name = f'dist/{addon_id}-{version}.zip'
+          with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+              # Add all paths from manifest
+              for path in paths:
+                  path_clean = path.rstrip('/')
+                  
+                  if should_exclude(path_clean):
+                      continue
+                  
+                  if os.path.isdir(path_clean):
+                      # Add directory recursively
+                      for root, dirs, files in os.walk(path_clean):
+                          # Filter out excluded directories during walk
+                          dirs[:] = [d for d in dirs if not should_exclude(os.path.join(root, d))]
+                          
+                          for file in files:
+                              file_path = os.path.join(root, file)
+                              rel_path = os.path.relpath(file_path, '.')
+                              
+                              if not should_exclude(rel_path):
+                                  arcname = os.path.join(addon_id, rel_path)
+                                  zipf.write(file_path, arcname)
+                  elif os.path.isfile(path_clean):
+                      # Add single file
+                      if not should_exclude(path_clean):
+                          arcname = os.path.join(addon_id, path_clean)
+                          zipf.write(path_clean, arcname)
+              
+              # Always include the manifest file
+              zipf.write('blender_manifest.toml', f'{addon_id}/blender_manifest.toml')
+          
+          # Write outputs for GitHub Actions
+          output_file = os.environ.get('GITHUB_OUTPUT', '/dev/stdout')
+          with open(output_file, 'a') as f:
+              f.write(f"version={version}\n")
+              f.write(f"asset_path={zip_name}\n")
+              f.write(f"asset_name={os.path.basename(zip_name)}\n")
+          print(f"Built {zip_name}")
+          EOF
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.prepare_asset.outputs.asset_path }}
+          files: ${{ steps.build.outputs.asset_path }}
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
-            ## Chord Song ${{ steps.get_version.outputs.version }}
+            ## Chord Song ${{ steps.build.outputs.version }}
             
             Blender add-on release built from tag ${{ github.ref_name }}.
             
             ### Installation
-            1. Download `${{ steps.prepare_asset.outputs.asset_name }}`
+            1. Download `${{ steps.build.outputs.asset_name }}`
             2. In Blender, go to Edit > Preferences > Add-ons
             3. Click "Install..." and select the ZIP file
             4. Enable the add-on
