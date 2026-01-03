@@ -35,6 +35,7 @@ def _check_chord_conflicts(new_key: tuple, chords_to_check: list) -> bool:
 
 def _schedule_recheck():
     """Schedule a re-run of the conflict checker."""
+    # pylint: disable=protected-access
     if CHORDSONG_OT_CheckConflicts._recheck_pending:
         return
 
@@ -56,6 +57,209 @@ def _schedule_recheck():
 
     bpy.app.timers.register(recheck, first_interval=1.5)
 
+def generate_chord(base_chord, all_chords, exclude_chord=None, exclude_symbols=None, change_last=False):
+    """Shared utility function to generate a non-conflicting chord.
+    
+    Args:
+        base_chord: The base chord to modify
+        all_chords: List of existing chord strings to check against
+        exclude_chord: Optional chord string to explicitly exclude
+        exclude_symbols: List of symbols to skip (for unique suggestions)
+        change_last: If True, change last symbol; if False, add new symbol
+    """
+    base_tokens = split_chord(base_chord)
+    if not base_tokens:
+        print(f"Warning: generate_chord got empty tokens for '{base_chord}'")
+        return None
+
+    exclude_symbols = exclude_symbols or []
+    base_key = tuple(base_tokens)
+    if change_last:
+        chords_to_check = all_chords
+    else:
+        chords_to_check = [c for c in all_chords if tuple(split_chord(c)) != base_key]
+
+    # Try all letters (lowercase then uppercase)
+    all_letters = string.ascii_lowercase + string.ascii_uppercase
+
+    for letter in all_letters:
+        if letter in exclude_symbols:
+            continue
+
+        if change_last:
+            if base_tokens[-1] == letter:
+                continue
+            new_tokens = base_tokens[:-1] + [letter]
+        else:
+            new_tokens = base_tokens + [letter]
+
+        new_chord = " ".join(new_tokens)
+        new_key = tuple(new_tokens)
+
+        if exclude_chord and new_chord == exclude_chord:
+            continue
+
+        if not _check_chord_conflicts(new_key, chords_to_check):
+            return new_chord
+
+    # Try numbers if adding
+    if not change_last:
+        for num in "1234567890":
+            if num in exclude_symbols:
+                continue
+            new_tokens = base_tokens + [num]
+            new_key = tuple(new_tokens)
+            if not _check_chord_conflicts(new_key, chords_to_check):
+                return " ".join(new_tokens)
+
+    # Fallback: find any valid non-conflicting chord
+    fallback_alphabet = "abcdefghijklmnopqrstuvwxyz1234567890"
+    if change_last:
+        indices = range(len(base_tokens) - 1, -1, -1)
+    else:
+        indices = range(len(base_tokens))
+        
+    for i in indices:
+        for sym in fallback_alphabet:
+            if sym in exclude_symbols:
+                continue
+            
+            new_tokens = list(base_tokens)
+            if i < len(new_tokens):
+                if new_tokens[i] == sym:
+                    continue
+                new_tokens[i] = sym
+            
+            # Check for exact matches and prefixes
+            new_key = tuple(new_tokens)
+            if not _check_chord_conflicts(new_key, chords_to_check):
+                return " ".join(new_tokens)
+
+    # Absolute last resort - just return something that is likely unique
+    # We use a timestamp-like suffix or just keep trying more symbols
+    suffix_list = "xyzuvwabcdefghijklmnopqrt0123456789"
+    for s in suffix_list:
+        if s not in exclude_symbols:
+            if change_last and len(base_tokens) > 0:
+                return " ".join(base_tokens[:-1] + [s])
+            else:
+                return " ".join(base_tokens + [s])
+    
+    # If all else fails
+    return base_chord + " x"
+
+def find_conflicts_util(mappings, generate_fixes=True):
+    """Shared utility function to find all chord conflicts.
+    
+    Args:
+        mappings: Collection of mapping objects to check
+        generate_fixes: If True, generate suggested fixes (expensive). If False, only detect conflicts.
+    
+    Returns a dict with 'prefix_conflicts' and 'duplicates' lists.
+    """
+    conflicts = {"prefix_conflicts": [], "duplicates": []}
+    by_context = {}
+    
+    for m in mappings:
+        if not getattr(m, "enabled", True):
+            continue
+        ctx = getattr(m, "context", "VIEW_3D")
+        by_context.setdefault(ctx, []).append(m)
+
+    for ctx, ctx_mappings in by_context.items():
+        chord_map = {}
+        all_chords = []
+
+        for m in ctx_mappings:
+            chord_str = get_str_attr(m, "chord")
+            tokens = split_chord(chord_str)
+            if not tokens:
+                continue
+
+            all_chords.append(chord_str)
+            chord_key = tuple(tokens)
+            chord_map.setdefault(chord_key, []).append(m)
+
+        # Check for duplicates
+        for chord_key, mappings_list in chord_map.items():
+            if len(mappings_list) > 1:
+                base_chord = " ".join(chord_key)
+                
+                conflict_data = {
+                    "chord": base_chord,
+                    "context": ctx,
+                    "count": len(mappings_list),
+                    "labels": [get_str_attr(m, "label") for m in mappings_list],
+                    "groups": [get_str_attr(m, "group") for m in mappings_list],
+                    "mappings": mappings_list,
+                }
+                
+                # Only generate fixes if requested (expensive operation)
+                if generate_fixes:
+                    fixes = {"add": [], "change_last": []}
+                    base_key = chord_key
+                    
+                    for strategy in fixes:
+                        # CRITICAL: When generating fixes for a duplicate set, 
+                        # we must NOT check against the duplicates themselves,
+                        # otherwise the existing chord will block many potential fixes.
+                        temp_chords = [c for c in all_chords if tuple(split_chord(c)) != base_key]
+                        used_symbols = []
+
+                        for _ in mappings_list:
+                            fix = generate_chord(
+                                base_chord, temp_chords,
+                                exclude_symbols=used_symbols,
+                                change_last=(strategy == "change_last")
+                            )
+                            if fix:
+                                fixes[strategy].append(fix)
+                                temp_chords.append(fix)
+
+                                fix_tokens = split_chord(fix)
+                                if strategy == "change_last":
+                                    used_symbols.append(fix_tokens[-1])
+                                elif len(fix_tokens) > len(chord_key):
+                                    used_symbols.append(fix_tokens[-1])
+                    
+                    conflict_data["suggested_fixes_add"] = fixes["add"]
+                    conflict_data["suggested_fixes_change_last"] = fixes["change_last"]
+
+                conflicts["duplicates"].append(conflict_data)
+
+        # Check for prefix conflicts
+        chord_keys = list(chord_map.keys())
+        for i, chord1 in enumerate(chord_keys):
+            for chord2 in chord_keys[i+1:]:
+                if len(chord1) < len(chord2) and chord2[:len(chord1)] == chord1:
+                    prefix_key, full_key = chord1, chord2
+                elif len(chord2) < len(chord1) and chord1[:len(chord2)] == chord2:
+                    prefix_key, full_key = chord2, chord1
+                else:
+                    continue
+
+                prefix_chord = " ".join(prefix_key)
+                full_chord = " ".join(full_key)
+
+                conflict_data = {
+                    "prefix_chord": prefix_chord,
+                    "prefix_label": get_str_attr(chord_map[prefix_key][0], "label"),
+                    "prefix_group": get_str_attr(chord_map[prefix_key][0], "group"),
+                    "full_chord": full_chord,
+                    "full_label": get_str_attr(chord_map[full_key][0], "label"),
+                    "full_group": get_str_attr(chord_map[full_key][0], "group"),
+                    "context": ctx,
+                    "prefix_mapping": chord_map[prefix_key][0],
+                }
+                
+                # Only generate fix if requested
+                if generate_fixes:
+                    conflict_data["suggested_fix"] = generate_chord(prefix_chord, all_chords, exclude_chord=full_chord)
+
+                conflicts["prefix_conflicts"].append(conflict_data)
+
+    return conflicts
+
 class CHORDSONG_OT_ApplyConflictFix(bpy.types.Operator):
     """Apply suggested fix for chord conflict"""
 
@@ -70,39 +274,73 @@ class CHORDSONG_OT_ApplyConflictFix(bpy.types.Operator):
     def execute(self, context: bpy.types.Context):
         """Apply the fix."""
         # pylint: disable=protected-access
-        conflicts = dict(CHORDSONG_OT_CheckConflicts._conflicts)
+        conflicts = CHORDSONG_OT_CheckConflicts._conflicts
         if not conflicts:
             self.report({"WARNING"}, "No conflicts data available")
             return {"CANCELLED"}
 
         p = prefs(context)
+        fixed_label = None
 
         if self.conflict_type == "PREFIX":
             if self.conflict_index < len(conflicts["prefix_conflicts"]):
                 conflict = conflicts["prefix_conflicts"][self.conflict_index]
                 if "prefix_mapping" in conflict and "suggested_fix" in conflict:
                     conflict["prefix_mapping"].chord = conflict["suggested_fix"]
-                    schedule_autosave_safe(p, delay_s=5.0)
-                    self.report({"INFO"}, f"Fixed: {conflict['prefix_label']}")
-                    _schedule_recheck()
+                    fixed_label = conflict['prefix_label']
 
         elif self.conflict_type == "DUPLICATE":
             if self.conflict_index < len(conflicts["duplicates"]):
                 dup = conflicts["duplicates"][self.conflict_index]
                 fixes_key = f"suggested_fixes_{self.duplicate_strategy.lower()}"
 
-                if fixes_key in dup:
+                if fixes_key in dup and dup[fixes_key]:
                     fixed = 0
                     for i, mapping in enumerate(dup["mappings"]):
                         if i < len(dup[fixes_key]):
                             mapping.chord = dup[fixes_key][i]
                             fixed += 1
-
                     if fixed > 0:
-                        schedule_autosave_safe(p, delay_s=5.0)
-                        self.report({"INFO"}, f"Fixed {fixed} duplicate(s)")
-                        _schedule_recheck()
+                        fixed_label = f"{fixed} duplicate(s)"
 
+        if not fixed_label:
+            self.report({"INFO"}, "Conflict already resolved")
+            return {"FINISHED"}
+        
+        schedule_autosave_safe(p, delay_s=5.0)
+        self.report({"INFO"}, f"Fixed: {fixed_label}")
+        
+        # Refresh conflicts - must update the class variable so the dialog sees changes
+        # We use a small timer to ensure Blender has processed the property changes
+        def delayed_refresh():
+            # Get fresh prefs reference
+            p_fresh = prefs(bpy.context)
+            new_conflicts = find_conflicts_util(p_fresh.mappings, generate_fixes=True)
+            
+            # Update the class variable reference directly
+            CHORDSONG_OT_CheckConflicts._conflicts = new_conflicts
+            
+            # Also update the in-place lists if someone is holding a reference to the old dict
+            if conflicts:
+                conflicts["prefix_conflicts"][:] = new_conflicts["prefix_conflicts"]
+                conflicts["duplicates"][:] = new_conflicts["duplicates"]
+
+            # Redraw
+            region_popup = CHORDSONG_OT_CheckConflicts._popup_region
+            if region_popup:
+                try:
+                    region_popup.tag_redraw()
+                    region_popup.tag_refresh_ui()
+                except (ReferenceError, TypeError, RuntimeError):
+                    pass
+            
+            # Redraw all windows
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    area.tag_redraw()
+            return None
+
+        bpy.app.timers.register(delayed_refresh, first_interval=0.1)
         return {"FINISHED"}
 
 class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
@@ -115,6 +353,7 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
     _conflicts = None
     _recheck_pending = False
     _prefs_context = None
+    _popup_region = None
 
     def invoke(self, context: bpy.types.Context, event):  # pylint: disable=unused-argument
         """Show dialog with conflicts."""
@@ -147,69 +386,120 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
     def draw(self, context: bpy.types.Context):  # pylint: disable=unused-argument
         """Draw the conflict report in a dialog."""
         layout = self.layout
+        
+        # Capture popup region for later refresh (Blender 4.2+)
+        region_popup = getattr(context, "region_popup", None)
+        if region_popup:
+            CHORDSONG_OT_CheckConflicts._popup_region = region_popup
 
-        if not self._conflicts:
+        # Always use class variable to ensure we see latest data
+        conflicts = CHORDSONG_OT_CheckConflicts._conflicts
+        if not conflicts:
             return
 
-        total = len(self._conflicts["prefix_conflicts"]) + len(self._conflicts["duplicates"])
+        total = len(conflicts["prefix_conflicts"]) + len(conflicts["duplicates"])
 
-        # Header
-        box = layout.box()
-        row = box.row()
-        row.alert = True
-        row.label(text=f"Found {total} Conflict(s)", icon="ERROR")
+        # Compact header - show success when all resolved
+        row = layout.row()
+        if total == 0:
+            row.label(text="✓ All Conflicts Resolved!", icon="CHECKMARK")
+        else:
+            row.alert = True
+            row.label(text=f"⚠ {total} Conflict(s) Found", icon="ERROR")
 
-        # Prefix conflicts
-        if self._conflicts["prefix_conflicts"]:
-            layout.separator()
+        # Prefix conflicts - compact layout
+        if conflicts["prefix_conflicts"]:
             box = layout.box()
-            box.row().label(text=f"PREFIX CONFLICTS ({len(self._conflicts['prefix_conflicts'])})", icon="DISCLOSURE_TRI_DOWN")
+            box.label(text=f"Prefix Conflicts ({len(conflicts['prefix_conflicts'])})")
 
-            for idx, conflict in enumerate(self._conflicts["prefix_conflicts"]):
-                cbox = box.box()
-                cbox.row().label(text=f"Prefix: {conflict['prefix_chord']}")
-                cbox.row().label(text=f"  → {conflict['prefix_label']} [{conflict['prefix_group'] or 'No Group'}]", icon="BLANK1")
-                cbox.separator(factor=0.3)
-                cbox.row().label(text=f"Blocks: {conflict['full_chord']}")
-                cbox.row().label(text=f"  → {conflict['full_label']} [{conflict['full_group'] or 'No Group'}]", icon="BLANK1")
-                cbox.row().label(text=f"Context: {conflict['context']}", icon="WORLD")
-                cbox.separator(factor=0.5)
-                cbox.row().label(text=f"💡 Suggested fix: {conflict['suggested_fix']}", icon="HELP")
-                op = cbox.row().operator("chordsong.apply_conflict_fix", text="Apply Fix", icon="CHECKMARK")
+            for idx, conflict in enumerate(conflicts["prefix_conflicts"]):
+                # Build group info string
+                prefix_grp = conflict.get('prefix_group') or 'Ungrouped'
+                full_grp = conflict.get('full_group') or 'Ungrouped'
+                groups_str = f"[{prefix_grp}] vs [{full_grp}]" if prefix_grp != full_grp else f"[{prefix_grp}]"
+                
+                row = box.row(align=True)
+                # Chord info with groups: "a" blocks "a b" [Group] (VIEW_3D)
+                row.label(
+                    text=f"'{conflict['prefix_chord']}' blocks '{conflict['full_chord']}' {groups_str} ({conflict['context']})",
+                    icon="FORWARD"
+                )
+                # Fix button with suggested chord
+                op = row.operator(
+                    "chordsong.apply_conflict_fix",
+                    text=f"→ {conflict['suggested_fix']}",
+                    icon="CHECKMARK"
+                )
                 op.conflict_index = idx
                 op.conflict_type = "PREFIX"
 
-        # Duplicate chords
-        if self._conflicts["duplicates"]:
-            layout.separator()
+        # Duplicate chords - table layout
+        if conflicts["duplicates"]:
             box = layout.box()
-            box.row().label(text=f"DUPLICATE CHORDS ({len(self._conflicts['duplicates'])})", icon="DISCLOSURE_TRI_DOWN")
+            box.label(text=f"Duplicate Chords ({len(conflicts['duplicates'])})")
 
-            for idx, dup in enumerate(self._conflicts["duplicates"]):
-                dbox = box.box()
-                dbox.row().label(text=f"Chord: {dup['chord']}")
-                dbox.row().label(text=f"Context: {dup['context']}", icon="WORLD")
-                dbox.separator(factor=0.3)
-                dbox.row().label(text=f"Found {dup['count']} times:")
+            for idx, dup in enumerate(conflicts["duplicates"]):
+                dup_box = box.box()
+                
+                # Header row with chord and context
+                header = dup_box.row(align=True)
+                header.label(text=f"'{dup['chord']}' ({dup['context']})", icon="COPYDOWN")
+                
+                # Table header row
+                table_header = dup_box.row(align=True)
+                split = table_header.split(factor=0.5)
+                split.label(text="Mapping")
+                cols = split.split(factor=0.5)
+                cols.label(text="Add Symbol")
+                cols.label(text="Change Last")
+                
+                # Get fixes
+                fixes_add = dup.get("suggested_fixes_add", [])
+                fixes_change = dup.get("suggested_fixes_change_last", [])
+                
+                # Table rows - one per duplicate entry
                 for i, label in enumerate(dup['labels']):
-                    group = dup['groups'][i]
-                    dbox.row().label(text=f"  → {label} [{group or 'No Group'}]", icon="BLANK1")
+                    grp = dup['groups'][i] if i < len(dup['groups']) else ''
+                    grp_str = grp or 'Ungrouped'
+                    fix_add = fixes_add[i] if i < len(fixes_add) else "-"
+                    fix_change = fixes_change[i] if i < len(fixes_change) else "-"
+                    
+                    row = dup_box.row(align=True)
+                    split = row.split(factor=0.5)
+                    split.label(text=f"{label} [{grp_str}]")
+                    cols = split.split(factor=0.5)
+                    cols.label(text=fix_add)
+                    cols.label(text=fix_change)
+                
+                # Fix buttons row - aligned with table columns
+                btn_row = dup_box.row(align=True)
+                split = btn_row.split(factor=0.5)
+                split.label(text="")  # Empty space under Mapping column
+                cols = split.split(factor=0.5)
+                if fixes_add:
+                    op = cols.operator(
+                        "chordsong.apply_conflict_fix",
+                        text="Apply",
+                        icon="CHECKMARK"
+                    )
+                    op.conflict_index = idx
+                    op.conflict_type = "DUPLICATE"
+                    op.duplicate_strategy = "ADD"
+                else:
+                    cols.label(text="")
+                if fixes_change:
+                    op = cols.operator(
+                        "chordsong.apply_conflict_fix",
+                        text="Apply",
+                        icon="CHECKMARK"
+                    )
+                    op.conflict_index = idx
+                    op.conflict_type = "DUPLICATE"
+                    op.duplicate_strategy = "CHANGE_LAST"
+                else:
+                    cols.label(text="")
 
-                dbox.separator(factor=0.5)
-
-                # Strategy buttons
-                for strategy, label_text in [("add", "Add symbol"), ("change_last", "Change last")]:
-                    fixes_key = f"suggested_fixes_{strategy}"
-                    if fixes_key in dup and dup[fixes_key]:
-                        dbox.row().label(text=f"💡 {label_text}:", icon="HELP")
-                        for i, fix in enumerate(dup[fixes_key]):
-                            if i < len(dup['labels']):
-                                dbox.row().label(text=f"  {dup['labels'][i]} → {fix}", icon="BLANK1")
-                        op = dbox.row().operator("chordsong.apply_conflict_fix", text=f"Fix: {label_text.title()}", icon="CHECKMARK")
-                        op.conflict_index = idx
-                        op.conflict_type = "DUPLICATE"
-                        op.duplicate_strategy = strategy.upper()
-                        dbox.separator(factor=0.3)
+                box.separator(factor=0.3)
 
     def _print_to_console(self):
         """Print detailed report to console."""
@@ -244,192 +534,18 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
         print("="*60 + "\n")
 
     def _generate_chord(self, base_chord, all_chords, exclude_chord=None, exclude_symbols=None, change_last=False):
-        """Unified chord generation function.
-
-        Args:
-            base_chord: The base chord to modify
-            all_chords: List of existing chord strings to check against
-            exclude_chord: Optional chord string to explicitly exclude
-            exclude_symbols: List of symbols to skip (for unique suggestions)
-            change_last: If True, change last symbol; if False, add new symbol
-        """
-        base_tokens = split_chord(base_chord)
-        if not base_tokens:
-            return None
-
-        exclude_symbols = exclude_symbols or []
-
-        # Build list of chords to check against (exclude base chord when extending)
-        base_key = tuple(base_tokens)
-        if change_last:
-            chords_to_check = all_chords
-        else:
-            chords_to_check = [c for c in all_chords if tuple(split_chord(c)) != base_key]
-
-        # Try all letters (lowercase then uppercase)
-        all_letters = string.ascii_lowercase + string.ascii_uppercase
-
-        for letter in all_letters:
-            if letter in exclude_symbols:
-                continue
-
-            if change_last:
-                if base_tokens[-1] == letter:
-                    continue
-                new_tokens = base_tokens[:-1] + [letter]
-            else:
-                new_tokens = base_tokens + [letter]
-
-            new_chord = " ".join(new_tokens)
-            new_key = tuple(new_tokens)
-
-            if exclude_chord and new_chord == exclude_chord:
-                continue
-
-            if not _check_chord_conflicts(new_key, chords_to_check):
-                return new_chord
-
-        # 2. Try numbers if adding
-        if not change_last:
-            for num in "1234567890":
-                if num in exclude_symbols:
-                    continue
-                new_tokens = base_tokens + [num]
-                new_key = tuple(new_tokens)
-                if not _check_chord_conflicts(new_key, chords_to_check):
-                    return " ".join(new_tokens)
-
-        # 3. Last resort fallback: find any valid non-conflicting chord.
-        # If the prefix is "poisoned" (e.g. 's u' blocks all 's u ...'),
-        # we try changing tokens until we find a clear path.
-        
-        fallback_alphabet = "abcdefghijklmnopqrstuvwxyz1234567890"
-        
-        # Differentiate search order to keep suggestions diverse:
-        # - Change Last strategy: prioritize changing tokens from the END (index 2, 1, 0)
-        # - Add strategy: prioritize changing tokens from the START (index 0, 1, 2)
-        if change_last:
-            indices = range(len(base_tokens) - 1, -1, -1)
-        else:
-            indices = range(len(base_tokens))
-            
-        for i in indices:
-            for sym in fallback_alphabet:
-                if sym in exclude_symbols:
-                    continue
-                
-                new_tokens = list(base_tokens)
-                if i < len(new_tokens):
-                    if new_tokens[i] == sym:
-                        continue
-                    new_tokens[i] = sym
-                
-                if not _check_chord_conflicts(tuple(new_tokens), chords_to_check):
-                    return " ".join(new_tokens)
-
-        # 4. Absolute last resort: just pick a non-excluded symbol to guarantee uniqueness in results
-        # even if it still results in a conflict with something else (better than a duplicate fix).
-        suffix = "x"
-        for s in "xyzuvwabcdefghijklmnopqrt":
-            if s not in exclude_symbols:
-                suffix = s
-                break
-        
-        if change_last and len(base_tokens) > 0:
-            return " ".join(base_tokens[:-1] + [suffix])
-        else:
-            return " ".join(base_tokens + [suffix])
+        """Unified chord generation function - delegates to shared utility."""
+        return generate_chord(base_chord, all_chords, exclude_chord, exclude_symbols, change_last)
 
     def _find_conflicts(self, mappings):
-        """Find all chord conflicts."""
-        conflicts = {"prefix_conflicts": [], "duplicates": []}
+        """Find all chord conflicts - delegates to shared utility with fixes."""
+        return find_conflicts_util(mappings, generate_fixes=True)
 
-        # Organize mappings by context
-        by_context = {}
-        for m in mappings:
-            if not getattr(m, "enabled", True):
-                continue
-            ctx = getattr(m, "context", "VIEW_3D")
-            by_context.setdefault(ctx, []).append(m)
-
-        for ctx, ctx_mappings in by_context.items():
-            chord_map = {}
-            all_chords = []
-
-            for m in ctx_mappings:
-                chord_str = get_str_attr(m, "chord")
-                tokens = split_chord(chord_str)
-                if not tokens:
-                    continue
-
-                all_chords.append(chord_str)
-                chord_key = tuple(tokens)
-                chord_map.setdefault(chord_key, []).append(m)
-
-            # Check for duplicates
-            for chord_key, mappings_list in chord_map.items():
-                if len(mappings_list) > 1:
-                    base_chord = " ".join(chord_key)
-
-                    # Generate fixes for both strategies
-                    fixes = {"add": [], "change_last": []}
-
-                    for strategy in fixes:
-                        temp_chords = list(all_chords)
-                        used_symbols = []
-
-                        for _ in mappings_list:
-                            fix = self._generate_chord(
-                                base_chord, temp_chords,
-                                exclude_symbols=used_symbols,
-                                change_last=(strategy == "change_last")
-                            )
-                            fixes[strategy].append(fix)
-                            temp_chords.append(fix)
-
-                            # Track used symbol
-                            fix_tokens = split_chord(fix)
-                            if strategy == "change_last":
-                                used_symbols.append(fix_tokens[-1])
-                            elif len(fix_tokens) > len(chord_key):
-                                used_symbols.append(fix_tokens[-1])
-
-                    conflicts["duplicates"].append({
-                        "chord": base_chord,
-                        "context": ctx,
-                        "count": len(mappings_list),
-                        "labels": [get_str_attr(m, "label") for m in mappings_list],
-                        "groups": [get_str_attr(m, "group") for m in mappings_list],
-                        "mappings": mappings_list,
-                        "suggested_fixes_add": fixes["add"],
-                        "suggested_fixes_change_last": fixes["change_last"]
-                    })
-
-            # Check for prefix conflicts
-            chord_keys = list(chord_map.keys())
-            for i, chord1 in enumerate(chord_keys):
-                for chord2 in chord_keys[i+1:]:
-                    # Determine which is prefix of which
-                    if len(chord1) < len(chord2) and chord2[:len(chord1)] == chord1:
-                        prefix_key, full_key = chord1, chord2
-                    elif len(chord2) < len(chord1) and chord1[:len(chord2)] == chord2:
-                        prefix_key, full_key = chord2, chord1
-                    else:
-                        continue
-
-                    prefix_chord = " ".join(prefix_key)
-                    full_chord = " ".join(full_key)
-
-                    conflicts["prefix_conflicts"].append({
-                        "prefix_chord": prefix_chord,
-                        "prefix_label": get_str_attr(chord_map[prefix_key][0], "label"),
-                        "prefix_group": get_str_attr(chord_map[prefix_key][0], "group"),
-                        "full_chord": full_chord,
-                        "full_label": get_str_attr(chord_map[full_key][0], "label"),
-                        "full_group": get_str_attr(chord_map[full_key][0], "group"),
-                        "context": ctx,
-                        "prefix_mapping": chord_map[prefix_key][0],
-                        "suggested_fix": self._generate_chord(prefix_chord, all_chords, exclude_chord=full_chord)
-                    })
-
-        return conflicts
+def find_conflicts(mappings, generate_fixes=False):
+    """Module-level function to find conflicts without needing an operator instance.
+    
+    Args:
+        mappings: Collection of mapping objects to check
+        generate_fixes: If True, generate suggested fixes. Default False for silent checks.
+    """
+    return find_conflicts_util(mappings, generate_fixes=generate_fixes)

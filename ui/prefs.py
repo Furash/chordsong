@@ -47,6 +47,17 @@ def _autosave_now(prefs):
     except Exception:
         pass
 
+def _check_conflicts_silent(context):
+    """Run conflict checker without showing popup - just updates the conflicts cache."""
+    try:
+        from ..operators.check_conflicts import CHORDSONG_OT_CheckConflicts, find_conflicts
+        prefs = context.preferences.addons[_addon_root_pkg()].preferences
+        
+        conflicts = find_conflicts(prefs.mappings)
+        CHORDSONG_OT_CheckConflicts._conflicts = conflicts
+    except Exception:
+        pass
+
 def _on_prefs_changed(self, _context):
     # Called when a preferences value changes.
     try:
@@ -63,6 +74,9 @@ def _on_mapping_changed(_self, context):
         
         # Sync groups after a short delay to avoid crashing during rapid typing/redraws
         prefs.sync_groups_delayed()
+        
+        # Check conflicts silently to update UI highlighting
+        _check_conflicts_silent(context)
     except Exception:
         pass
 
@@ -624,39 +638,12 @@ class CHORDSONG_Preferences(AddonPreferences):
     )
 
     def ensure_defaults(self):
-        """Ensure default config path and mappings are set."""
+        """Ensure default config path and nerd icons are initialized."""
         if not (self.config_path or "").strip():
             self.config_path = default_config_path()
 
         # Populate nerd icons
         self._populate_nerd_icons()
-
-        # Do NOT call sync_groups_delayed here!
-        # Calling it in ensure_defaults causes it to run on every access, 
-        # leading to startup crashes and performance issues.
-
-        if self.mappings:
-            return
-
-        def add(chord, label, group, operator, kwargs_json="", context="VIEW_3D"):
-            m = self.mappings.add()
-            m.chord = chord
-            m.label = label
-            m.group = group
-            m.context = context
-            m.mapping_type = "OPERATOR"
-            m.operator = operator
-            m.call_context = "EXEC_DEFAULT"
-            m.kwargs_json = kwargs_json
-            m.enabled = True
-
-        add("g g", "Frame Selected", "View", "view3d.view_selected", '{"use_all_regions": false}', "VIEW_3D")
-        add("g a", "Frame All", "View", "view3d.view_all", "{}", "VIEW_3D")
-        add("s r", "Run Active Script", "Script", "text.run_script", "{}", "VIEW_3D")
-        add("k c", "Open Preferences", "Chord Song", "chordsong.open_prefs", "{}", "VIEW_3D")
-
-        # Trigger initial sync after defaults are added
-        self.sync_groups_delayed()
 
     # Static variable to hold the timer function for debouncing
     _sync_timer_fn = None

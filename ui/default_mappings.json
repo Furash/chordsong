@@ -1,0 +1,427 @@
+{
+    "version": 2,
+    "scripts_folder": "",
+    "leader_key": "SPACE",
+    "overlay": {
+        "enabled": true,
+        "fading_enabled": true,
+        "show_header": true,
+        "show_footer": true,
+        "max_items": 100,
+        "column_rows": 15,
+        "font_size_header": 12,
+        "font_size_chord": 18,
+        "font_size_body": 15,
+        "font_size_footer": 12,
+        "font_size_fading": 24,
+        "font_size_toggle": 23,
+        "toggle_offset_y": -6,
+        "color_chord": [
+            0.3914475440979004,
+            0.6429893374443054,
+            0.8464089632034302,
+            1.0
+        ],
+        "color_label": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+        ],
+        "color_header": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+        ],
+        "color_icon": [
+            0.3914475440979004,
+            0.6429893374443054,
+            0.8464089632034302,
+            1.0
+        ],
+        "color_toggle_on": [
+            0.1739487498998642,
+            1.0,
+            0.76335209608078,
+            1.0
+        ],
+        "color_toggle_off": [
+            0.9646492004394531,
+            0.6671714782714844,
+            0.30953386425971985,
+            0.5
+        ],
+        "color_recents_hotkey": [
+            0.6499999761581421,
+            0.800000011920929,
+            1.0,
+            1.0
+        ],
+        "color_list_background": [
+            0.042096495628356934,
+            0.04517610743641853,
+            0.05087645351886749,
+            0.5
+        ],
+        "color_header_background": [
+            0.08225114643573761,
+            0.08862298727035522,
+            0.10047036409378052,
+            1.0
+        ],
+        "color_footer_background": [
+            0.08225297182798386,
+            0.08862846344709396,
+            0.10047505795955658,
+            1.0
+        ],
+        "gap": 10,
+        "column_gap": 30,
+        "line_height": 1.5,
+        "footer_gap": 50,
+        "footer_token_gap": 4,
+        "footer_label_gap": 8,
+        "position": "BOTTOM_LEFT",
+        "style": "HYBRID",
+        "offset_x": 65,
+        "offset_y": -15,
+        "ungrouped_expanded": true
+    },
+    "groups": [
+        {
+            "name": "Mesh",
+            "display_order": 0,
+            "expanded": true
+        },
+        {
+            "name": "Toggle",
+            "display_order": 1,
+            "expanded": false
+        },
+        {
+            "name": "Math",
+            "display_order": 2,
+            "expanded": false
+        },
+        {
+            "name": "Vector Math",
+            "display_order": 3,
+            "expanded": false
+        },
+        {
+            "name": "Node",
+            "display_order": 4,
+            "expanded": false
+        }
+    ],
+    "mappings": [
+        {
+            "enabled": true,
+            "chord": "a 1",
+            "label": "Cube",
+            "icon": "󰆧",
+            "group": "Mesh",
+            "context": "VIEW_3D",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "mesh.primitive_cube_add",
+                    "call_context": "INVOKE_DEFAULT",
+                    "kwargs": {}
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "a 2",
+            "label": "UV Sphere",
+            "icon": "",
+            "group": "Mesh",
+            "context": "VIEW_3D",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "mesh.primitive_uv_sphere_add",
+                    "call_context": "INVOKE_DEFAULT",
+                    "kwargs": {}
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "a 3",
+            "label": "Cylinder",
+            "icon": "󱥎",
+            "group": "Mesh",
+            "context": "VIEW_3D",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "mesh.primitive_cylinder_add",
+                    "call_context": "INVOKE_DEFAULT",
+                    "kwargs": {}
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "a 4",
+            "label": "Cone",
+            "icon": "󱥌",
+            "group": "Mesh",
+            "context": "VIEW_3D",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "mesh.primitive_cone_add",
+                    "call_context": "INVOKE_DEFAULT",
+                    "kwargs": {}
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "b 1",
+            "label": "Bevel 4",
+            "icon": "󰘇",
+            "group": "Mesh",
+            "context": "VIEW_3D_EDIT",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "mesh.bevel",
+                    "call_context": "EXEC_DEFAULT",
+                    "kwargs": {
+                        "segments": 4,
+                        "offset": 0.1
+                    }
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "b 2",
+            "label": "Bevel 6",
+            "icon": "󰘇",
+            "group": "Mesh",
+            "context": "VIEW_3D_EDIT",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "mesh.bevel",
+                    "call_context": "EXEC_DEFAULT",
+                    "kwargs": {
+                        "segments": 6,
+                        "offset": 0.2
+                    }
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "b 3",
+            "label": "Bevel 8",
+            "icon": "󰘇",
+            "group": "Mesh",
+            "context": "VIEW_3D_EDIT",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "mesh.bevel",
+                    "call_context": "EXEC_DEFAULT",
+                    "kwargs": {
+                        "segments": 8,
+                        "offset": 0.4
+                    }
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "b 4",
+            "label": "Bevel 16",
+            "icon": "",
+            "group": "Mesh",
+            "context": "VIEW_3D_EDIT",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "mesh.bevel",
+                    "call_context": "EXEC_DEFAULT",
+                    "kwargs": {
+                        "segments": 16,
+                        "offset": 1
+                    }
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "t 3",
+            "label": "Show 3D Cursor",
+            "icon": "",
+            "group": "Toggle",
+            "context": "VIEW_3D",
+            "mapping_type": "CONTEXT_TOGGLE",
+            "sync_toggles": false,
+            "context_path": "space_data.overlay.show_cursor"
+        },
+        {
+            "enabled": true,
+            "chord": "t b",
+            "label": "Backface Culling",
+            "icon": "",
+            "group": "Toggle",
+            "context": "VIEW_3D",
+            "mapping_type": "CONTEXT_TOGGLE",
+            "sync_toggles": false,
+            "context_path": "space_data.shading.show_backface_culling"
+        },
+        {
+            "enabled": true,
+            "chord": "t o",
+            "label": "Show Overlays",
+            "icon": "",
+            "group": "Toggle",
+            "context": "VIEW_3D",
+            "mapping_type": "CONTEXT_TOGGLE",
+            "sync_toggles": false,
+            "context_path": "space_data.overlay.show_overlays"
+        },
+        {
+            "enabled": true,
+            "chord": "t s",
+            "label": "Show Statistics",
+            "icon": "󰋽",
+            "group": "Toggle",
+            "context": "VIEW_3D",
+            "mapping_type": "CONTEXT_TOGGLE",
+            "sync_toggles": true,
+            "context_path": "space_data.overlay.show_stats",
+            "sub_items": [
+                {
+                    "path": "space_data.overlay.show_text",
+                    "value": ""
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "m a",
+            "label": "Add",
+            "icon": "󰎂",
+            "group": "Math",
+            "context": "SHADER_EDITOR",
+            "mapping_type": "PYTHON_FILE",
+            "python_file": "sample_scripts/NODE_Add.py",
+            "kwargs": {
+                "id": "ShaderNodeMath",
+                "operation": "ADD"
+            }
+        },
+        {
+            "enabled": true,
+            "chord": "m m",
+            "label": "Multiply",
+            "icon": "󰎂",
+            "group": "Math",
+            "context": "SHADER_EDITOR",
+            "mapping_type": "PYTHON_FILE",
+            "python_file": "sample_scripts/NODE_Add.py",
+            "kwargs": {
+                "id": "ShaderNodeMath",
+                "operation": "MULTIPLY"
+            }
+        },
+        {
+            "enabled": true,
+            "chord": "m d",
+            "label": "Divide",
+            "icon": "󰎂",
+            "group": "Math",
+            "context": "SHADER_EDITOR",
+            "mapping_type": "PYTHON_FILE",
+            "python_file": "sample_scripts/NODE_Add.py",
+            "kwargs": {
+                "id": "ShaderNodeMath",
+                "operation": "DIVIDE"
+            }
+        },
+        {
+            "enabled": true,
+            "chord": "v a",
+            "label": "Vector Add",
+            "icon": "󰑃",
+            "group": "Vector Math",
+            "context": "SHADER_EDITOR",
+            "mapping_type": "PYTHON_FILE",
+            "python_file": "sample_scripts/NODE_Add.py",
+            "kwargs": {
+                "id": "ShaderNodeVectorMath",
+                "operation": "ADD"
+            }
+        },
+        {
+            "enabled": true,
+            "chord": "v m",
+            "label": "Vector Mulitply",
+            "icon": "󰑃 󰎂",
+            "group": "Vector Math",
+            "context": "SHADER_EDITOR",
+            "mapping_type": "PYTHON_FILE",
+            "python_file": "sample_scripts/NODE_Add.py",
+            "kwargs": {
+                "id": "ShaderNodeVectorMath",
+                "operation": "MULTIPLY"
+            }
+        },
+        {
+            "enabled": true,
+            "chord": "v s",
+            "label": "Vector Subtract",
+            "icon": "󰑃",
+            "group": "Vector Math",
+            "context": "SHADER_EDITOR",
+            "mapping_type": "PYTHON_FILE",
+            "python_file": "sample_scripts/NODE_Add.py",
+            "kwargs": {
+                "id": "ShaderNodeVectorMath",
+                "operation": "SUBTRACT"
+            }
+        },
+        {
+            "enabled": true,
+            "chord": "v d",
+            "label": "Vector Divide",
+            "icon": "󰑃",
+            "group": "Vector Math",
+            "context": "SHADER_EDITOR",
+            "mapping_type": "PYTHON_FILE",
+            "python_file": "sample_scripts/NODE_Add.py",
+            "kwargs": {
+                "id": "ShaderNodeVectorMath",
+                "operation": "DIVIDE"
+            }
+        },
+        {
+            "enabled": true,
+            "chord": "b",
+            "label": "Bevel",
+            "icon": "",
+            "group": "Node",
+            "context": "SHADER_EDITOR",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "node.add_node",
+                    "call_context": "INVOKE_DEFAULT",
+                    "kwargs": {
+                        "type": "ShaderNodeBevel",
+                        "use_transform": false
+                    }
+                }
+            ]
+        }
+    ]
+}

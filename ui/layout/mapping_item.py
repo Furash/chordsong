@@ -2,7 +2,58 @@
 Drawing logic for individual mapping items.
 """
 
-def draw_mapping_item(prefs, m, idx, layout):
+from ...core.engine import get_str_attr, split_chord
+
+def _is_mapping_conflicted(m, all_mappings):
+    """Check if a mapping conflicts with other mappings in real-time."""
+    if not getattr(m, "enabled", True):
+        return False
+    
+    chord_str = get_str_attr(m, "chord")
+    if not chord_str:
+        return False
+    
+    chord_tokens = tuple(split_chord(chord_str))
+    if not chord_tokens:
+        return False
+    
+    context = getattr(m, "context", "VIEW_3D")
+    
+    # Check against all other enabled mappings in the same context
+    for other_m in all_mappings:
+        if not getattr(other_m, "enabled", True):
+            continue
+        
+        if other_m == m:
+            continue
+        
+        other_context = getattr(other_m, "context", "VIEW_3D")
+        if other_context != context:
+            continue
+        
+        other_chord_str = get_str_attr(other_m, "chord")
+        if not other_chord_str:
+            continue
+        
+        other_tokens = tuple(split_chord(other_chord_str))
+        if not other_tokens:
+            continue
+        
+        # Check for exact duplicate
+        if chord_tokens == other_tokens:
+            return True
+        
+        # Check for prefix conflict: this chord is prefix of other
+        if len(chord_tokens) < len(other_tokens) and other_tokens[:len(chord_tokens)] == chord_tokens:
+            return True
+        
+        # Check for prefix conflict: other chord is prefix of this
+        if len(other_tokens) < len(chord_tokens) and chord_tokens[:len(other_tokens)] == other_tokens:
+            return True
+    
+    return False
+
+def draw_mapping_item(prefs, m, idx, layout, all_mappings=None):
     """Draw a single mapping item box."""
     # Wrap each mapping in its own box for clear visual separation
     item_box = layout.box()
@@ -10,8 +61,17 @@ def draw_mapping_item(prefs, m, idx, layout):
     # Main row with enabled, chord, label, and remove button
     r = item_box.row(align=True)
     r.prop(m, "enabled", text="")
-    r.scale_x = 0.5
-    r.prop(m, "chord", text="")
+    
+    # Chord field - highlight if conflicted
+    chord_cell = r.row(align=True)
+    chord_cell.scale_x = 0.5
+    # Use all mappings if provided, otherwise fall back to prefs.mappings
+    mappings_to_check = all_mappings if all_mappings is not None else prefs.mappings
+    is_conflicted = _is_mapping_conflicted(m, mappings_to_check)
+    # Always set alert state explicitly (don't rely on previous state)
+    chord_cell.alert = is_conflicted
+    chord_cell.prop(m, "chord", text="")
+    
     r.separator()
     r.scale_x = 1.5
     r.prop(m, "label", text="")

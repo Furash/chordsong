@@ -12,6 +12,12 @@ from .group.group_rename import CHORDSONG_OT_Group_Rename
 from .group.group_select import CHORDSONG_OT_Group_Select
 from .icon_select import CHORDSONG_OT_Icon_Select, CHORDSONG_OT_Icon_Select_Apply
 from .leader import CHORDSONG_OT_Leader, cleanup_all_handlers
+from .config.append_config import CHORDSONG_OT_Append_Config
+from .config.export_config import (
+    CHORDSONG_OT_Export_Config,
+    CHORDSONG_OT_Export_Config_Toggle_Groups,
+    CHORDSONG_PG_GroupSelection,
+)
 from .config.load_autosave import CHORDSONG_OT_Load_Autosave
 from .config.load_config import CHORDSONG_OT_Load_Config
 from .config.load_default import CHORDSONG_OT_Load_Default
@@ -29,7 +35,11 @@ from .script_select import CHORDSONG_OT_Script_Select, CHORDSONG_OT_Script_Selec
 from .test_overlay import CHORDSONG_OT_TestFadingOverlay, CHORDSONG_OT_TestMainOverlay
 
 __all__ = [
+    "CHORDSONG_OT_Append_Config",
     "CHORDSONG_OT_ApplyConflictFix",
+    "CHORDSONG_OT_Export_Config",
+    "CHORDSONG_OT_Export_Config_Toggle_Groups",
+    "CHORDSONG_PG_GroupSelection",
     "CHORDSONG_OT_CheckConflicts",
     "CHORDSONG_OT_Context_Menu",
     "CHORDSONG_OT_Group_Add",

@@ -3,7 +3,7 @@ Mappings tab for addon preferences.
 """
 
 from ...core.engine import get_str_attr
-from .mapping_item import draw_mapping_item
+from .mapping_item import draw_mapping_item, _is_mapping_conflicted
 
 def draw_mappings_tab(prefs, context, layout):
     """Draw the Mappings tab content."""
@@ -97,6 +97,11 @@ def draw_mappings_tab(prefs, context, layout):
 
         is_expanded, expand_data, expand_prop = _get_group_expansion_state(prefs, group_name)
 
+        # Check if any mapping in this group has conflicts
+        group_has_conflicts = any(
+            _is_mapping_conflicted(m, prefs.mappings) for _, m in items
+        )
+
         # Foldable header row
         header = col.row(align=True)
         
@@ -112,7 +117,13 @@ def draw_mappings_tab(prefs, context, layout):
                 text="",
                 emboss=False,
             )
-        row_left.label(text=f"{group_name}")
+        
+        # Show conflict indicator if group has conflicted chords
+        if group_has_conflicts:
+            row_left.alert = True
+            row_left.label(text=f"{group_name}", icon="ERROR")
+        else:
+            row_left.label(text=f"{group_name}")
 
         # Right side: Buttons (compact and aligned right)
         row_right = split.row(align=True)
@@ -140,8 +151,9 @@ def draw_mappings_tab(prefs, context, layout):
             continue
 
         col.separator()
+        # Pass all mappings for conflict checking
         for idx, m in items:
-            draw_mapping_item(prefs, m, idx, col)
+            draw_mapping_item(prefs, m, idx, col, all_mappings=prefs.mappings)
             # Extra spacing between item boxes
             col.separator(factor=2.0)
 

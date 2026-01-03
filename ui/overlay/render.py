@@ -1,4 +1,5 @@
 """Rendering functions for the overlay."""
+import os
 import time
 import gpu  # type: ignore
 from gpu_extras.batch import batch_for_shader  # type: ignore
@@ -414,7 +415,16 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
 
         # Display buffer with + separator instead of spaces
         prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
-        header = f"Chord Song  |  {prefix}"
+        
+        # Get blend file name for header
+        import bpy  # type: ignore
+        blend_filepath = bpy.data.filepath
+        if blend_filepath:
+            blend_filename = os.path.basename(blend_filepath)
+        else:
+            blend_filename = "<unsaved .blend file>"
+        
+        header = f"{blend_filename}  |  {prefix}"
 
         # Scale font sizes
         header_size = max(int(p.overlay_font_size_header * scale_factor), 12)
