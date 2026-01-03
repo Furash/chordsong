@@ -768,14 +768,18 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                     text=f"'{conflict['prefix_chord']}' blocks '{conflict['full_chord']}' {groups_str} ({conflict['context']})",
                     icon="FORWARD"
                 )
-                # Fix button with suggested chord
-                op = row.operator(
-                    "chordsong.apply_conflict_fix",
-                    text=f"→ {conflict['suggested_fix']}",
-                    icon="CHECKMARK"
-                )
-                op.conflict_index = idx
-                op.conflict_type = "PREFIX"
+                # Fix button with suggested chord (only show if suggested_fix exists)
+                if "suggested_fix" in conflict and conflict["suggested_fix"]:
+                    op = row.operator(
+                        "chordsong.apply_conflict_fix",
+                        text=f"→ {conflict['suggested_fix']}",
+                        icon="CHECKMARK"
+                    )
+                    op.conflict_index = idx
+                    op.conflict_type = "PREFIX"
+                else:
+                    # Show button without suggested fix if fix generation failed or wasn't requested
+                    row.label(text="(Fix generation unavailable)", icon="INFO")
 
         # Duplicate chords - table layout
         if conflicts["duplicates"]:
