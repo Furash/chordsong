@@ -2,13 +2,13 @@
   <img src="docs/logo/chordsong_logo.png" alt="Chord Song Logo" width="400">
 </div>
 
-# Chord Song
-
 **Vim-like `<Leader>` key implementation for Blender** — Trigger operators, execute scripts, and modify properties using key sequences.
 
 ## Why Chords?
 
 Instead of memorizing awkward `Ctrl+Alt+Shift+F5` combinations, use intuitive sequences like `m c` for **M**esh > **C**ube. A single leader key (default: `Space`) opens up dozens of unique combinations with visual feedback.
+
+![Overlay Example](docs/scr/overlay_style_a.png)
 
 ## Features
 
@@ -68,12 +68,8 @@ See [full documentation](https://furash.github.io/chordsong/concepts/chord/) for
 
 ## Documentation
 
-📚 **[Full Documentation →](https://furash.github.io/chordsong/)**
+**[Full Documentation →](https://furash.github.io/chordsong/)**
 
 ## Security
 
 ⚠️ **Python Script Execution**: Chord Song can execute arbitrary Python scripts. Only map chords to scripts you've written or audited.
-
-## License
-
-GPL-3.0-or-later — See [LICENSE](LICENSE)
