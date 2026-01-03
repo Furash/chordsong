@@ -15,7 +15,8 @@ There are several ways to add chord mappings:
 - **Preferences**: Manually add and edit mappings in the Chord Song preferences tab.
 - **Context Menu**: Right-click any button or menu item in Blender and select **Add Chord Mapping**.
 - **Info Panel**: Select operator history rows in Blender's Info Editor, right-click, and select **Extract to Chord Mapping** for batch creation.
-- **JSON File**: Manually edit the `chordsong.json` file. You can open its location by **Alt+Clicking** the folder icon next to the path in preferences.
+- **Import/Append**: Load or merge configurations from JSON files (see [Import & Export](import_export.md)).
+- **Manual Editing**: Advanced users can edit the JSON configuration file directly. See [Configuration File Format](import_export.md#configuration-file-format) for details.
 
 ## Mapping Types
 

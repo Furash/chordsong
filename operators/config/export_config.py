@@ -176,6 +176,7 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
                     if contexts:
                         # Map contexts to Blender icon names
                         context_icons = {
+                            "ALL": "WORLD",
                             "VIEW_3D": "OBJECT_DATAMODE",
                             "VIEW_3D_EDIT": "EDITMODE_HLT",
                             "GEOMETRY_NODE": "GEOMETRY_NODES",
