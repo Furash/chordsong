@@ -1,5 +1,7 @@
 # Customization
 
+## Preferences
+
 - **Config Path**: Path to the configuration file.
 - **Scripts Folder**: Default directory for Python scripts used in script mappings.
 

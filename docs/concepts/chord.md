@@ -7,6 +7,10 @@ A chord is a sequence of one or more key tokens (e.g., `m c` or `f r a`).
 | **Chord** | A sequence of one or more key tokens (e.g., `m c` or `f r a`). |
 | **Action** | The specific operation to execute (Operator, Property, Toggle, or Script). |
 | **Context** | The Blender editor where the mapping is active (e.g., 3D View, Shader Editor). |
+
+## Context
+
+The **Context** determines which Blender editor or area the chord mapping is active in. Each mapping can be assigned to a specific context, ensuring that chords only trigger in the appropriate workspace.
 | **Label** | The chord's name displayed in the overlay. |
 | **Icon** | A visual identifier using Nerd Font icons or any other symbol. |
 | **Group** | An optional category used to organize items into sections within the overlay. |

@@ -12,7 +12,7 @@ See [Adding Mappings](../mappings.md#adding-mappings) for general methods. Scrip
 
 ### Scripts Folder
 
-To streamline your workflow, you can define a **Scripts Folder** in the [Customization](../customization.md#preferences) section.
+To streamline your workflow, you can define a **Scripts Folder** in the [Customization](../../customization.md#preferences) section.
 
 When configuring a Script Mapping:
 

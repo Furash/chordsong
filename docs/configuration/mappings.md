@@ -8,6 +8,15 @@ Every chord mapping consists of the following properties:
 - **Group**: Optional category to organize your overlay into sections.
 - **Context**: The Blender editor where the mapping is active (3D View, Shader Editor, etc.).
 
+## Adding Mappings
+
+There are several ways to add chord mappings:
+
+- **Preferences**: Manually add and edit mappings in the Chord Song preferences tab.
+- **Context Menu**: Right-click any button or menu item in Blender and select **Add Chord Mapping**.
+- **Info Panel**: Select operator history rows in Blender's Info Editor, right-click, and select **Extract to Chord Mapping** for batch creation.
+- **JSON File**: Manually edit the `chordsong.json` file. You can open its location by **Alt+Clicking** the folder icon next to the path in preferences.
+
 ## Mapping Types
 
 Each chord mapping type has its own set of attributes and configuration options.
