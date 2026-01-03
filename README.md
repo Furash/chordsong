@@ -2,7 +2,7 @@
   <img src="docs/logo/chordsong_logo.png" alt="Chord Song Logo" width="400">
 </div>
 
-**Vim-like `<Leader>` key implementation for Blender** — Trigger operators, execute scripts, and modify properties using key sequences.
+**Vim-like `<Leader>` key implementation for Blender** — Trigger operators, execute scripts, and modify properties using key sequences. Inspired by Neovim addon [which-key.nvim](https://github.com/folke/which-key.nvim).
 
 ## Why Chords?
 
