@@ -1,0 +1,76 @@
+name: Build and Release Blender Add-on
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Blender Extension Builder
+        run: pip install blender-extension-builder
+
+      - name: Build Blender Add-on
+        run: build-blender-extension -m blender_manifest.toml
+
+      - name: Get Version from Manifest
+        id: get_version
+        run: |
+          pip install tomli
+          VERSION=$(python -c "import tomli; f=open('blender_manifest.toml','rb'); m=tomli.load(f); print(m['version'])")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Built version: $VERSION"
+
+      - name: Prepare Release Asset
+        id: prepare_asset
+        run: |
+          cd dist
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          NEW_NAME="chordsong-${{ steps.get_version.outputs.version }}.zip"
+          mv "$ZIP_FILE" "$NEW_NAME"
+          echo "asset_path=dist/$NEW_NAME" >> $GITHUB_OUTPUT
+          echo "asset_name=$NEW_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.prepare_asset.outputs.asset_path }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Chord Song ${{ steps.get_version.outputs.version }}
+            
+            Blender add-on release built from tag ${{ github.ref_name }}.
+            
+            ### Installation
+            1. Download `${{ steps.prepare_asset.outputs.asset_name }}`
+            2. In Blender, go to Edit > Preferences > Add-ons
+            3. Click "Install..." and select the ZIP file
+            4. Enable the add-on
+            
+            ### Changes
+            See the [changelog](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.ref_name }}) for details.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

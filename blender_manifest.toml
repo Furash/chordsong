@@ -23,7 +23,6 @@ paths = [
     "ui/",
     "utils/",
     "LICENSE",
-    "README.md",
     "sample_scripts/",
 ]
 paths_exclude_pattern = [
@@ -36,8 +35,8 @@ paths_exclude_pattern = [
     ".github/",
     ".vscode/",
     "docs/",
-    "sample_scripts/",
     "mkdocs.yml",
     "requirements.txt",
     ".gitignore",
+    "README.md",
 ]

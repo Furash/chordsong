@@ -209,3 +209,4 @@ cython_debug/
 *.ai
 *.psd
 .agent/
+VIDEO_SCRIPT.md
