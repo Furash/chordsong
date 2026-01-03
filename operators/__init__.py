@@ -1,4 +1,4 @@
-from .check_conflicts import CHORDSONG_OT_CheckConflicts, CHORDSONG_OT_ApplyConflictFix
+from .check_conflicts import CHORDSONG_OT_CheckConflicts, CHORDSONG_OT_ApplyConflictFix, CHORDSONG_OT_MergeIdentical
 from .context_menu import (
     CHORDSONG_OT_Context_Menu,
     register_context_menu,
@@ -38,6 +38,7 @@ __all__ = [
     "CHORDSONG_OT_Append_Config",
     "CHORDSONG_OT_ApplyConflictFix",
     "CHORDSONG_OT_Export_Config",
+    "CHORDSONG_OT_MergeIdentical",
     "CHORDSONG_OT_Export_Config_Toggle_Groups",
     "CHORDSONG_PG_GroupSelection",
     "CHORDSONG_OT_CheckConflicts",

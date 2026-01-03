@@ -31,21 +31,21 @@ def _validate_chordsong_config(data: dict) -> tuple[bool, str]:
     if version is not None and version not in (None, 1):
         return False, f"Unsupported config version: {version} (current {CHORDSONG_CONFIG_VERSION})"
     
-        # Validate mappings structure if present
-        if "mappings" in data:
-            mappings = data["mappings"]
-            if not isinstance(mappings, list):
-                return False, "Mappings must be a list"
-            # Check at least one mapping has expected structure
-            if mappings:
-                first_mapping = mappings[0]
-                if not isinstance(first_mapping, dict):
-                    return False, "Each mapping must be an object"
-                # Check for required fields
-                if "chord" not in first_mapping:
-                    return False, "Mappings must contain 'chord' field"
-                if "mapping_type" not in first_mapping:
-                    return False, "Mappings must contain 'mapping_type' field"
+    # Validate mappings structure if present
+    if "mappings" in data:
+        mappings = data["mappings"]
+        if not isinstance(mappings, list):
+            return False, "Mappings must be a list"
+        # Check at least one mapping has expected structure
+        if mappings:
+            first_mapping = mappings[0]
+            if not isinstance(first_mapping, dict):
+                return False, "Each mapping must be an object"
+            # Check for required fields
+            if "chord" not in first_mapping:
+                return False, "Mappings must contain 'chord' field"
+            if "mapping_type" not in first_mapping:
+                return False, "Mappings must contain 'mapping_type' field"
     
     # Validate groups structure if present
     if "groups" in data:
@@ -81,7 +81,7 @@ class CHORDSONG_OT_Append_Config(bpy.types.Operator, ImportHelper):
             
             if not is_valid:
                 # Show warning but proceed anyway
-                self.report({"WARNING"}, f"File validation warning: {error_msg}. Proceeding with append...")
+                self.report({"WARNING"}, f"File validation warning: {error_msg}")
             
             p._chordsong_suspend_autosave = True
             warns = apply_config_append(p, data)
