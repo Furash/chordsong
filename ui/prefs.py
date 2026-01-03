@@ -214,6 +214,7 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         name="Context",
         description="Editor context where this chord mapping is active",
         items=(
+            ("ALL", "All Contexts", "Active in all editor contexts"),
             ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)"),
             ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)"),
             ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor"),

@@ -417,13 +417,14 @@ def filter_mappings_by_context(mappings, context_type: str):
         context_type: One of "VIEW_3D", "GEOMETRY_NODE", "SHADER_EDITOR", "IMAGE_EDITOR"
 
     Returns:
-        List of mappings matching the context
+        List of mappings matching the context (includes mappings with "ALL" context)
     """
     filtered = []
     for m in mappings:
         # Get the context attribute, default to VIEW_3D for backward compatibility
         mapping_context = getattr(m, "context", "VIEW_3D")
-        if mapping_context == context_type:
+        # Include mappings with "ALL" context or matching context
+        if mapping_context == context_type or mapping_context == "ALL":
             filtered.append(m)
     return filtered
 

@@ -1,5 +1,5 @@
 {
-    "version": 2,
+    "version": 1,
     "scripts_folder": "",
     "leader_key": "SPACE",
     "overlay": {
@@ -100,18 +100,23 @@
             "expanded": false
         },
         {
-            "name": "Math",
-            "display_order": 2,
-            "expanded": false
-        },
-        {
             "name": "Vector Math",
             "display_order": 3,
             "expanded": false
         },
         {
+            "name": "Chord Song",
+            "display_order": 0,
+            "expanded": false
+        },
+        {
             "name": "Node",
             "display_order": 4,
+            "expanded": false
+        },
+        {
+            "name": "Math",
+            "display_order": 5,
             "expanded": false
         }
     ],
@@ -144,6 +149,22 @@
                 {
                     "operator": "mesh.primitive_uv_sphere_add",
                     "call_context": "INVOKE_DEFAULT",
+                    "kwargs": {}
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "chord": "k c",
+            "label": "Chord Song Prefs",
+            "icon": "",
+            "group": "Chord Song",
+            "context": "ALL",
+            "mapping_type": "OPERATOR",
+            "operators": [
+                {
+                    "operator": "chordsong.open_prefs",
+                    "call_context": "EXEC_DEFAULT",
                     "kwargs": {}
                 }
             ]

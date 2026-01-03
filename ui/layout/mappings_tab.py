@@ -79,7 +79,8 @@ def draw_mappings_tab(prefs, context, layout):
     groups = {}
     for idx, m in enumerate(prefs.mappings):
         mapping_context = getattr(m, "context", "VIEW_3D")
-        if mapping_context != current_context:
+        # Include mappings with matching context or "ALL" context
+        if mapping_context != current_context and mapping_context != "ALL":
             continue
 
         group = get_str_attr(m, "group") or "Ungrouped"

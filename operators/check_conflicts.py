@@ -166,6 +166,16 @@ def find_conflicts_util(mappings, generate_fixes=True):
         ctx = getattr(m, "context", "VIEW_3D")
         by_context.setdefault(ctx, []).append(m)
 
+    # Get "ALL" context mappings separately
+    all_context_mappings = by_context.get("ALL", [])
+    all_context_chords = {}
+    for m in all_context_mappings:
+        chord_str = get_str_attr(m, "chord")
+        tokens = split_chord(chord_str)
+        if tokens:
+            chord_key = tuple(tokens)
+            all_context_chords.setdefault(chord_key, []).append(m)
+
     for ctx, ctx_mappings in by_context.items():
         chord_map = {}
         all_chords = []
@@ -257,6 +267,92 @@ def find_conflicts_util(mappings, generate_fixes=True):
                     conflict_data["suggested_fix"] = generate_chord(prefix_chord, all_chords, exclude_chord=full_chord)
 
                 conflicts["prefix_conflicts"].append(conflict_data)
+
+    # Check "ALL" context mappings against all other contexts
+    if all_context_mappings and len(by_context) > 1:
+        # Check "ALL" mappings for conflicts with each specific context
+        for ctx, ctx_mappings in by_context.items():
+            if ctx == "ALL":
+                continue
+            
+            ctx_chord_map = {}
+            ctx_all_chords = []
+            for m in ctx_mappings:
+                chord_str = get_str_attr(m, "chord")
+                tokens = split_chord(chord_str)
+                if tokens:
+                    ctx_all_chords.append(chord_str)
+                    chord_key = tuple(tokens)
+                    ctx_chord_map.setdefault(chord_key, []).append(m)
+            
+            # Check for duplicates: "ALL" mappings vs this context
+            for chord_key, all_mappings_list in all_context_chords.items():
+                if chord_key in ctx_chord_map:
+                    # Conflict: same chord in "ALL" and this specific context
+                    base_chord = " ".join(chord_key)
+                    conflict_data = {
+                        "chord": base_chord,
+                        "context": f"ALL/{ctx}",
+                        "count": len(all_mappings_list) + len(ctx_chord_map[chord_key]),
+                        "labels": ([get_str_attr(m, "label") for m in all_mappings_list] + 
+                                  [get_str_attr(m, "label") for m in ctx_chord_map[chord_key]]),
+                        "groups": ([get_str_attr(m, "group") for m in all_mappings_list] + 
+                                  [get_str_attr(m, "group") for m in ctx_chord_map[chord_key]]),
+                        "mappings": all_mappings_list + ctx_chord_map[chord_key],
+                    }
+                    if generate_fixes:
+                        fixes = {"add": [], "change_last": []}
+                        temp_chords = [c for c in ctx_all_chords if tuple(split_chord(c)) != chord_key]
+                        used_symbols = []
+                        for _ in all_mappings_list + ctx_chord_map[chord_key]:
+                            fix = generate_chord(
+                                base_chord, temp_chords,
+                                exclude_symbols=used_symbols,
+                                change_last=(len(fixes["change_last"]) < len(fixes["add"]))
+                            )
+                            if fix:
+                                strategy = "change_last" if len(fixes["change_last"]) < len(fixes["add"]) else "add"
+                                fixes[strategy].append(fix)
+                                temp_chords.append(fix)
+                                fix_tokens = split_chord(fix)
+                                if strategy == "change_last":
+                                    used_symbols.append(fix_tokens[-1])
+                                elif len(fix_tokens) > len(chord_key):
+                                    used_symbols.append(fix_tokens[-1])
+                        conflict_data["suggested_fixes_add"] = fixes["add"]
+                        conflict_data["suggested_fixes_change_last"] = fixes["change_last"]
+                    conflicts["duplicates"].append(conflict_data)
+            
+            # Check for prefix conflicts: "ALL" mappings vs this context
+            for all_chord_key, all_mappings_list in all_context_chords.items():
+                for ctx_chord_key, ctx_mappings_list in ctx_chord_map.items():
+                    if len(all_chord_key) < len(ctx_chord_key) and ctx_chord_key[:len(all_chord_key)] == all_chord_key:
+                        prefix_key, full_key = all_chord_key, ctx_chord_key
+                        prefix_mappings, full_mappings = all_mappings_list, ctx_mappings_list
+                    elif len(ctx_chord_key) < len(all_chord_key) and all_chord_key[:len(ctx_chord_key)] == ctx_chord_key:
+                        prefix_key, full_key = ctx_chord_key, all_chord_key
+                        prefix_mappings, full_mappings = ctx_mappings_list, all_mappings_list
+                    else:
+                        continue
+                    
+                    prefix_chord = " ".join(prefix_key)
+                    full_chord = " ".join(full_key)
+                    
+                    conflict_data = {
+                        "prefix_chord": prefix_chord,
+                        "prefix_label": get_str_attr(prefix_mappings[0], "label"),
+                        "prefix_group": get_str_attr(prefix_mappings[0], "group"),
+                        "full_chord": full_chord,
+                        "full_label": get_str_attr(full_mappings[0], "label"),
+                        "full_group": get_str_attr(full_mappings[0], "group"),
+                        "context": f"ALL/{ctx}",
+                        "prefix_mapping": prefix_mappings[0],
+                    }
+                    
+                    if generate_fixes:
+                        conflict_data["suggested_fix"] = generate_chord(prefix_chord, ctx_all_chords, exclude_chord=full_chord)
+                    
+                    conflicts["prefix_conflicts"].append(conflict_data)
 
     return conflicts
 

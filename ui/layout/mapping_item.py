@@ -20,6 +20,7 @@ def _is_mapping_conflicted(m, all_mappings):
     context = getattr(m, "context", "VIEW_3D")
     
     # Check against all other enabled mappings in the same context
+    # Mappings with "ALL" context should be checked against all contexts
     for other_m in all_mappings:
         if not getattr(other_m, "enabled", True):
             continue
@@ -28,7 +29,8 @@ def _is_mapping_conflicted(m, all_mappings):
             continue
         
         other_context = getattr(other_m, "context", "VIEW_3D")
-        if other_context != context:
+        # Skip if contexts don't match (unless one is "ALL")
+        if context != "ALL" and other_context != "ALL" and other_context != context:
             continue
         
         other_chord_str = get_str_attr(other_m, "chord")
@@ -103,29 +105,33 @@ def draw_mapping_item(prefs, m, idx, layout, all_mappings=None):
     # Left side: Icons
     icon_col = r2_split.column()
     icon_col.separator(factor=0.5)
-    icon_row = icon_col.row(align=True)
     
-    # Context selector (icon-only)
-    icon_row.prop_enum(m, "context", "VIEW_3D", icon="OBJECT_DATAMODE", text="")
-    icon_row.separator()
-    icon_row.prop_enum(m, "context", "VIEW_3D_EDIT", icon="EDITMODE_HLT", text="")
-    icon_row.separator()
-    icon_row.prop_enum(m, "context", "GEOMETRY_NODE", icon="GEOMETRY_NODES", text="")
-    icon_row.separator()
-    icon_row.prop_enum(m, "context", "SHADER_EDITOR", icon="NODE_MATERIAL", text="")
-    icon_row.separator()
-    icon_row.prop_enum(m, "context", "IMAGE_EDITOR", icon="UV", text="")
-    icon_row.separator()
-    icon_row.separator()
+    # Context selector and mapping type selector - 2 rows
+    # Row 1: First 3 context icons + 4 mapping type icons (continuing the same row)
+    context_row1 = icon_col.row(align=True)
+    context_row1.prop_enum(m, "context", "ALL", icon="WORLD", text="")
+    context_row1.separator()
+    context_row1.prop_enum(m, "context", "VIEW_3D", icon="OBJECT_DATAMODE", text="")
+    context_row1.separator()
+    context_row1.prop_enum(m, "context", "VIEW_3D_EDIT", icon="EDITMODE_HLT", text="")
+    context_row1.separator()
+    context_row1.separator()
+    # Mapping type icons continue on the same row
+    context_row1.prop_enum(m, "mapping_type", "OPERATOR", icon="SETTINGS", text="")
+    context_row1.separator()
+    context_row1.prop_enum(m, "mapping_type", "PYTHON_FILE", icon="FILE_SCRIPT", text="")
+    context_row1.separator()
+    context_row1.prop_enum(m, "mapping_type", "CONTEXT_TOGGLE", icon="CHECKBOX_HLT", text="")
+    context_row1.separator()
+    context_row1.prop_enum(m, "mapping_type", "CONTEXT_PROPERTY", icon="PROPERTIES", text="")
     
-    # Icon-only mapping type selector
-    icon_row.prop_enum(m, "mapping_type", "OPERATOR", icon="SETTINGS", text="")
-    icon_row.separator()
-    icon_row.prop_enum(m, "mapping_type", "PYTHON_FILE", icon="FILE_SCRIPT", text="")
-    icon_row.separator()
-    icon_row.prop_enum(m, "mapping_type", "CONTEXT_TOGGLE", icon="CHECKBOX_HLT", text="")
-    icon_row.separator()
-    icon_row.prop_enum(m, "mapping_type", "CONTEXT_PROPERTY", icon="PROPERTIES", text="")
+    # Row 2: Remaining 3 context icons
+    context_row2 = icon_col.row(align=True)
+    context_row2.prop_enum(m, "context", "GEOMETRY_NODE", icon="GEOMETRY_NODES", text="")
+    context_row2.separator()
+    context_row2.prop_enum(m, "context", "SHADER_EDITOR", icon="NODE_MATERIAL", text="")
+    context_row2.separator()
+    context_row2.prop_enum(m, "context", "IMAGE_EDITOR", icon="UV", text="")
     
     # Right side: Type-specific fields
     r2 = r2_split.column()
