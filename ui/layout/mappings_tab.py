@@ -8,7 +8,7 @@ from .mapping_item import draw_mapping_item, _is_mapping_conflicted
 def draw_mappings_tab(prefs, context, layout):
     """Draw the Mappings tab content."""
     col = layout.column()
-    
+
     # Leader Key section
     kc = context.window_manager.keyconfigs.addon
     if kc:
@@ -60,7 +60,7 @@ def draw_mappings_tab(prefs, context, layout):
     row.scale_y = 1.5
     op = row.operator("chordsong.mapping_add", text="Add New Chord", icon="ADD")
     op.context = prefs.mapping_context_tab
-    
+
     row.separator()
     op = row.operator("chordsong.group_add", text="Add New Group", icon="ADD")
     op.name = "New Group"
@@ -69,7 +69,7 @@ def draw_mappings_tab(prefs, context, layout):
     row.separator()
     row.operator("chordsong.group_fold_all", text="", icon="TRIA_UP")
     row.operator("chordsong.group_unfold_all", text="", icon="TRIA_DOWN")
-    
+
     col.separator()
 
 
@@ -105,10 +105,10 @@ def draw_mappings_tab(prefs, context, layout):
 
         # Foldable header row
         header = col.row(align=True)
-        
+
         # Split: Label (Left) | Buttons (Right)
         split = header.split(factor=0.6)
-        
+
         # Left side: Expansion + Group Name
         row_left = split.row(align=True)
         if expand_data and expand_prop:
@@ -118,7 +118,7 @@ def draw_mappings_tab(prefs, context, layout):
                 text="",
                 emboss=False,
             )
-        
+
         # Show conflict indicator if group has conflicted chords
         if group_has_conflicts:
             row_left.alert = True
@@ -129,13 +129,13 @@ def draw_mappings_tab(prefs, context, layout):
         # Right side: Buttons (compact and aligned right)
         row_right = split.row(align=True)
         row_right.alignment = 'RIGHT'
-        
+
         # Add new chord button
         op = row_right.operator("chordsong.mapping_add", text="", icon="ADD", emboss=True)
         op.group = group_name
         op.context = prefs.mapping_context_tab
         row_right.separator()
-        
+
         # Rename and Delete group buttons
         if group_name != "Ungrouped":
             group_idx = _get_group_index(prefs, group_name)
@@ -164,11 +164,11 @@ def _get_group_expansion_state(prefs, group_name):
     """Retrieve expansion state for a group."""
     if group_name == "Ungrouped":
         return prefs.ungrouped_expanded, prefs, "ungrouped_expanded"
-    
+
     for grp in prefs.groups:
         if grp.name == group_name:
             return grp.expanded, grp, "expanded"
-    
+
     return True, None, None
 
 def _get_group_index(prefs, group_name):

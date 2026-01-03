@@ -30,24 +30,24 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
 
     filename_ext = ".json"
     filter_glob: StringProperty(default="*.json", options={"HIDDEN"})
-    
+
     # Class variable to store the active operator instance
     _active_instance = None
 
     # Group selections (dynamic)
     group_selections: CollectionProperty(type=CHORDSONG_PG_GroupSelection)
-    
+
     # Helper property for select all/deselect all
     select_all_groups: BoolProperty(
         default=True,
         options={"HIDDEN"},
     )
-    
+
     def _update_all_group_selections(self):
         """Update all group selections based on select_all_groups."""
         for item in self.group_selections:
             item.selected = self.select_all_groups
-    
+
     # Flag to track if we've shown the selection dialog
     selections_confirmed: BoolProperty(
         default=False,
@@ -63,59 +63,64 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
             if presets_dir:
                 folder = os.path.join(presets_dir, "chordsong")
                 os.makedirs(folder, exist_ok=True)
-                if not self.filepath or self.filepath.endswith("chordsong_export.json"):
+                # Initialize filepath if not set or if it's the default
+                # filepath is provided by ExportHelper, use getattr for safety
+                current_filepath = getattr(self, "filepath", "")
+                if not current_filepath or current_filepath.endswith("chordsong_export.json"):
                     self.filepath = os.path.join(folder, "chordsong_export.json")
             else:
-                if not self.filepath:
+                # Initialize filepath if not set
+                current_filepath = getattr(self, "filepath", "")
+                if not current_filepath:
                     self.filepath = os.path.join(os.path.expanduser("~"), "chordsong_export.json")
             return super().invoke(context, event)
-        
+
         # First time: show selection dialog
         p = prefs(context)
-        
+
         # Initialize group selections
         self.group_selections.clear()
         group_names = set()
-        
+
         # Collect all group names from groups collection
         for grp in p.groups:
             group_name = (getattr(grp, "name", "") or "").strip()
             if group_name:
                 group_names.add(group_name)
-        
+
         # Also collect group names from mappings (for "Ungrouped" handling)
         for m in p.mappings:
             group_name = (getattr(m, "group", "") or "").strip()
             if group_name:
                 group_names.add(group_name)
-        
+
         # Create selection entries for each group
         for group_name in sorted(group_names):
             item = self.group_selections.add()
             item.name = group_name
             item.selected = True  # Default to selected
-        
+
         # Initialize select_all_groups property
         self.select_all_groups = True
         self.selections_confirmed = False
-        
+
         # Store reference to this operator instance in class variable for toggle access
         CHORDSONG_OT_Export_Config._active_instance = self
-        
+
         # Calculate width based on number of columns needed
         total_items = len(self.group_selections)
         num_columns = (total_items + 19) // 20  # Ceiling division
         dialog_width = 500 if num_columns == 1 else 800
-        
+
         return context.window_manager.invoke_props_dialog(self, width=dialog_width)
 
     def draw(self, context: bpy.types.Context):
         """Draw the export selection dialog."""
         layout = self.layout
-        
+
         # Header
         layout.label(text="Select Groups to Export", icon="EXPORT")
-        
+
         # Select All / Deselect All buttons at the top
         btn_row = layout.row(align=True)
         # Check if all items are selected to determine button text
@@ -129,12 +134,12 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
         else:
             op = btn_row.operator("chordsong.export_config_toggle_groups", text="Select All", emboss=True)
             op.toggle_to = True
-        
+
         # Groups section
         box = layout.box()
         header = box.row()
         header.label(text="Groups:", icon="FILE_FOLDER")
-        
+
         # Group checkboxes with context hints
         if self.group_selections:
             p = prefs(context)
@@ -147,25 +152,25 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
                     if group_name not in group_contexts:
                         group_contexts[group_name] = set()
                     group_contexts[group_name].add(context)
-            
+
             # Split into columns with max 20 items per column
             items_per_column = 20
             total_items = len(self.group_selections)
             num_columns = (total_items + items_per_column - 1) // items_per_column  # Ceiling division
-            
+
             # Create columns side by side
             columns_row = box.row()
             for col_idx in range(num_columns):
                 col = columns_row.column()
                 start_idx = col_idx * items_per_column
                 end_idx = min(start_idx + items_per_column, total_items)
-                
+
                 # Add items to this column
                 for i in range(start_idx, end_idx):
                     item = self.group_selections[i]
                     row = col.row(align=True)
                     row.prop(item, "selected", text="")
-                    
+
                     # Show context icons before group name
                     contexts = group_contexts.get(item.name, set())
                     if contexts:
@@ -180,7 +185,7 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
                         for ctx in sorted(contexts):
                             icon_name = context_icons.get(ctx, "BLANK1")
                             row.label(text="", icon=icon_name)
-                    
+
                     # Group name
                     row.label(text=item.name)
         else:
@@ -200,13 +205,13 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
                     value = 'PRESS'
                 event = DummyEvent()
             return self.invoke(context, event)
-        
+
         # File browser was shown and user selected a file, now export
         p = prefs(context)
         try:
             # Collect selected group names
             selected_groups = {item.name for item in self.group_selections if item.selected}
-            
+
             # Build filter options - exclude leader_key
             # Always export mappings, groups, overlay, and scripts_folder
             filter_options = {
@@ -217,13 +222,13 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
                 "leader_key": False,  # Don't export leader key
                 "selected_group_names": selected_groups,
             }
-            
+
             data = dump_prefs_filtered(p, filter_options)
             text = json.dumps(data, indent=4, ensure_ascii=False)
             with open(self.filepath, "w", encoding="utf-8") as f:
                 f.write(text)
                 f.write("\n")
-            
+
             self.report({"INFO"}, f"Config exported to {os.path.basename(self.filepath)}")
             return {"FINISHED"}
         except Exception as ex:
@@ -238,29 +243,27 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
 
 class CHORDSONG_OT_Export_Config_Toggle_Groups(bpy.types.Operator):
     """Toggle all selections (categories and groups) in export dialog."""
-    
+
     bl_idname = "chordsong.export_config_toggle_groups"
     bl_label = "Toggle All Selections"
     bl_options = {"INTERNAL"}
-    
+
     toggle_to: BoolProperty(default=True)
-    
+
     def execute(self, context: bpy.types.Context):
         """Toggle all selections (categories and groups)."""
         # Access the export operator from class variable
         export_op = CHORDSONG_OT_Export_Config._active_instance
-        
+
         if export_op:
             # Toggle all group selections
             if hasattr(export_op, 'group_selections'):
                 for item in export_op.group_selections:
                     item.selected = self.toggle_to
                 export_op.select_all_groups = self.toggle_to
-            
+
             # Force redraw
             for area in context.screen.areas:
                 area.tag_redraw()
-        
+
         return {"FINISHED"}
-
-
