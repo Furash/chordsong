@@ -165,7 +165,10 @@
                 {
                     "operator": "chordsong.open_prefs",
                     "call_context": "EXEC_DEFAULT",
-                    "kwargs": {}
+                    "kwargs": 
+                        {
+                            "addon": "chordsong"
+                        }
                 }
             ]
         },
