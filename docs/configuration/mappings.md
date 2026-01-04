@@ -25,7 +25,7 @@ Each chord mapping type has its own set of attributes and configuration options.
 Mapping type can be switched by clicking one of the icons in the mapping item.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../../scr/mapping_types.png" alt="Mapping Type Selector" width="200">
+<img src="/chordsong/scr/mapping_types.png" alt="Mapping Type Selector" width="200">
 <!-- markdownlint-enable MD033 -->
 
 - [Operator Mapping](mappings/operator.md)

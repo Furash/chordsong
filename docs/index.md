@@ -1,6 +1,6 @@
 <div class="logo-container">
-    <img src="logo/chordsong_logo.png" alt="Logo" class="logo-dark">
-    <img src="logo/chordsong_logo_inv.png" alt="Logo" class="logo-light">
+    <img src="/chordsong/logo/chordsong_logo.png" alt="Logo" class="logo-dark">
+    <img src="/chordsong/logo/chordsong_logo_inv.png" alt="Logo" class="logo-light">
 </div>
 
 
@@ -36,7 +36,7 @@ Chord Song uses **Nerd Font** icons to provide visual cues in the overlay. Witho
 3. In Blender, navigate to **Edit > Preferences > Interface > Text Rendering**.
 4. Set the **Interface Font** to your installed Nerd Font.
 
-![Text Rendering](scr/text_rendering.png){ width="640" }
+![Text Rendering](/chordsong/scr/text_rendering.png){ width="640" }
 
 ### 2. Download the Add-on
 Choose your preferred platform to download the latest `.zip` release:

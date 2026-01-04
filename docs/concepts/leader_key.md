@@ -31,5 +31,5 @@ You can customize the leader key in the add-on preferences
 2. Locate the **Leader Key** property.
 3. Click the button to capture a new key (good choices: `Space`, `Q`, `/`).
 
-![Leader Key Configuration](../scr/leader_key.png)
+![Leader Key Configuration](/chordsong/scr/leader_key.png)
 

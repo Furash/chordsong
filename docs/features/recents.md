@@ -4,4 +4,4 @@ Double-tap the leader key to open the Recents menu. Execute items by pressing nu
 
 Triple-tap the leader key to repeat the most recent action.
 
-![Recents](../scr/recents.png){ width="640" }
+![Recents](/chordsong/scr/recents.png){ width="640" }

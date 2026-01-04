@@ -1,7 +1,7 @@
 # Overlay Configuration
 
 <!-- markdownlint-disable MD033 -->
-<img src="../../scr/prefs_ui.png" alt="UI Settings">
+<img src="/chordsong/scr/prefs_ui.png" alt="UI Settings">
 <!-- markdownlint-enable MD033 -->
 
 ## Display Control
@@ -36,10 +36,10 @@ Controls overlay position.
 Choose one of the 4 styles:
 
 <!-- markdownlint-disable MD033 -->
-<img src="../../scr/overlay_style_a.png" alt="Default">
-<img src="../../scr/overlay_style_b.png" alt="Groups After">
-<img src="../../scr/overlay_style_c.png" alt="Groups First ::">
-<img src="../../scr/overlay_style_d.png" alt="Groups First ->">
+<img src="/chordsong/scr/overlay_style_a.png" alt="Default">
+<img src="/chordsong/scr/overlay_style_b.png" alt="Groups After">
+<img src="/chordsong/scr/overlay_style_c.png" alt="Groups First ::">
+<img src="/chordsong/scr/overlay_style_d.png" alt="Groups First ->">
 <!-- markdownlint-enable MD033 -->
 
 - **Colors & Opacity**: Per-element colors (chord, label, icon, toggle states, backgrounds).

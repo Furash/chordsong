@@ -33,11 +33,11 @@ Only the first mapping executes, leading to unpredictable behavior.
 3. Review the dialog and System Console report.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../../scr/conflict_checker.png" alt="Check Conflicts" width="500">
+<img src="/chordsong/scr/conflict_checker.png" alt="Check Conflicts" width="500">
 <!-- markdownlint-enable MD033 -->
 
 <!-- markdownlint-disable MD033 -->
-<img src="../../scr/conflict_ui.png" alt="Check Conflicts Report">
+<img src="/chordsong/scr/conflict_ui.png" alt="Check Conflicts Report">
 <!-- markdownlint-enable MD033 -->
 
 ## Resolving Conflicts

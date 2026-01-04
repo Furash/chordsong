@@ -2,7 +2,7 @@
 
 Configuration operations for chord mappings.
 
-![Import & Export](../scr/prefs_config.png)
+![Import & Export](/chordsong/scr/prefs_config.png)
 
 ## Operations
 
@@ -20,7 +20,7 @@ Configuration operations for chord mappings.
 
 ## Export Config
 
-![Export Config](../scr/export_config.png)
+![Export Config](/chordsong/scr/export_config.png)
 
 Exports selected group mappings.
 

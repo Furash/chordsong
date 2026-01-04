@@ -40,5 +40,5 @@ bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
 ```
 
 <!-- markdownlint-disable MD033 -->
-<img src="../../../scr/operator_chain.gif" alt="Operator Chain">
+<img src="/chordsong/scr/operator_chain.gif" alt="Operator Chain">
 <!-- markdownlint-enable MD033 -->

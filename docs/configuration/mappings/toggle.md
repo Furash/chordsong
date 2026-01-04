@@ -15,14 +15,14 @@ Unlike [Property Mappings](property.md), toggle mappings flip the state each tim
 You can bind multiple toggles to a single chord to create "Presets" (e.g., one chord that toggles text and statistics at once).
 
 <!-- markdownlint-disable MD033 -->
-<img src="../../../scr/toggle_presets.png" alt="Toggle Presets">
+<img src="/chordsong/scr/toggle_presets.png" alt="Toggle Presets">
 <!-- markdownlint-enable MD033 -->
 
 ## Toggle State Overlay
 
 The state of the toggle is displayed in the overlay.
 <!-- markdownlint-disable MD033 -->
-<img src="../../../scr/toggle_overlay.png" alt="Toggle State Overlay" width="400">
+<img src="/chordsong/scr/toggle_overlay.png" alt="Toggle State Overlay" width="400">
 <!-- markdownlint-enable MD033 -->
 
 ### The "Checker Board" Problem
