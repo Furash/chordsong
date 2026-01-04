@@ -5,13 +5,13 @@ Contexts control which Blender editor a chord mapping is active in.
 Each mapping can be assigned to a specific context.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../scr/context_selector.png" alt="Context Selector" width="600">
+<img src="../../scr/context_selector.png" alt="Context Selector" width="600">
 <!-- markdownlint-enable MD033 -->
 
 Switching a context will immediately send the chord to the new context's tab.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../scr/context_switch.gif" alt="Context Switch" width="600">
+<img src="../../scr/context_switch.gif" alt="Context Switch" width="600">
 <!-- markdownlint-enable MD033 -->
 
 ## Available Contexts

@@ -3,7 +3,7 @@
 Create chord mappings from Blender's operator history.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../scr/info_panel.png" alt="Info Panel" width="500">
+<img src="../../scr/info_panel.png" alt="Info Panel" width="500">
 <!-- markdownlint-enable MD033 -->
 
 ## Workflow
@@ -31,7 +31,7 @@ bpy.context.space_data.overlay.show_wireframes = False
 2. Right-click and choose **"Add Chord Mapping"**.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../scr/add_info.png" alt="Add Chord Info Panel" width="500">
+<img src="../../scr/add_info.png" alt="Add Chord Info Panel" width="500">
 <!-- markdownlint-enable MD033 -->
 
 ### Step 3: Configure the Mapping

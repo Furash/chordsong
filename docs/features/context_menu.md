@@ -7,13 +7,13 @@ Create mappings from Blender's context menu.
 Right-click any UI element to create a mapping.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../scr/add_chord_rmb.png" alt="Context Menu" width="200">
+<img src="../../scr/add_chord_rmb.png" alt="Context Menu" width="200">
 <!-- markdownlint-enable MD033 -->
 
 The pop up will appear with the following fields
 
 <!-- markdownlint-disable MD033 -->
-<img src="../scr/add_chord_rmb_menu.png" alt="Add Chord Popup">
+<img src="../../scr/add_chord_rmb_menu.png" alt="Add Chord Popup">
 <!-- markdownlint-enable MD033 -->
 
 - **Enter Chord**: The sequence of keys that will trigger the mapping.

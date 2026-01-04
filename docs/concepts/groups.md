@@ -7,13 +7,13 @@ Groups organize chord mappings into logical categories for easier management.
 - **Preferences UI**: Collapsible sections let you fold/unfold groups to focus on specific categories.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../scr/groups_prefs_ui.gif" alt="Groups in Preferences">
+<img src="../../scr/groups_prefs_ui.gif" alt="Groups in Preferences">
 <!-- markdownlint-enable MD033 -->
 
 - **Overlay Display**: When multiple mappings share a token prefix, the overlay shows which groups contain them.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../scr/groups_overlay.png" alt="Groups in Overlay" width="300">
+<img src="../../scr/groups_overlay.png" alt="Groups in Overlay" width="300">
 <!-- markdownlint-enable MD033 -->
 
 ## Group Management

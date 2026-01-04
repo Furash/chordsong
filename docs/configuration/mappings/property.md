@@ -15,7 +15,7 @@ Unlike [Toggle Mappings](toggle.md), property mappings set a fixed value rather 
 You can bind multiple properties to a single chord to create "Presets" (e.g., one chord that sets Camera FOV, Clip Start, and Clip End at once).
 
 <!-- markdownlint-disable MD033 -->
-<img src="../../scr/property_presets.png" alt="Property Chain">
+<img src="../../../scr/property_presets.png" alt="Property Chain">
 <!-- markdownlint-enable MD033 -->
 
 ## Configuration Properties

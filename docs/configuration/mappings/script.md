@@ -46,7 +46,7 @@ You can use the mapping UI to add parameters to your script.
 They can be comma separated or added as individual rows using `+` button.
 
 <!-- markdownlint-disable MD033 -->
-<img src="../../scr/scripts.png" alt="Script Params">
+<img src="../../../scr/scripts.png" alt="Script Params">
 <!-- markdownlint-enable MD033 -->
 
 
