@@ -532,10 +532,22 @@ class CHORDSONG_OT_ApplyConflictFix(bpy.types.Operator):
                 except (ReferenceError, TypeError, RuntimeError):
                     pass
 
-            # Redraw all windows
-            for window in bpy.context.window_manager.windows:
-                for area in window.screen.areas:
-                    area.tag_redraw()
+            # Redraw all windows - wrap in try-except to handle destroyed areas
+            try:
+                for window in bpy.context.window_manager.windows:
+                    try:
+                        screen = window.screen
+                        if not screen:
+                            continue
+                        for area in screen.areas:
+                            try:
+                                area.tag_redraw()
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             return None
 
         bpy.app.timers.register(delayed_refresh, first_interval=0.1)
@@ -674,15 +686,27 @@ class CHORDSONG_OT_MergeIdentical(bpy.types.Operator):
                 except (ReferenceError, TypeError, RuntimeError):
                     pass
 
-            # Force redraw of all areas
-            for window in bpy.context.window_manager.windows:
-                for area in window.screen.areas:
-                    area.tag_redraw()
-                # Also try to redraw the window
-                try:
-                    window.tag_redraw()
-                except (ReferenceError, TypeError, RuntimeError):
-                    pass
+            # Force redraw of all areas - wrap in try-except to handle destroyed areas
+            try:
+                for window in bpy.context.window_manager.windows:
+                    try:
+                        screen = window.screen
+                        if not screen:
+                            continue
+                        for area in screen.areas:
+                            try:
+                                area.tag_redraw()
+                            except Exception:
+                                pass
+                        # Also try to redraw the window
+                        try:
+                            window.tag_redraw()
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
             # Force update of window manager
             try:

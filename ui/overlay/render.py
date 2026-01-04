@@ -388,6 +388,10 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
     # Generate signature for mappings to prevent cache collision (e.g. between Test and Leader)
     mappings_sig = (len(filtered_mappings), getattr(filtered_mappings[0], 'chord', '') if filtered_mappings else None)
 
+    # Get blend file path for cache validation (to detect when file is saved with different name)
+    import bpy  # type: ignore
+    blend_filepath = bpy.data.filepath
+
     # Check cache validity
     buffer_key = tuple(buffer_tokens) if buffer_tokens else ()
     prefs_hash = get_prefs_hash(p, region_w, region_h)
@@ -396,6 +400,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         _overlay_cache["buffer_tokens"] == buffer_key and
         _overlay_cache["prefs_hash"] == prefs_hash and
         _overlay_cache.get("mappings_sig") == mappings_sig and
+        _overlay_cache.get("filepath") == blend_filepath and
         _overlay_cache["layout_data"] is not None
     )
 
@@ -416,9 +421,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         # Display buffer with + separator instead of spaces
         prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
         
-        # Get blend file name for header
-        import bpy  # type: ignore
-        blend_filepath = bpy.data.filepath
+        # Get blend file name for header (blend_filepath already retrieved above)
         if blend_filepath:
             blend_filename = os.path.basename(blend_filepath)
         else:
@@ -504,6 +507,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         _overlay_cache["buffer_tokens"] = buffer_key
         _overlay_cache["prefs_hash"] = prefs_hash
         _overlay_cache["mappings_sig"] = mappings_sig
+        _overlay_cache["filepath"] = blend_filepath
         _overlay_cache["layout_data"] = layout
 
     # Render (always done, only layout calculation is cached)

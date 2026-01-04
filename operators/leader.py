@@ -32,7 +32,7 @@ _fading_overlay_state = {
     "area": None,
 }
 
-def _show_fading_overlay(context, chord_tokens, label, icon):
+def _show_fading_overlay(_context, chord_tokens, label, icon):
     """Start showing a fading overlay for the executed chord."""
     state = _fading_overlay_state
 
@@ -46,7 +46,8 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
     state["label"] = label
     state["icon"] = icon
     state["start_time"] = time.time()
-    state["area"] = context.area
+    # Don't store area reference - accessing it later can crash when windows are closed
+    state["area"] = None
 
     # Add draw handlers for all major space types
     supported_types = [
@@ -62,22 +63,9 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
             if not state["active"]:
                 return
 
-            # Only draw in the area where the chord was executed (if area is still valid)
-            # If the stored area is None or invalid, try to draw anyway
-            stored_area = state.get("area")
-            current_area = bpy.context.area
-            
-            if stored_area is not None:
-                # Check if stored area is still valid by checking if it's in the window manager
-                try:
-                    # Try to access a property to see if the area is still valid
-                    _ = stored_area.type
-                    # If we get here, area is valid - check if it matches current area
-                    if current_area != stored_area:
-                        return
-                except (AttributeError, ReferenceError):
-                    # Stored area is invalid, clear it and continue drawing
-                    state["area"] = None
+            # Don't try to validate stored_area - accessing its properties can crash
+            # Just draw the overlay in the current area if we have valid context
+            # The overlay will appear in whichever area is being redrawn
             
             # Respect UI settings in calculate_scale_factor (called inside draw_fading_overlay)
             p = prefs(bpy.context)
@@ -108,10 +96,10 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
         stored_area = state.get("area")
         if stored_area:
             try:
-                # Check if area is still valid
-                _ = stored_area.type
+                # Don't access stored_area.type - it can crash on destroyed areas
+                # Just try to tag_redraw directly and catch any exception
                 stored_area.tag_redraw()
-            except (AttributeError, ReferenceError):
+            except Exception:
                 # Area is invalid, clear it and tag all relevant areas
                 state["area"] = None
                 tag_all_views()
@@ -123,12 +111,19 @@ def _show_fading_overlay(context, chord_tokens, label, icon):
     def tag_all_views():
         try:
             for window in bpy.context.window_manager.windows:
-                for area in window.screen.areas:
-                    if area.type in {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}:
+                try:
+                    screen = window.screen
+                    if not screen:
+                        continue
+                    for area in screen.areas:
+                        # Don't access area.type - it can crash on destroyed areas
+                        # Just try to tag_redraw and catch exceptions
                         try:
                             area.tag_redraw()
                         except Exception:
                             pass
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -187,14 +182,43 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     _context_type = None  # Store the detected context type
     _last_mod_type = None  # Store the type of the last modifier key
 
+    def _is_area_valid(self, area):
+        """Check if an area is still valid without accessing type (which can crash)."""
+        if not area:
+            return False
+        try:
+            # Use a very safe check - just verify we can access a basic property
+            # Don't access 'type' as it can crash on partially destroyed areas
+            # Check 'spaces' which is safer, but wrap everything in broad exception handling
+            _ = area.spaces
+            # If we got here without exception, area is likely valid
+            # But don't access 'type' as it can cause EXCEPTION_ACCESS_VIOLATION
+            return True
+        except Exception:
+            # Any exception (including system-level crashes) means area is invalid
+            return False
+
+    def _is_region_valid(self, region):
+        """Check if a region is still valid."""
+        if not region:
+            return False
+        try:
+            # Use a safe property check - don't access 'type' as it can crash
+            _ = region.width
+            return True
+        except Exception:
+            return False
+
     def _ensure_draw_handler(self, context: bpy.types.Context):
         p = prefs(context)
         if not p.overlay_enabled or self._draw_handles:
             return
 
-        # Best effort: only draw in the region/area we started from.
-        self._area = context.area
-        self._region = context.region
+        # Don't store area/region references to avoid crashes when windows are closed
+        # The draw callback will use current context which is safer
+        # Storing references causes crashes when preferences windows are closed
+        self._area = None
+        self._region = None
 
         # Register handlers for all major space types to ensure visibility across split views
         self._draw_handles = {}
@@ -220,11 +244,32 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self._draw_handles = {}
 
     def _tag_redraw(self):
-        if self._area:
-            try:
-                self._area.tag_redraw()
-            except Exception:
-                pass
+        """Tag all relevant areas for redraw to ensure overlay is visible."""
+        try:
+            # Tag all relevant areas since we don't store area references anymore
+            # This ensures the overlay shows up regardless of which area is active
+            # But we must be very careful not to access area.type on partially destroyed areas
+            for window in bpy.context.window_manager.windows:
+                try:
+                    screen = window.screen
+                    if not screen:
+                        continue
+                    for area in screen.areas:
+                        # Don't access area.type directly - it can crash on destroyed areas
+                        # Instead, try to tag_redraw and catch exceptions
+                        try:
+                            # Try to tag - if area is valid, this will work
+                            # If area is destroyed, this will raise an exception
+                            area.tag_redraw()
+                        except Exception:
+                            # Area is invalid or destroyed, skip it
+                            pass
+                except Exception:
+                    # Window or screen is invalid, skip it
+                    pass
+        except Exception:
+            # If anything fails, just continue - this is best effort
+            pass
 
     def _draw_callback(self):
         """Draw callback for the overlay."""
@@ -234,23 +279,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if not p.overlay_enabled:
             return
 
-        # Ensure we have a valid region - use stored region if context doesn't have one
-        if not context.region and self._region and self._area:
-            try:
-                # Use temp_override to set the correct region/area
-                with context.temp_override(region=self._region, area=self._area):
-                    filtered_mappings = filter_mappings_by_context(p.mappings, self._context_type)
-                    buffer_tokens = self._buffer or []
-                    draw_overlay(context, p, buffer_tokens, filtered_mappings)
-                return
-            except Exception:
-                pass
-
         # Normal case: use context directly
         # Filter mappings by context for overlay display
         filtered_mappings = filter_mappings_by_context(p.mappings, self._context_type)
 
         # Use the buffer tokens for overlay rendering with filtered mappings
+        # draw_overlay handles context.region being None gracefully (uses defaults: 600x400)
         buffer_tokens = self._buffer or []
         draw_overlay(context, p, buffer_tokens, filtered_mappings)
 

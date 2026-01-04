@@ -72,21 +72,24 @@ def validate_viewport_context(ctx_viewport) -> dict:
                 return {}
 
         # Check if area is still valid
+        # Don't access area.type - it can crash on partially destroyed areas
+        # Instead check a safer property like 'spaces'
         area = ctx_viewport.get("area")
         if area:
             try:
-                # Try to access properties to see if area is still valid
-                _ = area.type
+                # Try to access 'spaces' which is safer than 'type'
                 _ = area.spaces
             except (AttributeError, RuntimeError, ReferenceError):
                 return {}
 
         # Check if region is still valid
+        # Don't access region.type - it can crash on partially destroyed regions
+        # Instead check a safer property like 'width'
         region = ctx_viewport.get("region")
         if region:
             try:
-                # Try to access a property to see if region is still valid
-                _ = region.type
+                # Try to access 'width' which is safer than 'type'
+                _ = region.width
             except (AttributeError, RuntimeError, ReferenceError):
                 return {}
 

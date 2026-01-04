@@ -263,8 +263,15 @@ class CHORDSONG_OT_Export_Config_Toggle_Groups(bpy.types.Operator):
                     item.selected = self.toggle_to
                 export_op.select_all_groups = self.toggle_to
 
-            # Force redraw
-            for area in context.screen.areas:
-                area.tag_redraw()
+            # Force redraw - wrap in try-except for safety
+            try:
+                if context.screen:
+                    for area in context.screen.areas:
+                        try:
+                            area.tag_redraw()
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
         return {"FINISHED"}

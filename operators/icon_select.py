@@ -105,10 +105,21 @@ class CHORDSONG_OT_Icon_Select_Apply(bpy.types.Operator):
         from .common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)
 
-        # Close the dialog
-        for window in context.window_manager.windows:
-            for area in window.screen.areas:
-                if area.type == 'PROPERTIES':
-                    area.tag_redraw()
+        # Close the dialog and redraw - wrap in try-except for safety
+        try:
+            for window in context.window_manager.windows:
+                try:
+                    screen = window.screen
+                    if not screen:
+                        continue
+                    for area in screen.areas:
+                        try:
+                            area.tag_redraw()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         return {"FINISHED"}

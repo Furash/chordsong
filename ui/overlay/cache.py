@@ -5,6 +5,7 @@ _overlay_cache = {
     "buffer_tokens": None,
     "prefs_hash": None,
     "layout_data": None,
+    "filepath": None,
 }
 
 def clear_overlay_cache():
@@ -12,6 +13,7 @@ def clear_overlay_cache():
     _overlay_cache["buffer_tokens"] = None
     _overlay_cache["prefs_hash"] = None
     _overlay_cache["layout_data"] = None
+    _overlay_cache["filepath"] = None
 
 def get_prefs_hash(p, region_w, region_h):
     """Get a hash of preferences that affect overlay layout."""

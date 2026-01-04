@@ -41,10 +41,23 @@ def disable_test_overlays():
 
 def tag_redraw_all_views():
     """Tag all relevant areas for redraw to ensure overlay visibility."""
-    for window in bpy.context.window_manager.windows:
-        for area in window.screen.areas:
-            if area.type in {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR'}:
-                area.tag_redraw()
+    try:
+        for window in bpy.context.window_manager.windows:
+            try:
+                screen = window.screen
+                if not screen:
+                    continue
+                for area in screen.areas:
+                    # Don't access area.type - it can crash on destroyed areas
+                    # Just try to tag_redraw and catch exceptions
+                    try:
+                        area.tag_redraw()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 def _fading_test_draw_callback():
     if not _fading_test_handler_ctx:
