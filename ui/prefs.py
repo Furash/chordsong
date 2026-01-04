@@ -724,29 +724,14 @@ class CHORDSONG_Preferences(AddonPreferences):
             self._sort_groups()
 
     def _sort_groups(self):
-        """Rebuild the groups collection in alphabetical order."""
-        if not self.groups:
-            return
-            
-        data = []
-        for grp in self.groups:
-            data.append({"name": grp.name, "expanded": grp.expanded})
+        """Preserve user-defined group order (no longer auto-sorts).
         
-        # Case-insensitive sort
-        data.sort(key=lambda x: x["name"].lower())
-        
-        # Final set of names to check if we actually need to clear
-        current_order = [grp.name for grp in self.groups]
-        sorted_order = [item["name"] for item in data]
-        
-        if current_order == sorted_order:
-            return # Already sorted, avoid clear()
-            
-        self.groups.clear()
-        for item in data:
-            grp = self.groups.add()
-            grp.name = item["name"]
-            grp.expanded = item["expanded"]
+        Previously sorted alphabetically, but now users can manually 
+        reorder groups with up/down buttons. New groups are added at the end.
+        """
+        # No longer auto-sort - preserve user order
+        # This method is kept for API compatibility but is now a no-op
+        pass
 
     def draw(self, context: bpy.types.Context):
         """Draw preferences UI."""

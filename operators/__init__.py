@@ -7,6 +7,7 @@ from .context_menu import (
 from .group.group_add import CHORDSONG_OT_Group_Add
 from .group.group_cleanup import CHORDSONG_OT_Group_Cleanup
 from .group.group_fold import CHORDSONG_OT_Group_Fold_All, CHORDSONG_OT_Group_Unfold_All
+from .group.group_move import CHORDSONG_OT_Group_Move_Up, CHORDSONG_OT_Group_Move_Down
 from .group.group_remove import CHORDSONG_OT_Group_Remove
 from .group.group_rename import CHORDSONG_OT_Group_Rename
 from .group.group_select import CHORDSONG_OT_Group_Select
@@ -47,6 +48,8 @@ __all__ = [
     "CHORDSONG_OT_Group_Cleanup",
     "CHORDSONG_OT_Group_Fold_All",
     "CHORDSONG_OT_Group_Unfold_All",
+    "CHORDSONG_OT_Group_Move_Up",
+    "CHORDSONG_OT_Group_Move_Down",
     "CHORDSONG_OT_Group_Remove",
     "CHORDSONG_OT_Group_Rename",
     "CHORDSONG_OT_Group_Select",

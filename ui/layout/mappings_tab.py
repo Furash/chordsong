@@ -67,8 +67,9 @@ def draw_mappings_tab(prefs, context, layout):
     row.separator()
     row.operator("chordsong.group_cleanup", text="", icon="BRUSH_DATA")
     row.separator()
-    row.operator("chordsong.group_fold_all", text="", icon="TRIA_UP")
-    row.operator("chordsong.group_unfold_all", text="", icon="TRIA_DOWN")
+    row.operator("chordsong.group_fold_all", text="", icon="TRIA_UP_BAR")
+    row.separator()
+    row.operator("chordsong.group_unfold_all", text="", icon="TRIA_DOWN_BAR")
 
     col.separator()
 
@@ -86,8 +87,20 @@ def draw_mappings_tab(prefs, context, layout):
         group = get_str_attr(m, "group") or "Ungrouped"
         groups.setdefault(group, []).append((idx, m))
 
+    # Build group order from prefs.groups collection (user-defined order)
+    # Groups in the collection come first (in order), then any remaining groups alphabetically
+    group_order = []
+    for grp in prefs.groups:
+        if grp.name in groups:
+            group_order.append(grp.name)
+    # Add any groups not in the collection (e.g., "Ungrouped" or orphaned groups)
+    remaining = [g for g in groups.keys() if g not in group_order]
+    # Sort remaining: "Ungrouped" first, then alphabetically
+    remaining.sort(key=lambda s: (s != "Ungrouped", s.lower()))
+    group_order = remaining + group_order  # Ungrouped first, then user-ordered groups
+
     # Draw grouped UI boxes
-    for group_name in sorted(groups.keys(), key=lambda s: (s != "Ungrouped", s.lower())):
+    for group_name in group_order:
         items = groups[group_name]
         items.sort(
             key=lambda im: (
@@ -136,10 +149,17 @@ def draw_mappings_tab(prefs, context, layout):
         op.context = prefs.mapping_context_tab
         row_right.separator()
 
-        # Rename and Delete group buttons
+        # Rename, Move, and Delete group buttons
         if group_name != "Ungrouped":
             group_idx = _get_group_index(prefs, group_name)
             if group_idx is not None:
+                # Move up button
+                op = row_right.operator("chordsong.group_move_up", text="", icon="TRIA_UP", emboss=False)
+                op.index = group_idx
+                # Move down button
+                op = row_right.operator("chordsong.group_move_down", text="", icon="TRIA_DOWN", emboss=False)
+                op.index = group_idx
+                row_right.separator()
                 # Rename group button
                 op = row_right.operator("chordsong.group_rename", text="", icon="EVENT_A", emboss=False)
                 op.index = group_idx
