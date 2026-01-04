@@ -44,8 +44,25 @@ def parse_property_from_text(text):
     if not text:
         return None, None
 
+    # Exclude operator calls - they should be parsed as operators, not properties
+    # Check if this looks like an operator call (bpy.ops.module.operator(...))
+    if text.strip().startswith('bpy.ops.'):
+        return None, None
+
     # Handle bpy.context.XXX = YYY or bpy.data.XXX = YYY
     # We use a permissive regex that captures everything before the first equals sign
+    # But we need to ensure the equals sign is at the top level, not inside parentheses
+    # Check if there's an opening parenthesis before the equals sign
+    equals_pos = text.find('=')
+    if equals_pos == -1:
+        return None, None
+    
+    # Check if there's an opening parenthesis before the equals sign
+    # If so, this is likely an operator call with keyword arguments, not a property assignment
+    paren_pos = text.find('(')
+    if paren_pos != -1 and paren_pos < equals_pos:
+        return None, None
+    
     pattern = r'^(?:bpy\.(?:context|data)\.)?(.+?)\s*=\s*(.*)$'
     match = re.search(pattern, text)
     if match:

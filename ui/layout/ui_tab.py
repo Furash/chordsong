@@ -50,7 +50,7 @@ def draw_ui_tab(prefs, layout):
     
     r = box.row(align=True)
     r.prop(prefs, "overlay_font_size_toggle", text="Toggle Icon Size")
-    r.prop(prefs, "overlay_toggle_offset_y", text="Vertical Offset")
+    r.prop(prefs, "overlay_toggle_offset_y", text="Toggle Vertical Offset")
 
     # Section: Positioning
     box = layout.box()
