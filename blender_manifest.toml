@@ -16,6 +16,7 @@ website = "https://github.com/Furash/chordsong/"
 tags = ["User Interface", "Accessibility"]
 
 [build]
+
 paths = [
     "__init__.py",
     "core/",
@@ -25,6 +26,7 @@ paths = [
     "LICENSE",
     "sample_scripts/",
 ]
+
 paths_exclude_pattern = [
     "__pycache__/",
     "*.pyc",
