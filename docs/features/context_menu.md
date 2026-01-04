@@ -16,7 +16,6 @@ The pop up will appear with the following fields
 <img src="../scr/add_chord_rmb_menu.png" alt="Add Chord Popup">
 <!-- markdownlint-enable MD033 -->
 
-
 - **Enter Chord**: The sequence of keys that will trigger the mapping.
 - **Editor Context**: Context in which the mapping will be active.
 - **Label**: Chord name.
@@ -25,4 +24,3 @@ The pop up will appear with the following fields
 
 !!! note "Parameters Automatic Detection"
     If the operator is detected successfully, the parameters will be filled automatically. The non-conflicting chord will be also suggested based on the operator name.
-
