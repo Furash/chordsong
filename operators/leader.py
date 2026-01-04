@@ -30,6 +30,7 @@ _fading_overlay_state = {
     "start_time": 0,
     "draw_handles": {},  # Dictionary of space_type -> handle
     "area": None,
+    "invoke_area_ptr": None,  # Store area pointer for comparison
 }
 
 def _show_fading_overlay(_context, chord_tokens, label, icon):
@@ -46,16 +47,51 @@ def _show_fading_overlay(_context, chord_tokens, label, icon):
     state["label"] = label
     state["icon"] = icon
     state["start_time"] = time.time()
-    # Don't store area reference - accessing it later can crash when windows are closed
+    # Store area pointer for comparison during draw
+    # as_pointer() gives us a stable memory address for the area
+    try:
+        state["invoke_area_ptr"] = _context.area.as_pointer() if (_context and _context.area) else None
+    except Exception:
+        state["invoke_area_ptr"] = None
     state["area"] = None
 
-    # Add draw handlers for all major space types
-    supported_types = [
-        bpy.types.SpaceView3D,
-        bpy.types.SpaceNodeEditor,
-        bpy.types.SpaceImageEditor,
-        bpy.types.SpaceSequenceEditor,
-    ]
+    # Determine which space type to use based on the context
+    # Only register handler for the specific space type where overlay was invoked
+    space = None
+    space_type_class = None
+    
+    try:
+        if _context:
+            space = getattr(_context, 'space_data', None)
+    except Exception:
+        pass
+    
+    if space:
+        try:
+            space_type = getattr(space, 'type', None)
+            if space_type == 'NODE_EDITOR':
+                space_type_class = bpy.types.SpaceNodeEditor
+            elif space_type == 'IMAGE_EDITOR':
+                space_type_class = bpy.types.SpaceImageEditor
+            elif space_type == 'SEQUENCE_EDITOR':
+                space_type_class = bpy.types.SpaceSequenceEditor
+            elif space_type == 'VIEW_3D':
+                space_type_class = bpy.types.SpaceView3D
+            else:
+                # For unsupported space types (like PREFERENCES), fall back to View3D
+                # The area pointer check will prevent drawing in wrong areas
+                space_type_class = bpy.types.SpaceView3D
+        except Exception:
+            # If we can't access space.type, fall back to View3D
+            space_type_class = bpy.types.SpaceView3D
+    else:
+        # If there's no space_data (e.g., preferences window), fall back to View3D
+        # The area pointer check will ensure we only draw in the correct area
+        space_type_class = bpy.types.SpaceView3D
+    
+    # If we still don't have a valid space type class, don't register handler
+    if not space_type_class:
+        return
 
     def draw_callback():
         try:
@@ -63,11 +99,86 @@ def _show_fading_overlay(_context, chord_tokens, label, icon):
             if not state["active"]:
                 return
 
-            # Don't try to validate stored_area - accessing its properties can crash
-            # Just draw the overlay in the current area if we have valid context
-            # The overlay will appear in whichever area is being redrawn
+            # Find the original area where overlay was invoked
+            # Search through all windows/areas to find the one matching invoke_area_ptr
+            # This is necessary because bpy.context.area might be different (e.g., preferences window)
+            target_area = None
+            if state["invoke_area_ptr"] is not None:
+                try:
+                    for window in bpy.context.window_manager.windows:
+                        try:
+                            screen = window.screen
+                            if not screen:
+                                continue
+                            for area in screen.areas:
+                                try:
+                                    if area.as_pointer() == state["invoke_area_ptr"]:
+                                        target_area = area
+                                        break
+                                except Exception:
+                                    pass
+                            if target_area:
+                                break
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             
-            # Respect UI settings in calculate_scale_factor (called inside draw_fading_overlay)
+            # If we couldn't find the target area, check if current context area matches
+            if not target_area and state["invoke_area_ptr"] is not None:
+                try:
+                    if bpy.context.area and bpy.context.area.as_pointer() == state["invoke_area_ptr"]:
+                        target_area = bpy.context.area
+                except Exception:
+                    pass
+            
+            # If we still don't have a target area, skip drawing
+            # (This prevents showing overlay in wrong areas)
+            if state["invoke_area_ptr"] is not None and not target_area:
+                return
+            
+            # Create a context override for the target area if we found it
+            # Otherwise use current context
+            if target_area:
+                try:
+                    # Try to get region from target area (usually the first WINDOW region)
+                    # Don't access region.type directly - it can crash
+                    # Instead, try to find a region by checking if it has width/height (WINDOW regions do)
+                    target_region = None
+                    for region in target_area.regions:
+                        try:
+                            # WINDOW regions have width and height, other regions might not
+                            # This is a safe way to identify WINDOW regions without accessing .type
+                            _ = region.width
+                            _ = region.height
+                            target_region = region
+                            break
+                        except Exception:
+                            continue
+                    
+                    if target_region:
+                        # Create context override with target area and region
+                        with bpy.context.temp_override(area=target_area, region=target_region):
+                            p = prefs(bpy.context)
+                            if not p:
+                                return
+                            
+                            still_active = draw_fading_overlay(
+                                bpy.context, p,
+                                state["chord_text"],
+                                state["label"],
+                                state["icon"],
+                                state["start_time"]
+                            )
+                            
+                            if not still_active:
+                                _cleanup_fading_overlay()
+                            return
+                except Exception:
+                    # If temp_override fails, fall through to default context
+                    pass
+            
+            # Fallback: use current context
             p = prefs(bpy.context)
             if not p:
                 return
@@ -85,11 +196,11 @@ def _show_fading_overlay(_context, chord_tokens, label, icon):
         except Exception:
             _cleanup_fading_overlay()
 
-
+    # Only register handler for the specific space type where overlay was invoked
     state["draw_handles"] = {}
-    for st in supported_types:
-        handle = st.draw_handler_add(draw_callback, (), "WINDOW", "POST_PIXEL")
-        state["draw_handles"][st] = handle
+    if space_type_class:
+        handle = space_type_class.draw_handler_add(draw_callback, (), "WINDOW", "POST_PIXEL")
+        state["draw_handles"][space_type_class] = handle
 
     # Helper function to tag the target area for redraw
     def tag_target_view():
@@ -145,6 +256,7 @@ def _cleanup_fading_overlay():
     """Clean up the fading overlay."""
     state = _fading_overlay_state
     state["active"] = False
+    state["invoke_area_ptr"] = None
 
     if state["draw_handles"]:
         for st, handle in state["draw_handles"].items():
@@ -178,6 +290,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     _buffer = None
     _region = None
     _area = None
+    _invoke_area_ptr = None  # Store area pointer for comparison
     _scroll_offset = 0
     _context_type = None  # Store the detected context type
     _last_mod_type = None  # Store the type of the last modifier key
@@ -214,9 +327,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if not p.overlay_enabled or self._draw_handles:
             return
 
-        # Don't store area/region references to avoid crashes when windows are closed
-        # The draw callback will use current context which is safer
-        # Storing references causes crashes when preferences windows are closed
+        # Store area pointer for comparison during draw
+        # as_pointer() gives us a stable memory address for the area
+        self._invoke_area_ptr = context.area.as_pointer() if context.area else None
         self._area = None
         self._region = None
 
@@ -278,6 +391,15 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         p = prefs(context)
         if not p.overlay_enabled:
             return
+
+        # Only draw in the area where leader was invoked
+        # Compare area pointers - as_pointer() gives stable memory addresses
+        if self._invoke_area_ptr is not None and context.area is not None:
+            try:
+                if context.area.as_pointer() != self._invoke_area_ptr:
+                    return  # Skip drawing in other areas
+            except Exception:
+                pass  # If we can't get pointer, just draw
 
         # Normal case: use context directly
         # Filter mappings by context for overlay display
@@ -494,16 +616,40 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             try:
                                 with bpy.context.temp_override(**valid_ctx):
                                     exec(compile(script_text, python_file, 'exec'), exec_globals)  # pylint: disable=exec-used
-                                    # Show fading overlay on success (inside temp_override for correct space detection)
-                                    _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                             except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                 # Context became invalid, fall back to default context
                                 exec(compile(script_text, python_file, 'exec'), exec_globals)  # pylint: disable=exec-used
-                                # Show fading overlay on success
-                                _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                         else:
                             exec(compile(script_text, python_file, 'exec'), exec_globals)  # pylint: disable=exec-used
-                            # Show fading overlay on success
+                        
+                        # Show fading overlay using the original captured context (ctx_viewport)
+                        # This ensures overlay appears in the editor where leader was invoked
+                        overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                        if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
+                            try:
+                                # Get space_data directly from the area (area.spaces[0] is the active space)
+                                area = overlay_ctx["area"]
+                                region = overlay_ctx["region"]
+                                space_data = None
+                                try:
+                                    if area.spaces:
+                                        space_data = area.spaces[0]
+                                except Exception:
+                                    pass
+                                
+                                # Create a context-like object with the area from overlay_ctx
+                                # This ensures we store the correct area pointer and space type
+                                class ContextWrapper:
+                                    def __init__(self, area, region, space_data):
+                                        self.area = area
+                                        self.region = region
+                                        self.space_data = space_data
+                                
+                                wrapped_ctx = ContextWrapper(area, region, space_data)
+                                _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
+                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                        else:
                             _show_fading_overlay(bpy.context, chord_tokens, label, icon)
 
                         # Add to history
@@ -623,15 +769,44 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         
                         # Show fading overlay with multi-status if applicable
                         if results:
+                            overlay_label = ""
                             if len(results) == 1:
                                 status = "ON" if results[0] else "OFF"
-                                _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status})", icon)
+                                overlay_label = f"{label} ({status})"
                             else:
                                 # Show count or joined status
                                 on_count = sum(1 for r in results if r)
                                 off_count = len(results) - on_count
                                 status_str = f"{on_count} ON, {off_count} OFF"
-                                _show_fading_overlay(bpy.context, chord_tokens, f"{label} ({status_str})", icon)
+                                overlay_label = f"{label} ({status_str})"
+                            
+                            # Use the original captured viewport context (ctx_viewport) for overlay
+                            overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                            if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
+                                try:
+                                    # Get space_data directly from the area (area.spaces[0] is the active space)
+                                    area = overlay_ctx["area"]
+                                    region = overlay_ctx["region"]
+                                    space_data = None
+                                    try:
+                                        if area.spaces:
+                                            space_data = area.spaces[0]
+                                    except Exception:
+                                        pass
+                                    
+                                    # Create a context-like object with the area from overlay_ctx
+                                    class ContextWrapper:
+                                        def __init__(self, area, region, space_data):
+                                            self.area = area
+                                            self.region = region
+                                            self.space_data = space_data
+                                    
+                                    wrapped_ctx = ContextWrapper(area, region, space_data)
+                                    _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
+                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                    _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
+                            else:
+                                _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
 
                         # Add to history
                         add_to_history(
@@ -731,10 +906,39 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                     success_count += 1
                         
                         if success_count > 0:
+                            overlay_label = ""
                             if success_count == 1:
-                                _show_fading_overlay(bpy.context, chord_tokens, f"{label}: {property_value}", icon)
+                                overlay_label = f"{label}: {property_value}"
                             else:
-                                _show_fading_overlay(bpy.context, chord_tokens, f"{label}: {success_count} values set", icon)
+                                overlay_label = f"{label}: {success_count} values set"
+                            
+                            # Use the original captured viewport context (ctx_viewport) for overlay
+                            overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                            if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
+                                try:
+                                    # Get space_data directly from the area (area.spaces[0] is the active space)
+                                    area = overlay_ctx["area"]
+                                    region = overlay_ctx["region"]
+                                    space_data = None
+                                    try:
+                                        if area.spaces:
+                                            space_data = area.spaces[0]
+                                    except Exception:
+                                        pass
+                                    
+                                    # Create a context-like object with the area from overlay_ctx
+                                    class ContextWrapper:
+                                        def __init__(self, area, region, space_data):
+                                            self.area = area
+                                            self.region = region
+                                            self.space_data = space_data
+                                    
+                                    wrapped_ctx = ContextWrapper(area, region, space_data)
+                                    _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
+                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                    _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
+                            else:
+                                _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
 
                         # Add to history
                         add_to_history(
@@ -829,7 +1033,36 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             success = True
 
                     if success:
-                        _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                        # Use the original captured viewport context (ctx_viewport) for overlay
+                        # This ensures we show overlay in the editor where leader was invoked
+                        # Validate it first to ensure it's still valid
+                        overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                        if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
+                            try:
+                                # Get space_data directly from the area (area.spaces[0] is the active space)
+                                area = overlay_ctx["area"]
+                                region = overlay_ctx["region"]
+                                space_data = None
+                                try:
+                                    if area.spaces:
+                                        space_data = area.spaces[0]
+                                except Exception:
+                                    pass
+                                
+                                # Create a context-like object with the area from overlay_ctx
+                                class ContextWrapper:
+                                    def __init__(self, area, region, space_data):
+                                        self.area = area
+                                        self.region = region
+                                        self.space_data = space_data
+                                
+                                wrapped_ctx = ContextWrapper(area, region, space_data)
+                                _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
+                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                # Context became invalid, fall back to current context
+                                _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                        else:
+                            _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                         add_to_history(
                             chord_tokens=chord_tokens,
                             label=label,
