@@ -14,15 +14,17 @@ The autosave file is saved next to your main configuration file with the `.autos
 
 ### Default Location
 
-If you haven't set a custom config path, the default location is:
+If you haven't set a custom config path, the default location is in the extension-specific user directory:
 
 ```
-<Blender User Scripts>/presets/chordsong/chordsong.json
+chordsong.json
 ```
 
 ```
-<Blender User Scripts>/presets/chordsong/chordsong.autosave.json
+chordsong.autosave.json
 ```
+
+The extension-specific user directory persists between extension upgrades and is managed by Blender. This ensures your configuration and autosave files are preserved when you update the extension.
 
 ### Custom Config Path
 

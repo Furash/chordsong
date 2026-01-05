@@ -248,7 +248,11 @@ def register():
     register_context_menu()
     # Initialize default config path early (so operators can use it before opening prefs UI).
     try:
-        prefs = bpy.context.preferences.addons[__package__].preferences
+        # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
+        # We need the first 3 parts: bl_ext.repo.addon_id
+        parts = __package__.split(".") if __package__ else []
+        package_name = ".".join(parts[:3]) if len(parts) >= 3 else (__package__ or "")
+        prefs = bpy.context.preferences.addons[package_name].preferences
         if hasattr(prefs, "ensure_defaults"):
             prefs.ensure_defaults()
 

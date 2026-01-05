@@ -58,21 +58,36 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
         """Show selection dialog first, then file browser."""
         # If selections are already confirmed, show file browser
         if self.selections_confirmed:
-            # Default to Blender's scripts/presets folder.
-            presets_dir = bpy.utils.user_resource("SCRIPTS", path="presets", create=True)
-            if presets_dir:
-                folder = os.path.join(presets_dir, "chordsong")
-                os.makedirs(folder, exist_ok=True)
-                # Initialize filepath if not set or if it's the default
-                # filepath is provided by ExportHelper, use getattr for safety
-                current_filepath = getattr(self, "filepath", "")
-                if not current_filepath or current_filepath.endswith("chordsong_export.json"):
-                    self.filepath = os.path.join(folder, "chordsong_export.json")
-            else:
-                # Initialize filepath if not set
-                current_filepath = getattr(self, "filepath", "")
-                if not current_filepath:
-                    self.filepath = os.path.join(os.path.expanduser("~"), "chordsong_export.json")
+            # Default to extension-specific user directory
+            try:
+                # Use extension_path_user for extension-specific user directory
+                extension_dir = bpy.utils.extension_path_user(__package__, path="", create=True)
+                if extension_dir:
+                    current_filepath = getattr(self, "filepath", "")
+                    if not current_filepath or current_filepath.endswith("chordsong_export.json"):
+                        self.filepath = os.path.join(extension_dir, "chordsong_export.json")
+                else:
+                    current_filepath = getattr(self, "filepath", "")
+                    if not current_filepath:
+                        self.filepath = os.path.join(os.path.expanduser("~"), "chordsong_export.json")
+            except Exception:
+                # Fallback to user_resource if extension_path_user is not available
+                try:
+                    presets_dir = bpy.utils.user_resource("SCRIPTS", path="presets", create=True)
+                    if presets_dir:
+                        folder = os.path.join(presets_dir, "chordsong")
+                        os.makedirs(folder, exist_ok=True)
+                        current_filepath = getattr(self, "filepath", "")
+                        if not current_filepath or current_filepath.endswith("chordsong_export.json"):
+                            self.filepath = os.path.join(folder, "chordsong_export.json")
+                    else:
+                        current_filepath = getattr(self, "filepath", "")
+                        if not current_filepath:
+                            self.filepath = os.path.join(os.path.expanduser("~"), "chordsong_export.json")
+                except Exception:
+                    current_filepath = getattr(self, "filepath", "")
+                    if not current_filepath:
+                        self.filepath = os.path.join(os.path.expanduser("~"), "chordsong_export.json")
             return super().invoke(context, event)
 
         # First time: show selection dialog

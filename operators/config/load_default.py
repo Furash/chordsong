@@ -7,6 +7,7 @@ import os
 import bpy  # type: ignore
 
 from ...core.config_io import apply_config, loads_json
+from ...ui.prefs import default_config_path
 from ..common import prefs
 
 def _get_default_config_path():
@@ -37,18 +38,23 @@ class CHORDSONG_OT_Load_Default(bpy.types.Operator):
             p._chordsong_suspend_autosave = True
 
             # Load default config from JSON file
-            default_config_path = _get_default_config_path()
-            if not os.path.exists(default_config_path):
-                self.report({"ERROR"}, f"Default config file not found: {default_config_path}")
+            bundled_config_path = _get_default_config_path()
+            if not os.path.exists(bundled_config_path):
+                self.report({"ERROR"}, f"Default config file not found: {bundled_config_path}")
                 return {"CANCELLED"}
 
-            with open(default_config_path, "r", encoding="utf-8") as f:
+            with open(bundled_config_path, "r", encoding="utf-8") as f:
                 data = loads_json(f.read())
 
             # Apply the default config
             warnings = apply_config(p, data)
             for w in warnings[:5]:
                 self.report({"WARNING"}, w)
+
+            # Set the config path to the default extension-specific directory
+            default_path = default_config_path()
+            if default_path:
+                p.config_path = default_path
 
             self.report({"INFO"}, "Loaded default config")
             return {"FINISHED"}

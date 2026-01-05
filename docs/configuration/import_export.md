@@ -16,7 +16,7 @@ Configuration operations for chord mappings.
 ## Save Config
 
 - If config path set: Saves directly to that file
-- Otherwise saves into *<Blender User Scripts\>/presets/chordsong/chordsong.json*
+- Otherwise saves into the extension-specific user directory: *chordsong.json*
 
 ## Export Config
 
@@ -25,6 +25,7 @@ Configuration operations for chord mappings.
 Exports selected group mappings.
 
 **Process**:
+
 1. Validates JSON and config structure
 2. Suspends autosave
 3. Adds mappings (does not clear existing)
@@ -40,13 +41,15 @@ Exports selected group mappings.
 
 ### Location
 
-**Default**: `<Blender User Scripts>/presets/chordsong/chordsong.json`
+**Default**: Extension-specific user directory (`chordsong.json`)
+
+The default configuration file is stored in the extension's user directory, which persists between extension upgrades. This directory is managed by Blender and is specific to the Chord Song extension.
 
 **Custom Path**: Set in preferences. When set:
+
 - Save Config saves directly (no browser)
 - Load Config loads directly (if file exists)
 - Autosave creates `.autosave.json` in same directory
-
 
 ### Manual Editing
 

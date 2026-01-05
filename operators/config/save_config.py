@@ -31,14 +31,26 @@ class CHORDSONG_OT_Save_Config(bpy.types.Operator, ExportHelper):
             self.filepath = config_path
             return self.execute(context)
 
-        # Default to Blender's scripts/presets folder.
-        presets_dir = bpy.utils.user_resource("SCRIPTS", path="presets", create=True)
-        if presets_dir:
-            folder = os.path.join(presets_dir, "chordsong")
-            os.makedirs(folder, exist_ok=True)
-            self.filepath = os.path.join(folder, "chordsong.json")
-        else:
-            self.filepath = os.path.join(os.path.expanduser("~"), "chordsong.json")
+        # Default to extension-specific user directory
+        try:
+            # Use extension_path_user for extension-specific user directory
+            extension_dir = bpy.utils.extension_path_user(__package__, path="", create=True)
+            if extension_dir:
+                self.filepath = os.path.join(extension_dir, "chordsong.json")
+            else:
+                self.filepath = os.path.join(os.path.expanduser("~"), "chordsong.json")
+        except Exception:
+            # Fallback to user_resource if extension_path_user is not available
+            try:
+                presets_dir = bpy.utils.user_resource("SCRIPTS", path="presets", create=True)
+                if presets_dir:
+                    folder = os.path.join(presets_dir, "chordsong")
+                    os.makedirs(folder, exist_ok=True)
+                    self.filepath = os.path.join(folder, "chordsong.json")
+                else:
+                    self.filepath = os.path.join(os.path.expanduser("~"), "chordsong.json")
+            except Exception:
+                self.filepath = os.path.join(os.path.expanduser("~"), "chordsong.json")
         return super().invoke(context, event)
 
     def execute(self, context: bpy.types.Context):

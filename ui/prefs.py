@@ -29,13 +29,33 @@ def _addon_root_pkg() -> str:
 
 def default_config_path() -> str:
     """
-    Default config path: <user scripts>/presets/chordsong/chordsong.json
-    Uses Blender's user script resource location.
+    Default config path: Uses extension-specific user directory.
+    This directory persists between extension upgrades.
     """
-    presets_dir = bpy.utils.user_resource("SCRIPTS", path="presets", create=True)
-    if presets_dir:
-        # Keep addon presets isolated in their own folder.
-        return os.path.join(presets_dir, "chordsong", "chordsong.json")
+    # Check if extension_path_user is available (Blender 4.2+)
+    if hasattr(bpy.utils, 'extension_path_user'):
+        try:
+            # Use extension_path_user for extension-specific user directory
+            # This ensures the directory persists between upgrades
+            # Try with root package name (first 3 parts: bl_ext.repo.addon_id)
+            # as extensions use this format for their namespace
+            root_pkg = _addon_root_pkg()
+            extension_dir = bpy.utils.extension_path_user(root_pkg, path="", create=True)
+            if extension_dir:
+                return os.path.join(extension_dir, "chordsong.json")
+        except Exception:
+            # Silently fallback if extension_path_user fails
+            pass
+    
+    # Fallback to user_resource if extension_path_user is not available
+    # (for backward compatibility with older Blender versions)
+    # Note: This respects BLENDER_USER_RESOURCES and BLENDER_USER_SCRIPTS env vars
+    try:
+        presets_dir = bpy.utils.user_resource("SCRIPTS", path="presets", create=True)
+        if presets_dir:
+            return os.path.join(presets_dir, "chordsong", "chordsong.json")
+    except Exception:
+        pass
     return ""
 
 def _autosave_now(prefs):

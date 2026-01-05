@@ -124,8 +124,8 @@ jobs:
             
             ### Installation
             1. Download `${{ steps.build.outputs.asset_name }}`
-            2. In Blender, go to Edit > Preferences > Add-ons
-            3. Click "Install..." and select the ZIP file
+            2. In Blender, go to Edit > Preferences > Get Extensions
+            3. Click "Install from Disk..." and select the ZIP file
             4. Enable the add-on
             
             ### Changes
