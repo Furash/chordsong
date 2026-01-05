@@ -128,6 +128,24 @@ _classes = (
 
 _addon_keymaps = []
 
+def _safe_register_class(cls):
+    """Register a class, recovering from partial/failed previous registrations."""
+    try:
+        bpy.utils.register_class(cls)
+    except ValueError:
+        # Most commonly: "already registered as a subclass ..."
+        try:
+            bpy.utils.unregister_class(cls)
+        except Exception:
+            pass
+        bpy.utils.register_class(cls)
+
+def _safe_unregister_class(cls):
+    try:
+        bpy.utils.unregister_class(cls)
+    except Exception:
+        pass
+
 def rebuild_keymaps():
     """Recreate add-on keymaps."""
     _unregister_keymaps()
@@ -225,7 +243,7 @@ def _unregister_keymaps():
 def register():
     """Register addon classes and keymaps."""
     for cls in _classes:
-        bpy.utils.register_class(cls)
+        _safe_register_class(cls)
     _register_keymaps()
     register_context_menu()
     # Initialize default config path early (so operators can use it before opening prefs UI).
@@ -267,4 +285,4 @@ def unregister():
     unregister_context_menu()
     _unregister_keymaps()
     for cls in reversed(_classes):
-        bpy.utils.unregister_class(cls)
+        _safe_unregister_class(cls)

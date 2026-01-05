@@ -485,12 +485,15 @@ def button_context_menu_draw(self, context):
 
 def register_context_menu():
     """Register the context menu hook."""
-    # Ensure the menu exists (it might not if we are not in developer extras mode or similar)
-    if not hasattr(bpy.types, "WM_MT_button_context"):
-        bpy.utils.register_class(CHORDSONG_MT_button_context)
+    # Prefer Blender's built-in menu when available; otherwise fall back to our own.
+    # Some Blender builds / configurations may not expose WM_MT_button_context.
+    menu_type = getattr(bpy.types, "WM_MT_button_context", None) or getattr(bpy.types, "W_MT_button_context", None)
+    if menu_type is None:
+        if not hasattr(bpy.types, "CHORDSONG_MT_button_context"):
+            bpy.utils.register_class(CHORDSONG_MT_button_context)
+        menu_type = bpy.types.CHORDSONG_MT_button_context
 
-    # Append to existing menu or our created one
-    bpy.types.WM_MT_button_context.append(button_context_menu_draw)
+    menu_type.append(button_context_menu_draw)
 
     # Also attempt to append to Info Editor context menu
     if hasattr(bpy.types, "INFO_MT_context_menu"):
@@ -498,14 +501,34 @@ def register_context_menu():
 
 def unregister_context_menu():
     """Unregister the context menu hook"""
+    # Remove from whichever menu we appended to.
     if hasattr(bpy.types, "WM_MT_button_context"):
-        bpy.types.WM_MT_button_context.remove(button_context_menu_draw)
+        try:
+            bpy.types.WM_MT_button_context.remove(button_context_menu_draw)
+        except Exception:
+            pass
+    if hasattr(bpy.types, "W_MT_button_context"):
+        try:
+            bpy.types.W_MT_button_context.remove(button_context_menu_draw)
+        except Exception:
+            pass
+    if hasattr(bpy.types, "CHORDSONG_MT_button_context"):
+        try:
+            bpy.types.CHORDSONG_MT_button_context.remove(button_context_menu_draw)
+        except Exception:
+            pass
 
     if hasattr(bpy.types, "INFO_MT_context_menu"):
-        bpy.types.INFO_MT_context_menu.remove(button_context_menu_draw)
+        try:
+            bpy.types.INFO_MT_context_menu.remove(button_context_menu_draw)
+        except Exception:
+            pass
 
     if hasattr(bpy.types, "CHORDSONG_MT_button_context"):
-        bpy.utils.unregister_class(CHORDSONG_MT_button_context)
+        try:
+            bpy.utils.unregister_class(CHORDSONG_MT_button_context)
+        except Exception:
+            pass
 
 __all__ = [
     "CHORDSONG_OT_Context_Menu",
