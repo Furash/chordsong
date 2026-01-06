@@ -256,13 +256,18 @@ def register():
         if hasattr(prefs, "ensure_defaults"):
             prefs.ensure_defaults()
 
-        # Try to load config from scripts/presets/chordsong/chordsong.json if it exists
+        # Try to load config from user's config_path if set, otherwise from default location
         try:
             import os
             from .core.config_io import apply_config, loads_json
             from .ui.prefs import default_config_path
 
-            config_path = default_config_path()
+            # First check if user has set a config_path in preferences
+            config_path = getattr(prefs, "config_path", "") or ""
+            if not config_path or not os.path.exists(config_path):
+                # Fall back to default config path if user's path is not set or doesn't exist
+                config_path = default_config_path()
+            
             if config_path and os.path.exists(config_path):
                 with open(config_path, "r", encoding="utf-8") as f:
                     data = loads_json(f.read())
