@@ -28,7 +28,68 @@ jobs:
           python-version: '3.11'
 
       - name: Install Dependencies
-        run: pip install tomli
+        run: pip install tomli tomli-w
+
+      - name: Extract Version from Tag or Input
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # Use version from workflow_dispatch input
+            TAG_NAME="${{ github.event.inputs.version }}"
+          else
+            # Use version from tag
+            TAG_NAME="${{ github.ref_name }}"
+          fi
+          # Remove 'v' prefix if present (e.g., v1.0.5 -> 1.0.5)
+          VERSION="${TAG_NAME#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION from tag/input: $TAG_NAME"
+
+      - name: Validate Version Matches Tag
+        run: |
+          python << 'EOF'
+          import tomli
+          
+          TAG_VERSION = "${{ steps.version.outputs.version }}"
+          
+          # Read current manifest version
+          with open('blender_manifest.toml', 'rb') as f:
+              manifest = tomli.load(f)
+          
+          MANIFEST_VERSION = manifest.get('version', '')
+          
+          if MANIFEST_VERSION != TAG_VERSION:
+              print(f"⚠️  Version mismatch detected!")
+              print(f"   Tag version: {TAG_VERSION}")
+              print(f"   Manifest version: {MANIFEST_VERSION}")
+              print(f"\n   The workflow will auto-update the manifest to {TAG_VERSION}.")
+              print(f"   For future releases, update blender_manifest.toml before creating the tag.")
+          else:
+              print(f"✅ Version matches: {TAG_VERSION}")
+          EOF
+
+      - name: Update Version in Manifest
+        run: |
+          python << 'EOF'
+          import tomli
+          import tomli_w
+          
+          VERSION = "${{ steps.version.outputs.version }}"
+          
+          # Read manifest
+          with open('blender_manifest.toml', 'rb') as f:
+              manifest = tomli.load(f)
+          
+          # Update version
+          old_version = manifest.get('version', 'unknown')
+          manifest['version'] = VERSION
+          
+          # Write back
+          with open('blender_manifest.toml', 'wb') as f:
+              tomli_w.dump(manifest, f)
+          
+          print(f"Updated version from {old_version} to {VERSION} in blender_manifest.toml")
+          EOF
 
       - name: Build Blender Add-on from Manifest
         id: build
@@ -105,10 +166,10 @@ jobs:
           # Write outputs for GitHub Actions
           output_file = os.environ.get('GITHUB_OUTPUT', '/dev/stdout')
           with open(output_file, 'a') as f:
-              f.write(f"version={version}\n")
-              f.write(f"asset_path={zip_name}\n")
-              f.write(f"asset_name={os.path.basename(zip_name)}\n")
-          print(f"Built {zip_name}")
+            f.write(f"version={version}\n")
+            f.write(f"asset_path={zip_name}\n")
+            f.write(f"asset_name={os.path.basename(zip_name)}\n")
+          print(f"Built {zip_name} with version {version}")
           EOF
 
       - name: Create Release
