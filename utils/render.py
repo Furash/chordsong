@@ -311,6 +311,86 @@ def execute_history_entry_operator(context, entry):
         traceback.print_exc()
         return False, error_msg
 
+def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None):
+    """Execute a Python script using Blender's text editor (avoids exec/runpy).
+    
+    Args:
+        filepath: Path to the Python script file
+        script_args: Optional dictionary of arguments to pass as 'args' global
+        valid_ctx: Optional validated viewport context dictionary
+        
+    Returns:
+        tuple: (success: bool, error_message: str or None)
+    """
+    try:
+        import os
+        if not os.path.exists(filepath):
+            return False, f"Script file not found: {filepath}"
+        
+        # Read the script file
+        with open(filepath, 'r', encoding='utf-8') as f:
+            script_content = f.read()
+        
+        # Prepend code to set up globals (args, context)
+        # This allows scripts to access 'args' dictionary and ensures 'context' is available
+        import json
+        # Always set up args (use empty dict if script_args is None)
+        args_dict = script_args if script_args is not None else {}
+        args_json = json.dumps(args_dict, default=str)
+        prepend_code = f"import json\nimport bpy\nargs = json.loads({repr(args_json)})\ncontext = bpy.context\n"
+        
+        # Combine prepended code with original script
+        full_script = prepend_code + script_content
+        
+        # Create a temporary text block
+        temp_name = f"__chordsong_temp_{os.path.basename(filepath)}"
+        # Remove existing temp block if it exists
+        if temp_name in bpy.data.texts:
+            bpy.data.texts.remove(bpy.data.texts[temp_name])
+        
+        # Create new text block with the script content
+        text_block = bpy.data.texts.new(temp_name)
+        text_block.write(full_script)
+        
+        # Prepare context override
+        override = bpy.context.copy()
+        override["edit_text"] = text_block
+        
+        # Execute the script
+        if valid_ctx:
+            try:
+                override.update(valid_ctx)
+                override["edit_text"] = text_block
+                with bpy.context.temp_override(**override):
+                    bpy.ops.text.run_script()
+            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                # Context became invalid, fall back to default context
+                with bpy.context.temp_override(**override):
+                    bpy.ops.text.run_script()
+        else:
+            with bpy.context.temp_override(**override):
+                bpy.ops.text.run_script()
+        
+        # Clean up temporary text block
+        bpy.data.texts.remove(text_block)
+        
+        return True, None
+        
+    except Exception as e:
+        import traceback
+        # Clean up text block if it exists
+        temp_name = f"__chordsong_temp_{os.path.basename(filepath)}"
+        if temp_name in bpy.data.texts:
+            try:
+                bpy.data.texts.remove(bpy.data.texts[temp_name])
+            except Exception:
+                pass
+        
+        error_msg = f"Failed to execute script {filepath}: {e}"
+        print(f"Chord Song: {error_msg}")
+        traceback.print_exc()
+        return False, error_msg
+
 def execute_history_entry_script(context, entry):
     """Execute a Python script from history entry.
 
@@ -336,20 +416,8 @@ def execute_history_entry_script(context, entry):
             ctx_viewport = capture_viewport_context(context)
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
-        with open(entry.python_file, 'r', encoding='utf-8') as f:
-            script_text = f.read()
-
-        if valid_ctx:
-            try:
-                with bpy.context.temp_override(**valid_ctx):
-                    exec(compile(script_text, entry.python_file, 'exec'))  # pylint: disable=exec-used
-            except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                # Context became invalid, fall back to default context
-                exec(compile(script_text, entry.python_file, 'exec'))  # pylint: disable=exec-used
-        else:
-            exec(compile(script_text, entry.python_file, 'exec'))  # pylint: disable=exec-used
-
-        return True, None
+        # Execute using Blender's text editor (no exec/runpy)
+        return _execute_script_via_text_editor(entry.python_file, script_args=None, valid_ctx=valid_ctx)
 
     except Exception as e:
         import traceback
