@@ -113,6 +113,7 @@ def dump_prefs(prefs) -> dict:
     return {
         "version": CHORDSONG_CONFIG_VERSION,
         "scripts_folder": get_str_attr(prefs, "scripts_folder"),
+        "allow_custom_user_scripts": bool(getattr(prefs, "allow_custom_user_scripts", False)),
         "leader_key": get_leader_key_type(),
         "overlay": {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
@@ -177,6 +178,7 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
     # Scripts folder
     if filter_options.get("scripts_folder", True):
         result["scripts_folder"] = get_str_attr(prefs, "scripts_folder")
+        result["allow_custom_user_scripts"] = bool(getattr(prefs, "allow_custom_user_scripts", False))
     
     # Leader key
     if filter_options.get("leader_key", True):
@@ -365,6 +367,16 @@ def apply_config(prefs, data: dict) -> list[str]:
         scripts_folder = data.get("scripts_folder", "")
         if isinstance(scripts_folder, str):
             prefs.scripts_folder = scripts_folder.strip()
+    
+    # Allow custom user scripts - default to False for security
+    # Only enable if explicitly set to True in config
+    if "allow_custom_user_scripts" in data:
+        allow_scripts = data.get("allow_custom_user_scripts", False)
+        if isinstance(allow_scripts, bool):
+            prefs.allow_custom_user_scripts = allow_scripts
+    else:
+        # Explicitly set to False if not in config (for backward compatibility and security)
+        prefs.allow_custom_user_scripts = False
 
     # Leader key
     if "leader_key" in data:

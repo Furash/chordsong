@@ -562,6 +562,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
             # Handle Python script execution
             if mapping_type == "PYTHON_FILE":
+                # Check if custom scripts are enabled
+                if not prefs(context).allow_custom_user_scripts:
+                    self.report({"ERROR"}, "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences.")
+                    self._finish(context)
+                    return {"CANCELLED"}
+                
                 python_file = (getattr(m, "python_file", "") or "").strip()
                 if not python_file:
                     self.report({"WARNING"}, f'Chord "{" ".join(self._buffer)}" has no script file')
@@ -596,7 +602,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         success, error_msg = _execute_script_via_text_editor(
                             python_file, 
                             script_args=script_args, 
-                            valid_ctx=valid_ctx
+                            valid_ctx=valid_ctx,
+                            context=bpy.context
                         )
                         
                         if not success:

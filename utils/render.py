@@ -311,17 +311,24 @@ def execute_history_entry_operator(context, entry):
         traceback.print_exc()
         return False, error_msg
 
-def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None):
+def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None, context=None):
     """Execute a Python script using Blender's text editor (avoids exec/runpy).
     
     Args:
         filepath: Path to the Python script file
         script_args: Optional dictionary of arguments to pass as 'args' global
         valid_ctx: Optional validated viewport context dictionary
+        context: Blender context (required for preference check)
         
     Returns:
         tuple: (success: bool, error_message: str or None)
     """
+    # Check if custom scripts are enabled (safety check)
+    if context:
+        from ..operators.common import prefs
+        if not prefs(context).allow_custom_user_scripts:
+            return False, "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences."
+    
     try:
         import os
         if not os.path.exists(filepath):
@@ -398,6 +405,13 @@ def execute_history_entry_script(context, entry):
         tuple: (success: bool, error_message: str or None)
     """
     try:
+        # Check if custom scripts are enabled
+        from ..operators.common import prefs
+        if not prefs(context).allow_custom_user_scripts:
+            error_msg = "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences."
+            print(f"Chord Song: {error_msg}")
+            return False, error_msg
+        
         import os
         if not os.path.exists(entry.python_file):
             error_msg = f"Script file not found: {entry.python_file}"
@@ -417,7 +431,7 @@ def execute_history_entry_script(context, entry):
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
         # Execute using Blender's text editor (no exec/runpy)
-        return _execute_script_via_text_editor(entry.python_file, script_args=None, valid_ctx=valid_ctx)
+        return _execute_script_via_text_editor(entry.python_file, script_args=None, valid_ctx=valid_ctx, context=context)
 
     except Exception as e:
         import traceback

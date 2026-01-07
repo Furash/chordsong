@@ -16,10 +16,17 @@ def draw_config_section(prefs, layout):
     r.prop(prefs, "config_path", text="", icon="FILE_CACHE")
 
     r = box.row()
-    r.scale_x = 0.4
-    r.label(text="Scripts Folder:")
-    r.scale_x = 4
-    r.prop(prefs, "scripts_folder", text="", icon="FILE_FOLDER")
+    if not prefs.allow_custom_user_scripts:
+        r = box.row()
+        r.alert = True
+        r.label(text="Script chords are disabled", icon="ERROR")
+        r.prop(prefs, "allow_custom_user_scripts", icon="SCRIPT")
+    else:
+        r.scale_x = 0.8
+        r.label(text="Scripts Folder:")
+        r.scale_x = 4
+        r.prop(prefs, "scripts_folder", text="", icon="FILE_FOLDER")
+        r.prop(prefs, "allow_custom_user_scripts", icon="SCRIPT")
 
     r = box.row(align=True)
     r.operator("chordsong.save_config", text="Save Config", icon="FILE_TICK")

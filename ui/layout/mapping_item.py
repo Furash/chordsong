@@ -119,8 +119,10 @@ def draw_mapping_item(prefs, m, idx, layout, all_mappings=None):
     # Mapping type icons continue on the same row
     context_row1.prop_enum(m, "mapping_type", "OPERATOR", icon="SETTINGS", text="")
     context_row1.separator()
-    context_row1.prop_enum(m, "mapping_type", "PYTHON_FILE", icon="FILE_SCRIPT", text="")
-    context_row1.separator()
+    # Only show PYTHON_FILE option if custom scripts are enabled
+    if prefs.allow_custom_user_scripts:
+        context_row1.prop_enum(m, "mapping_type", "PYTHON_FILE", icon="FILE_SCRIPT", text="")
+        context_row1.separator()
     context_row1.prop_enum(m, "mapping_type", "CONTEXT_TOGGLE", icon="CHECKBOX_HLT", text="")
     context_row1.separator()
     context_row1.prop_enum(m, "mapping_type", "CONTEXT_PROPERTY", icon="PROPERTIES", text="")
@@ -137,7 +139,15 @@ def draw_mapping_item(prefs, m, idx, layout, all_mappings=None):
     r2 = r2_split.column()
 
     if m.mapping_type == "PYTHON_FILE":
-        _draw_python_mapping(r2, m, idx)
+        # Only show Python mapping fields if custom scripts are enabled
+        if prefs.allow_custom_user_scripts:
+            _draw_python_mapping(r2, m, idx)
+        else:
+            # Show disabled message instead
+            disabled_box = r2.box()
+            disabled_box.alert = True
+            disabled_box.label(text="Script execution is disabled")
+            disabled_box.label(text="Enable 'Allow Custom User Scripts' in Preferences")
     elif m.mapping_type == "CONTEXT_TOGGLE":
         _draw_toggle_mapping(r2, m, idx)
     elif m.mapping_type == "CONTEXT_PROPERTY":

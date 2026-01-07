@@ -6,6 +6,36 @@ Map chords to Python scripts.
 
 Script mappings execute external or internal Python scripts, enabling custom workflows and macros.
 
+## Security Safeguard
+
+⚠️ **Script execution is disabled by default** for security reasons. Before you can use script mappings, you must explicitly enable script execution in Preferences.
+
+### Enabling Script Execution
+
+1. Open **Preferences → Add-ons → Chord Song**
+2. In the **Config** section, check the **"Allow Custom User Scripts"** checkbox
+3. The **Scripts Folder** path will appear once enabled
+
+<!-- markdownlint-disable MD033 -->
+<img src="/chordsong/scr/safeguard_settings.gif" alt="Enabling Script Execution">
+<!-- markdownlint-enable MD033 -->
+
+### What Happens When Disabled
+
+When script execution is disabled:
+
+- The **Scripts Folder** path is hidden
+- The **Script** mapping type button is hidden from the mapping type selector
+- Existing script mappings show a disabled message instead of their configuration fields
+- Attempting to trigger a script chord will show an error message
+
+<!-- markdownlint-disable MD033 -->
+<img src="/chordsong/scr/safeguard_action.gif" alt="Script Execution Disabled Behavior">
+<!-- markdownlint-enable MD033 -->
+
+!!! Warning "Important"
+    Only enable script execution if you trust the scripts you're executing.
+
 ### Creating Script Mappings
 
 See [Adding Mappings](../mappings.md#adding-mappings) for general methods. Script mappings are typically created manually in Preferences.

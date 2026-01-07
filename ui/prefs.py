@@ -357,6 +357,15 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
+    allow_custom_user_scripts: BoolProperty(
+        name="Allow Custom User Scripts",
+        description="Enable execution of custom Python scripts via chord mappings. "
+                    "⚠️ Only enable this if you trust the scripts you're executing. "
+                    "Scripts have full access to Blender's Python API.",
+        default=False,
+        update=_on_prefs_changed,
+    )
+
     overlay_enabled: BoolProperty(
         name="Overlay",
         description="Show which-key style overlay while capturing chords",
@@ -662,6 +671,10 @@ class CHORDSONG_Preferences(AddonPreferences):
         """Ensure default config path and nerd icons are initialized."""
         if not (self.config_path or "").strip():
             self.config_path = default_config_path()
+
+        # Ensure custom scripts are disabled by default (security safeguard)
+        if not hasattr(self, "allow_custom_user_scripts") or self.allow_custom_user_scripts is None:
+            self.allow_custom_user_scripts = False
 
         # Populate nerd icons
         self._populate_nerd_icons()

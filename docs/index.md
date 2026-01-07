@@ -87,8 +87,9 @@ After installation, proceed to the [Chord Mappings](concepts/chord.md) to define
 
 Chord Song allows for the execution of arbitrary Python scripts via chord mappings. 
 
+- **Safeguard Enabled**: Script execution is **disabled by default**. You must explicitly enable "Allow Custom User Scripts" in Preferences before script mappings will work.
 - **Identify Your Scripts**: Only map chords to `.py` files you have written or audited.
 - **Permission Boundary**: The add-on executes scripts within the standard Blender Python environment.
 
-Always review the source code of any script before adding it to your library.
+Always review the source code of any script before adding it to your library. See [Script Mappings](configuration/mappings/script.md#security-safeguard) for details on enabling script execution.
 

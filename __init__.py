@@ -256,31 +256,40 @@ def register():
         if hasattr(prefs, "ensure_defaults"):
             prefs.ensure_defaults()
 
-        # Try to load config from user's config_path if set, otherwise from default location
-        try:
-            import os
-            from .core.config_io import apply_config, loads_json
-            from .ui.prefs import default_config_path
-
-            # First check if user has set a config_path in preferences
-            config_path = getattr(prefs, "config_path", "") or ""
-            if not config_path or not os.path.exists(config_path):
-                # Fall back to default config path if user's path is not set or doesn't exist
-                config_path = default_config_path()
-            
-            if config_path and os.path.exists(config_path):
-                with open(config_path, "r", encoding="utf-8") as f:
-                    data = loads_json(f.read())
-                # Suspend autosave during initial load
-                prefs._chordsong_suspend_autosave = True  # pylint: disable=protected-access
-                try:
-                    apply_config(prefs, data)
-                finally:
-                    prefs._chordsong_suspend_autosave = False  # pylint: disable=protected-access
-        except Exception:
-            # Silently ignore errors during initial config load
-            # User can still load config manually if needed
-            pass
+        # Load default config on first install (when no user config exists)
+        import os
+        from .core.config_io import apply_config, loads_json
+        from .ui.prefs import default_config_path
+        
+        # Check if user has any mappings (indicates they've already configured)
+        has_existing_config = len(getattr(prefs, "mappings", [])) > 0
+        
+        # Also check if a config file exists at the default path
+        default_path = default_config_path()
+        config_file_exists = default_path and os.path.exists(default_path)
+        
+        # Only load default config if this appears to be a first install
+        if not has_existing_config and not config_file_exists:
+            # Load default config from bundled file
+            try:
+                # Get path to bundled default_mappings.json
+                from .operators.config.load_default import _get_default_config_path
+                bundled_config_path = _get_default_config_path()
+                
+                if os.path.exists(bundled_config_path):
+                    with open(bundled_config_path, "r", encoding="utf-8") as f:
+                        data = loads_json(f.read())
+                    
+                    # Suspend autosave during initial load
+                    prefs._chordsong_suspend_autosave = True  # pylint: disable=protected-access
+                    try:
+                        apply_config(prefs, data)
+                    finally:
+                        prefs._chordsong_suspend_autosave = False  # pylint: disable=protected-access
+            except Exception:
+                # Silently ignore errors during initial config load
+                # User can still load config manually if needed
+                pass
     except Exception:
         pass
 
