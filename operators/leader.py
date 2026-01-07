@@ -562,6 +562,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
             # Handle Python script execution
             if mapping_type == "PYTHON_FILE":
+                # Check if custom scripts are enabled
+                if not prefs(context).allow_custom_user_scripts:
+                    self.report({"ERROR"}, "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences.")
+                    self._finish(context)
+                    return {"CANCELLED"}
+                
                 python_file = (getattr(m, "python_file", "") or "").strip()
                 if not python_file:
                     self.report({"WARNING"}, f'Chord "{" ".join(self._buffer)}" has no script file')
@@ -588,39 +594,21 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 # Execute Python script
                 def execute_script_delayed():
                     try:
-                        import os
-                        if not os.path.exists(python_file):
-                            print(f"Chord Song: Script file not found: {python_file}")
-                            return None
-
-                        # Read and execute the script
-                        with open(python_file, 'r', encoding='utf-8') as f:
-                            script_text = f.read()
-
                         # Validate context before using it (may be invalid after undo)
-                        from ..utils.render import validate_viewport_context
+                        from ..utils.render import validate_viewport_context, _execute_script_via_text_editor
                         valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
-                        # Prepare execution globals
-                        # We pass 'args' dictionary to the script
-                        exec_globals = {
-                            "bpy": bpy,
-                            "context": bpy.context,
-                            "args": script_args,
-                            "__file__": python_file,
-                            "__name__": "__main__",
-                        }
-
-                        # Execute in Blender's context with captured viewport context
-                        if valid_ctx:
-                            try:
-                                with bpy.context.temp_override(**valid_ctx):
-                                    exec(compile(script_text, python_file, 'exec'), exec_globals)  # pylint: disable=exec-used
-                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                # Context became invalid, fall back to default context
-                                exec(compile(script_text, python_file, 'exec'), exec_globals)  # pylint: disable=exec-used
-                        else:
-                            exec(compile(script_text, python_file, 'exec'), exec_globals)  # pylint: disable=exec-used
+                        # Execute using Blender's text editor (avoids exec/runpy)
+                        success, error_msg = _execute_script_via_text_editor(
+                            python_file, 
+                            script_args=script_args, 
+                            valid_ctx=valid_ctx,
+                            context=bpy.context
+                        )
+                        
+                        if not success:
+                            print(f"Chord Song: {error_msg}")
+                            return None
                         
                         # Show fading overlay using the original captured context (ctx_viewport)
                         # This ensures overlay appears in the editor where leader was invoked
