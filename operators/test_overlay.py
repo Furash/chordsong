@@ -1,15 +1,11 @@
 import bpy
 import time
 from ..ui.overlay.render import draw_fading_overlay, draw_overlay
-from ..utils.render import DrawHandlerManager
+from ..utils.addon_package import addon_root_package
 
 def prefs(context):
     """Get addon preferences for extension workflow."""
-    # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
-    # We need the first 3 parts: bl_ext.repo.addon_id
-    pkg = __package__ or "bl_ext.user_default.chordsong"
-    parts = pkg.split(".")
-    package_name = ".".join(parts[:3])
+    package_name = addon_root_package(__package__)
     return context.preferences.addons[package_name].preferences
 
 # Global storage for the fading test handler

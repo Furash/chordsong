@@ -20,12 +20,15 @@ from bpy.props import (
 
 from .layout import draw_addon_preferences
 from .nerd_icons import NERD_ICONS
+from ..utils.addon_package import addon_root_package
 
 def _addon_root_pkg() -> str:
-    # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
-    # We need the first 3 parts: bl_ext.repo.addon_id
-    parts = __package__.split(".")
-    return ".".join(parts[:3])
+    """Return the root package used to look up prefs in Blender.
+
+    - Extensions: "bl_ext.{repo}.{addon_id}"
+    - Legacy: "{addon_id}"
+    """
+    return addon_root_package(__package__)
 
 def default_config_path() -> str:
     """
@@ -692,10 +695,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         def run_sync():
             try:
                 # We need to re-fetch prefs since self might be invalid if reloaded
-                # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
-                parts = __package__.split(".")
-                module_pkg = ".".join(parts[:3])
-                prefs = bpy.context.preferences.addons[module_pkg].preferences
+                prefs = bpy.context.preferences.addons[_addon_root_pkg()].preferences
                 prefs._sync_groups_from_mappings(remove_unused=remove_unused)
             except Exception:
                 pass

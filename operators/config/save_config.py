@@ -13,6 +13,7 @@ from bpy.props import StringProperty  # type: ignore
 
 from ...core.config_io import dump_prefs
 from ..common import prefs
+from ...utils.addon_package import addon_root_package
 
 class CHORDSONG_OT_Save_Config(bpy.types.Operator, ExportHelper):
     """Save chord mappings to a JSON config file."""
@@ -34,7 +35,7 @@ class CHORDSONG_OT_Save_Config(bpy.types.Operator, ExportHelper):
         # Default to extension-specific user directory
         try:
             # Use extension_path_user for extension-specific user directory
-            extension_dir = bpy.utils.extension_path_user(__package__, path="", create=True)
+            extension_dir = bpy.utils.extension_path_user(addon_root_package(__package__), path="", create=True)
             if extension_dir:
                 self.filepath = os.path.join(extension_dir, "chordsong.json")
             else:

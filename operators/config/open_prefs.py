@@ -4,6 +4,8 @@
 
 import bpy  # type: ignore
 
+from ...utils.addon_package import addon_root_package
+
 class CHORDSONG_OT_Open_Prefs(bpy.types.Operator):
     bl_idname = "chordsong.open_prefs"
     bl_label = "Open Add-on Preferences"
@@ -22,19 +24,9 @@ class CHORDSONG_OT_Open_Prefs(bpy.types.Operator):
             addon_id = None
             
             if not target:
-                # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
-                # We need the first 3 parts: bl_ext.repo.addon_id
-                # e.g., bl_ext.vscode_development.chordsong -> bl_ext.vscode_development.chordsong
-                # The middle part (repo) can be anything, we just take first 3 parts
-                parts = __package__.split(".")
-                if len(parts) >= 3:
-                    # Take first 3 parts: bl_ext.{repo}.{addon_id}
-                    target = ".".join(parts[:3])
-                    addon_id = parts[2]  # Store the addon ID part (e.g., "chordsong")
-                else:
-                    # Fallback: use the full package name
-                    target = __package__ if __package__ else "chordsong"
-                    addon_id = parts[-1] if parts else "chordsong"
+                # For both extensions & legacy add-ons, use the root package.
+                target = addon_root_package(__package__) or "chordsong"
+                addon_id = target.split(".")[-1]
             else:
                 # If user provided a name, check if it's just the addon ID or full path
                 if not target.startswith("bl_ext."):

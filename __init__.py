@@ -4,20 +4,6 @@ Chord Song Blender Add-on.
 Vim-like <Leader> chord launcher with which-key style overlay.
 """
 
-# bl_info is kept for backward compatibility and to avoid performance warnings.
-# Extension metadata is primarily defined in blender_manifest.toml (Blender 4.2+).
-# However, bl_info is still required for reload functionality to work properly.
-bl_info = {
-    "name": "Chord Song",
-    "author": "Cyrill Vitkovskiy",
-    "website": "https://github.com/Furash/chordsong/",
-    "version": (1, 0, 0),
-    "blender": (5, 0, 0),
-    "location": "Preferences > Add-ons > Chord Song",
-    "description": "Vim-like <Leader> key implementation for Blender",
-    "category": "Interface",
-}
-
 # pyright: reportMissingImports=false
 # pyright: reportMissingModuleSource=false
 # pylint: disable=import-error,wrong-import-position,broad-exception-caught,import-outside-toplevel
@@ -25,6 +11,7 @@ bl_info = {
 
 import bpy
 
+from .utils.addon_package import addon_root_package
 from .ui import (
     CHORDSONG_Preferences,
     CHORDSONG_PG_Group,
@@ -39,7 +26,7 @@ from .operators import (
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_CheckConflicts,
     CHORDSONG_OT_MergeIdentical,
-    CHORDSONG_OT_Context_Menu,
+    CHORDSONG_OT_ContextMenu,
     CHORDSONG_OT_Export_Config,
     CHORDSONG_OT_Export_Config_Toggle_Groups,
     CHORDSONG_OT_Group_Add,
@@ -90,7 +77,7 @@ _classes = (
     CHORDSONG_OT_Append_Config,
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_CheckConflicts,
-    CHORDSONG_OT_Context_Menu,
+    CHORDSONG_OT_ContextMenu,
     CHORDSONG_OT_Export_Config,
     CHORDSONG_OT_Export_Config_Toggle_Groups,
     CHORDSONG_OT_Group_Add,
@@ -248,10 +235,7 @@ def register():
     register_context_menu()
     # Initialize default config path early (so operators can use it before opening prefs UI).
     try:
-        # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
-        # We need the first 3 parts: bl_ext.repo.addon_id
-        parts = __package__.split(".") if __package__ else []
-        package_name = ".".join(parts[:3]) if len(parts) >= 3 else (__package__ or "")
+        package_name = addon_root_package(__package__)
         prefs = bpy.context.preferences.addons[package_name].preferences
         if hasattr(prefs, "ensure_defaults"):
             prefs.ensure_defaults()

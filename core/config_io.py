@@ -2,7 +2,6 @@ import json
 
 # pylint: disable=broad-exception-caught
 
-import bpy  # type: ignore
 from .engine import parse_kwargs, get_str_attr, get_leader_key_type, set_leader_key_in_keymap
 
 CHORDSONG_CONFIG_VERSION = 1

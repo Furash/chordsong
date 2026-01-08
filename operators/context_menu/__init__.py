@@ -9,15 +9,13 @@ from bpy.props import StringProperty, EnumProperty  # type: ignore
 
 from ..common import prefs, schedule_autosave_safe
 from .extractors import (
-    parse_operator_from_text,
-    extract_from_info_panel,
     extract_from_button_pointer,
     extract_context_path,
     detect_editor_context
 )
 from .suggester import suggest_chord
 
-class CHORDSONG_OT_Context_Menu(bpy.types.Operator):
+class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
     """Add a chord mapping for this UI element"""
     bl_idname = "chordsong.context_menu"
     bl_label = "Add Chord Mapping"
@@ -481,7 +479,7 @@ def button_context_menu_draw(self, context):
     layout.separator()
     # Force INVOKE_DEFAULT to ensure the dialog shows up, especially in Info/Console panels
     layout.operator_context = 'INVOKE_DEFAULT'
-    layout.operator(CHORDSONG_OT_Context_Menu.bl_idname, text="Add Chord Mapping", icon="EVENT_C")
+    layout.operator(CHORDSONG_OT_ContextMenu.bl_idname, text="Add Chord Mapping", icon="EVENT_C")
 
 def register_context_menu():
     """Register the context menu hook."""
@@ -531,7 +529,7 @@ def unregister_context_menu():
             pass
 
 __all__ = [
-    "CHORDSONG_OT_Context_Menu",
+    "CHORDSONG_OT_ContextMenu",
     "register_context_menu",
     "unregister_context_menu"
 ]

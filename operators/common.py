@@ -2,16 +2,13 @@ import bpy
 
 # Re-export get_str_attr from core.engine for backward compatibility
 from ..core.engine import get_str_attr
+from ..utils.addon_package import addon_root_package
 
 __all__ = ["prefs", "schedule_autosave_safe", "get_str_attr"]
 
 def prefs(context: bpy.types.Context):
     """Get addon preferences for extension workflow."""
-    # Extension format: bl_ext.{repo}.{addon_id}.{submodule...}
-    # We need the first 3 parts: bl_ext.repo.addon_id
-    pkg = __package__ or "bl_ext.user_default.chordsong"
-    parts = pkg.split(".")
-    package_name = ".".join(parts[:3])
+    package_name = addon_root_package(__package__)
     return context.preferences.addons[package_name].preferences
 
 def schedule_autosave_safe(prefs, delay_s=5.0):

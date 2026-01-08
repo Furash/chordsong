@@ -14,6 +14,7 @@ from bpy_extras.io_utils import ExportHelper  # type: ignore
 
 from ...core.config_io import dump_prefs_filtered
 from ..common import prefs
+from ...utils.addon_package import addon_root_package
 
 
 class CHORDSONG_PG_GroupSelection(PropertyGroup):
@@ -61,7 +62,7 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
             # Default to extension-specific user directory
             try:
                 # Use extension_path_user for extension-specific user directory
-                extension_dir = bpy.utils.extension_path_user(__package__, path="", create=True)
+                extension_dir = bpy.utils.extension_path_user(addon_root_package(__package__), path="", create=True)
                 if extension_dir:
                     current_filepath = getattr(self, "filepath", "")
                     if not current_filepath or current_filepath.endswith("chordsong_export.json"):

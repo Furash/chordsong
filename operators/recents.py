@@ -70,8 +70,6 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         try:
             import blf  # type: ignore
-            import gpu  # type: ignore
-            from gpu_extras.batch import batch_for_shader  # type: ignore
         except Exception:
             return
 

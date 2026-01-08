@@ -157,7 +157,7 @@ def extract_from_info_panel(context):
         return res['operator'], res['kwargs']
     else:
         # For properties, return None for operator but we might need a more generic extractor
-        # existing extract_from_info_panel is used by CHORDSONG_OT_Context_Menu.invoke
+        # existing extract_from_info_panel is used by CHORDSONG_OT_ContextMenu.invoke
         # which expects (operator, kwargs).
         return None, None
 

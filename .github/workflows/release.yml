@@ -46,6 +46,7 @@ jobs:
           echo "Extracted version: $VERSION from tag/input: $TAG_NAME"
 
       - name: Validate Version Matches Tag
+        id: validate
         run: |
           python << 'EOF'
           import tomli
@@ -59,16 +60,22 @@ jobs:
           MANIFEST_VERSION = manifest.get('version', '')
           
           if MANIFEST_VERSION != TAG_VERSION:
-              print(f"⚠️  Version mismatch detected!")
-              print(f"   Tag version: {TAG_VERSION}")
-              print(f"   Manifest version: {MANIFEST_VERSION}")
-              print(f"\n   The workflow will auto-update the manifest to {TAG_VERSION}.")
-              print(f"   For future releases, update blender_manifest.toml before creating the tag.")
+              print("⚠️  Version mismatch detected!")
+              print(f"   Tag/Input version: {TAG_VERSION}")
+              print(f"   Manifest version:   {MANIFEST_VERSION}")
+              print("\n   The workflow will update blender_manifest.toml locally for the build")
+              print("   and will also commit+push the bumped manifest back to the default branch.")
+              needs_bump = "true"
           else:
               print(f"✅ Version matches: {TAG_VERSION}")
+              needs_bump = "false"
+
+          # Emit an output for later steps
+          with open("${GITHUB_OUTPUT}", "a", encoding="utf-8") as f:
+              f.write(f"needs_bump={needs_bump}\n")
           EOF
 
-      - name: Update Version in Manifest
+      - name: Update Version in Manifest (for build)
         run: |
           python << 'EOF'
           import tomli
@@ -171,6 +178,44 @@ jobs:
             f.write(f"asset_name={os.path.basename(zip_name)}\n")
           print(f"Built {zip_name} with version {version}")
           EOF
+
+      - name: Commit & Push Manifest Version Bump to Default Branch
+        if: steps.validate.outputs.needs_bump == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          echo "Default branch: ${DEFAULT_BRANCH}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # We are checked out at a tag (detached HEAD). Update the default branch instead.
+          git fetch origin "${DEFAULT_BRANCH}"
+          git checkout "${DEFAULT_BRANCH}"
+
+          python << 'EOF'
+          import tomli
+          import tomli_w
+          import os
+
+          version = os.environ["VERSION"]
+          with open("blender_manifest.toml", "rb") as f:
+              manifest = tomli.load(f)
+          manifest["version"] = version
+          with open("blender_manifest.toml", "wb") as f:
+              tomli_w.dump(manifest, f)
+          EOF
+
+          git add blender_manifest.toml
+          if git diff --cached --quiet; then
+            echo "No manifest change to commit (already bumped on default branch)."
+            exit 0
+          fi
+
+          git commit -m "Bump version to ${VERSION}"
+          git push origin "${DEFAULT_BRANCH}"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
