@@ -113,7 +113,7 @@ _classes = (
     CHORDSONG_OT_TestMainOverlay,
 )
 
-_addon_keymaps = []
+addon_keymaps = []
 
 def _safe_register_class(cls):
     """Register a class, recovering from partial/failed previous registrations."""
@@ -133,105 +133,29 @@ def _safe_unregister_class(cls):
     except Exception:
         pass
 
-def rebuild_keymaps():
-    """Recreate add-on keymaps."""
-    _unregister_keymaps()
-    _register_keymaps()
-
-def _register_keymaps():
-    # Bind leader key in multiple editors to start chord capture.
-    # Users can change this in Blender's Keymap editor under Add-ons > Chord Song.
-    wm = bpy.context.window_manager
-    kc = wm.keyconfigs.addon
-    if not kc:
-        return
-
-    leader_key = "SPACE"
-
-    def _add_keymap_item(keymap_name, space_type):
-        """Helper to add keymap item, handling existing keymaps."""
-        try:
-            # Try to get existing keymap first
-            km = kc.keymaps.get(keymap_name)
-            if not km:
-                # Create new keymap if it doesn't exist
-                km = kc.keymaps.new(name=keymap_name, space_type=space_type)
-
-            # Check if keymap item already exists
-            existing_kmi = None
-            for item in km.keymap_items:
-                if item.idname == CHORDSONG_OT_Leader.bl_idname:
-                    existing_kmi = item
-                    break
-
-            if existing_kmi:
-                # Update existing keymap item
-                existing_kmi.type = leader_key
-                existing_kmi.value = "PRESS"
-                _addon_keymaps.append((km, existing_kmi))
-            else:
-                # Create new keymap item
-                kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
-                _addon_keymaps.append((km, kmi))
-        except Exception as e:
-            # Log error but continue with other keymaps
-            print(f"Chord Song: Failed to register keymap for {keymap_name}: {e}")
-
-    # Register for 3D View
-    _add_keymap_item("3D View", "VIEW_3D")
-
-    # Register for Node Editor (covers both Geometry Nodes and Shader Editor)
-    _add_keymap_item("Node Editor", "NODE_EDITOR")
-
-    # Register for UV/Image Editor
-    # Try to find existing keymap with IMAGE_EDITOR space type, or create one.
-    image_editor_km = None
-    for km_name in kc.keymaps.keys():
-        km_test = kc.keymaps.get(km_name)
-        if km_test and hasattr(km_test, 'space_type') and km_test.space_type == 'IMAGE_EDITOR':
-            image_editor_km = km_test
-            break
-
-    if image_editor_km:
-        # Found existing Image Editor keymap, add our item to it
-        existing_kmi = None
-        for item in image_editor_km.keymap_items:
-            if item.idname == CHORDSONG_OT_Leader.bl_idname:
-                existing_kmi = item
-                break
-
-        if existing_kmi:
-            existing_kmi.type = leader_key
-            existing_kmi.value = "PRESS"
-            _addon_keymaps.append((image_editor_km, existing_kmi))
-        else:
-            kmi = image_editor_km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
-            _addon_keymaps.append((image_editor_km, kmi))
-    else:
-        # No existing keymap found, try to create one
-        # Try different possible names
-        for name in ["Image Editor", "UV/Image Editor"]:
-            try:
-                km = kc.keymaps.new(name=name, space_type="IMAGE_EDITOR")
-                kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, type=leader_key, value="PRESS")
-                _addon_keymaps.append((km, kmi))
-                break
-            except Exception:
-                continue
-
-def _unregister_keymaps():
-    for km, kmi in _addon_keymaps:
-        try:
-            km.keymap_items.remove(kmi)
-        except Exception:
-            pass
-    _addon_keymaps.clear()
-
 def register():
     """Register addon classes and keymaps."""
     for cls in _classes:
         _safe_register_class(cls)
-    _register_keymaps()
+
+    # handle the keymap
+    wm = bpy.context.window_manager
+
+    # 3D View
+    km = wm.keyconfigs.addon.keymaps.new(name='3D View', space_type='VIEW_3D')
+    kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
+    addon_keymaps.append((km, kmi))
+
+    # Node Editor
+    km = wm.keyconfigs.addon.keymaps.new(name='Node Editor', space_type='NODE_EDITOR')
+    kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
+    addon_keymaps.append((km, kmi))
+
+    # Image Editor
+    km = wm.keyconfigs.addon.keymaps.new(name='Image Editor', space_type='IMAGE_EDITOR')
+    kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
+    addon_keymaps.append((km, kmi))
+
     register_context_menu()
     # Initialize default config path early (so operators can use it before opening prefs UI).
     try:
@@ -244,14 +168,14 @@ def register():
         import os
         from .core.config_io import apply_config, loads_json
         from .ui.prefs import default_config_path
-        
+
         # Check if user has any mappings (indicates they've already configured)
         has_existing_config = len(getattr(prefs, "mappings", [])) > 0
-        
+
         # Also check if a config file exists at the default path
         default_path = default_config_path()
         config_file_exists = default_path and os.path.exists(default_path)
-        
+
         # Only load default config if this appears to be a first install
         if not has_existing_config and not config_file_exists:
             # Load default config from bundled file
@@ -259,11 +183,11 @@ def register():
                 # Get path to bundled default_mappings.json
                 from .operators.config.load_default import _get_default_config_path
                 bundled_config_path = _get_default_config_path()
-                
+
                 if os.path.exists(bundled_config_path):
                     with open(bundled_config_path, "r", encoding="utf-8") as f:
                         data = loads_json(f.read())
-                    
+
                     # Suspend autosave during initial load
                     prefs._chordsong_suspend_autosave = True  # pylint: disable=protected-access
                     try:
@@ -284,7 +208,13 @@ def unregister():
         cleanup_all_handlers()
     except Exception:
         pass
+
     unregister_context_menu()
-    _unregister_keymaps()
+
+    # Clear keymap
+    for km, kmi in addon_keymaps:
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear()
+
     for cls in reversed(_classes):
         _safe_unregister_class(cls)

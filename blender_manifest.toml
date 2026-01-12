@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "chordsong"
-version = "1.0.4"
+version = "1.0.5"
 name = "Chord Song"
 tagline = "Vim-like <Leader> key implementation for Blender"
 maintainer = "Cyrill Vitkovskiy"
@@ -13,7 +13,7 @@ license = ["SPDX:GPL-3.0-or-later"]
 
 website = "https://github.com/Furash/chordsong/"
 
-tags = ["User Interface"]
+tags = ["Development"]
 
 [build]
 
