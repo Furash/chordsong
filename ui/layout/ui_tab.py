@@ -83,6 +83,26 @@ def draw_ui_tab(prefs, layout):
     r.label(text="Folder Display Style:")
     r.prop(prefs, "overlay_folder_style", text="")
     box.separator()
+    
+    # Theme Presets Section
+    theme_box = box.box()
+    theme_row = theme_box.row()
+    theme_row.label(text="Theme Presets", icon='COLOR')
+    
+    # Built-in presets
+    preset_row = theme_box.row(align=True)
+    preset_row.operator("chordsong.load_theme_preset", text="Default").preset_name = "default"
+    preset_row.operator("chordsong.load_theme_preset", text="Dark").preset_name = "dark"
+    preset_row.operator("chordsong.load_theme_preset", text="Light").preset_name = "light"
+    preset_row.operator("chordsong.load_theme_preset", text="Neon").preset_name = "neon"
+    
+    # Import/Export
+    io_row = theme_box.row(align=True)
+    io_row.operator("chordsong.export_overlay_theme", text="Export Theme", icon='EXPORT')
+    io_row.operator("chordsong.import_overlay_theme", text="Import Theme", icon='IMPORT')
+    io_row.operator("chordsong.extract_blender_theme", text="Extract from Blender", icon='EYEDROPPER')
+    
+    box.separator()
 
     # Color table logic
     split = box.split(factor=0.3)
