@@ -135,3 +135,4 @@ def draw_ui_tab(prefs, layout):
     row = box_test.row()
     row.operator("chordsong.test_main_overlay", text="Preview Main", icon="PLAY")
     row.operator("chordsong.test_fading_overlay", text="Preview Fading", icon="PLAY")
+    row.operator("chordsong.scripts_overlay", text="Scripts Overlay", icon="FILE_SCRIPT")
