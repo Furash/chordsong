@@ -6,11 +6,11 @@ This script is used for preparing releases. It updates the version in the manife
 and can optionally create and push git tags to trigger the GitHub Actions release workflow.
 
 Usage:
-    python .github/scripts/bump_version.py 1.0.5              # Update version only
-    python .github/scripts/bump_version.py 1.0.5 --commit     # Update version + commit blender_manifest.toml
-    python .github/scripts/bump_version.py 1.0.5 --tag        # Update version and create tag v1.0.5
-    python .github/scripts/bump_version.py 1.0.5 --commit --tag        # Commit first, then tag the commit
-    python .github/scripts/bump_version.py 1.0.5 --commit --tag --push  # Commit, tag, and push commit+tag
+    python .github/scripts/bump_version.py 1.0.5                            # Update version only
+    python .github/scripts/bump_version.py 1.0.5 --commit                   # Update version + commit blender_manifest.toml
+    python .github/scripts/bump_version.py 1.0.5 --tag                      # Update version and create tag v1.0.5
+    python .github/scripts/bump_version.py 1.0.5 --commit --tag             # Commit first, then tag the commit
+    python .github/scripts/bump_version.py 1.0.5 --commit --tag --push      # Commit, tag, and push commit+tag
 """
 
 # pyright: reportMissingImports=false

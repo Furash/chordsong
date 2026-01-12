@@ -65,7 +65,8 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             draw_overlay_header,
             draw_list_background,
             draw_overlay_footer,
-            draw_icon
+            draw_icon,
+            linear_to_srgb
         )
 
         try:
@@ -86,12 +87,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         body_size = max(int(p.overlay_font_size_body * scale_factor), 10)
         icon_size = chord_size
 
-        # Colors
-        col_header = p.overlay_color_header
-        col_chord = p.overlay_color_chord
-        col_label = p.overlay_color_label
-        col_icon = p.overlay_color_icon
-        col_recents_hotkey = p.overlay_color_recents_hotkey
+        # Colors (convert from linear to sRGB to match picker preview)
+        col_header = linear_to_srgb(p.overlay_color_header)
+        col_chord = linear_to_srgb(p.overlay_color_chord)
+        col_label = linear_to_srgb(p.overlay_color_label)
+        col_icon = linear_to_srgb(p.overlay_color_icon)
+        col_recents_hotkey = linear_to_srgb(p.overlay_color_recents_hotkey)
 
         # Helper to convert index to hotkey (1-9, a-z, A-Z, !-, -=+, punctuation)
         def index_to_hotkey(idx):
