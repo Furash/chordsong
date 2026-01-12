@@ -8,7 +8,7 @@ def get_str_attr(obj, attr, default=""):
 def normalize_token(event_type: str, shift: bool = False, ctrl: bool = False, alt: bool = False, oskey: bool = False, mod_side: str = None):
     """
     Convert a Blender event into a chord token using AHK-style modifier symbols.
-    
+
     Symbols:
     ^ : Ctrl
     ! : Alt
@@ -22,9 +22,9 @@ def normalize_token(event_type: str, shift: bool = False, ctrl: bool = False, al
 
     # Ignore pure modifiers as tokens
     if event_type in {
-        "LEFT_SHIFT", "RIGHT_SHIFT", 
-        "LEFT_CTRL", "RIGHT_CTRL", 
-        "LEFT_ALT", "RIGHT_ALT", 
+        "LEFT_SHIFT", "RIGHT_SHIFT",
+        "LEFT_CTRL", "RIGHT_CTRL",
+        "LEFT_ALT", "RIGHT_ALT",
         "OSKEY"
     }:
         return None
@@ -80,7 +80,7 @@ def normalize_token(event_type: str, shift: bool = False, ctrl: bool = False, al
 
     # Build modifier prefix
     mods = ""
-    
+
     # OSKey (Windows/Cmd)
     if oskey:
         mods += "#"
@@ -143,7 +143,7 @@ def _get_token_parts(token: str) -> tuple[set[str], str]:
     mod_symbols = {'#', '^', '!', '+'}
     found_mods = set()
     res = token
-    
+
     i = 0
     while i < len(res):
         char = res[i]
@@ -156,35 +156,35 @@ def _get_token_parts(token: str) -> tuple[set[str], str]:
             i += 2
         else:
             break
-            
+
     base = res[i:]
     # If base is a single uppercase letter, it implies a shift modifier
     if len(base) == 1 and base.isupper():
         found_mods.add('+')
         base = base.lower()
-            
+
     return found_mods, base
 
 def tokens_match(mapping_token: str, pressed_token: str) -> bool:
     """Check if a mapping token matches a pressed token, handling AHK modifiers and order."""
     if mapping_token == pressed_token:
         return True
-    
+
     m_mods, m_base = _get_token_parts(mapping_token)
     p_mods, p_base = _get_token_parts(pressed_token)
-    
+
     if m_base != p_base:
         return False
-        
-    # If the mapping doesn't have side indicators (< or >), we allow it to match 
+
+    # If the mapping doesn't have side indicators (< or >), we allow it to match
     # any side of that modifier in the pressed token.
     has_m_side = any(('<' in m or '>' in m) for m in m_mods)
-    
+
     if not has_m_side:
         # Strip side indicators from pressed mods for comparison
         stripped_p_mods = {mod.replace('<', '').replace('>', '') for mod in p_mods}
         return m_mods == stripped_p_mods
-    
+
     # If mapping HAS side indicators, they must match exactly
     return m_mods == p_mods
 
@@ -197,11 +197,11 @@ def humanize_token(token: str) -> str:
         '+': 'Shift',
         '#': 'Win'
     }
-    
+
     # Process side indicators and modifiers
     res = token
     parts = []
-    
+
     # Loop to pull off potential <^ >! etc prefixes
     while len(res) > 0:
         side = ""
@@ -212,7 +212,7 @@ def humanize_token(token: str) -> str:
         elif res.startswith('>'):
             side = "R"
             res = res[1:]
-            
+
         if len(res) > 0 and res[0] in mod_map:
             parts.append(f"{side}{mod_map[res[0]]}")
             res = res[1:]
@@ -222,7 +222,7 @@ def humanize_token(token: str) -> str:
             # but usually it's tied to one.
             parts.append(res)
             break
-            
+
     return "+".join(parts)
 
 def humanize_chord(tokens: list[str]) -> str:
@@ -237,7 +237,7 @@ def find_exact_mapping(mappings, buffer_tokens):
         chord_tokens = split_chord(get_str_attr(m, "chord"))
         if len(chord_tokens) != len(bt):
             continue
-            
+
         if all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(chord_tokens, bt)):
             return m
     return None
@@ -262,23 +262,23 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
         tokens = split_chord(get_str_attr(m, "chord"))
         if not tokens:
             continue
-            
+
         # Check if the current buffer matches the chord prefix
         if bt:
             if len(tokens) <= len(bt):
                 continue
             if not all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(tokens[:len(bt)], bt)):
                 continue
-        
+
         if len(tokens) <= len(bt):
             continue
-            
+
         nxt = tokens[len(bt)]
         label = get_str_attr(m, "label") or "(missing label)"
         group = get_str_attr(m, "group")
         icon = get_str_attr(m, "icon")
         property_value = get_str_attr(m, "property_value")
-        
+
         # Determine dynamic toggle state if possible
         if context and mapping_type == "CONTEXT_TOGGLE":
             try:
@@ -312,7 +312,7 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
         # Track counts and keep first label per next token for minimal UI
         if nxt not in out:
             out[nxt] = {
-                "cand": Candidate(nxt, label, group, icon, is_final, mapping_type, property_value), 
+                "cand": Candidate(nxt, label, group, icon, is_final, mapping_type, property_value),
                 "count": 1,
                 "groups": {group} if group else set()
             }
@@ -320,7 +320,7 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
             out[nxt]["count"] += 1
             if group:
                 out[nxt]["groups"].add(group)
-            
+
             # If we already have a non-final candidate, but found a final one, update the candidate
             # but keep the accumulated count and groups
             if not out[nxt]["cand"].is_final and is_final:
@@ -366,7 +366,7 @@ def parse_kwargs(kwargs_json: str) -> dict:
         in_quotes = False
         quote_char = ''
         nesting_level = 0
-        
+
         for char in kwargs_json:
             if char in ('"', "'"):
                 if not in_quotes:
@@ -374,19 +374,19 @@ def parse_kwargs(kwargs_json: str) -> dict:
                     quote_char = char
                 elif char == quote_char:
                     in_quotes = False
-            
+
             if not in_quotes:
                 if char in ('(', '[', '{'):
                     nesting_level += 1
                 elif char in (')', ']', '}'):
                     nesting_level -= 1
-            
+
             if char == ',' and not in_quotes and nesting_level == 0:
                 parts.append(''.join(current).strip())
                 current = []
             else:
                 current.append(char)
-        
+
         if current:
             parts.append(''.join(current).strip())
 
@@ -428,7 +428,7 @@ def filter_mappings_by_context(mappings, context_type: str):
             filtered.append(m)
     return filtered
 
-def get_leader_key_type() -> str:
+def get_leader_key_type():
     """Get the current leader key type from the addon keymap.
 
     Returns:
@@ -437,18 +437,23 @@ def get_leader_key_type() -> str:
     try:
         import bpy  # type: ignore
         wm = bpy.context.window_manager
-        kc = wm.keyconfigs.addon
-        if not kc:
-            return "SPACE"
 
-        km = kc.keymaps.get("3D View")
-        if not km:
-            return "SPACE"
+        # Check user keyconfig first (contains user customizations that persist)
+        # Then fall back to addon keyconfig (default)
+        keyconfigs = [wm.keyconfigs.user, wm.keyconfigs.addon]
 
-        # Find the leader keymap item
-        for kmi in km.keymap_items:
-            if kmi.idname == "chordsong.leader":
-                return kmi.type
+        for kc in keyconfigs:
+            if not kc:
+                continue
+
+            km = kc.keymaps.get("3D View")
+            if not km:
+                continue
+
+            # Find the leader keymap item
+            for kmi in km.keymap_items:
+                if kmi.idname == "chordsong.leader":
+                    return kmi.type
 
         return "SPACE"
     except Exception:
@@ -463,26 +468,31 @@ def get_leader_key_token() -> str:
     try:
         import bpy  # type: ignore
         wm = bpy.context.window_manager
-        kc = wm.keyconfigs.addon
-        if not kc:
-            return "<Leader>"
 
-        km = kc.keymaps.get("3D View")
-        if not km:
-            return "<Leader>"
+        # Check user keyconfig first (contains user customizations that persist)
+        # Then fall back to addon keyconfig (default)
+        keyconfigs = [wm.keyconfigs.user, wm.keyconfigs.addon]
 
-        # Find the leader keymap item
-        for kmi in km.keymap_items:
-            if kmi.idname == "chordsong.leader":
-                # Normalize the key type to a display token
-                shift_state = getattr(kmi, "shift", False)
-                token = normalize_token(kmi.type, shift=shift_state)
-                if token:
-                    return token
-                # Fallback: use key type directly
-                if kmi.type:
-                    return kmi.type.lower()
-                return "<Leader>"
+        for kc in keyconfigs:
+            if not kc:
+                continue
+
+            km = kc.keymaps.get("3D View")
+            if not km:
+                continue
+
+            # Find the leader keymap item
+            for kmi in km.keymap_items:
+                if kmi.idname == "chordsong.leader":
+                    # Normalize the key type to a display token
+                    shift_state = getattr(kmi, "shift", False)
+                    token = normalize_token(kmi.type, shift=shift_state)
+                    if token:
+                        return token
+                    # Fallback: use key type directly
+                    if kmi.type:
+                        return kmi.type.lower()
+                    return "<Leader>"
 
         return "<Leader>"
     except Exception:
@@ -497,18 +507,23 @@ def set_leader_key_in_keymap(key_type: str):
     try:
         import bpy  # type: ignore
         wm = bpy.context.window_manager
-        kc = wm.keyconfigs.addon
-        if not kc:
-            return
+
+        # Update in both addon and user keyconfigs to ensure persistence
+        # User changes will be stored in keyconfigs.user automatically
+        keyconfigs = [wm.keyconfigs.addon, wm.keyconfigs.user]
 
         # Update leader key in all registered keymaps
         keymap_names = ["3D View", "Node Editor", "Image"]
-        for km_name in keymap_names:
-            km = kc.keymaps.get(km_name)
-            if km:
-                for kmi in km.keymap_items:
-                    if kmi.idname == "chordsong.leader":
-                        kmi.type = key_type
-                        break
+        for kc in keyconfigs:
+            if not kc:
+                continue
+
+            for km_name in keymap_names:
+                km = kc.keymaps.get(km_name)
+                if km:
+                    for kmi in km.keymap_items:
+                        if kmi.idname == "chordsong.leader":
+                            kmi.type = key_type
+                            break
     except Exception:
         pass

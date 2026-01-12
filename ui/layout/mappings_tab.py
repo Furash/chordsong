@@ -10,38 +10,51 @@ def draw_mappings_tab(prefs, context, layout):
     col = layout.column()
 
     # Leader Key section
-    kc = context.window_manager.keyconfigs.addon
-    if kc:
-        leader_box = col.box()
+    # Check user keyconfig first (contains user customizations), then addon keyconfig
+    wm = context.window_manager
+    keyconfigs = [wm.keyconfigs.user, wm.keyconfigs.addon]
+    
+    leader_box = col.box()
 
-        # Header
-        header_row = leader_box.row()
-        header_row.alignment = 'CENTER'
-        header_row.label(text="Leader Key Bindings:", icon='KEYINGSET')
-        leader_box.separator()
+    # Header
+    header_row = leader_box.row()
+    header_row.alignment = 'CENTER'
+    header_row.label(text="Leader Key Bindings:", icon='KEYINGSET')
+    leader_box.separator()
+
+    # Display all 3 keymaps
+    keymap_configs = [
+        ('3D View', '3D View'),
+        ('Node Editor', 'Node Editor | Geometry Nodes'),
+        ('Image', 'Image Editor | UV Editor'),
+    ]
+
+    for km_name, display_name in keymap_configs:
+        # Check both keyconfigs to find the keymap item
+        found_kmi = None
+        found_km = None
         
-        # Display all 3 keymaps
-        keymap_configs = [
-            ('3D View', '3D View'),
-            ('Node Editor', 'Node Editor | Geometry Nodes'),
-            ('Image', 'Image Editor | UV Editor'),
-        ]
-        
-        for km_name, display_name in keymap_configs:
+        for kc in keyconfigs:
+            if not kc:
+                continue
             km = kc.keymaps.get(km_name)
             if km:
-                kmi = None
                 for item in km.keymap_items:
                     if item.idname == "chordsong.leader":
-                        kmi = item
+                        found_kmi = item
+                        found_km = km
                         break
-                if kmi:
-                    row = leader_box.row(align=True)
-                    row.scale_y = 1.5
-                    row.label(text=f"{display_name}:")
-                    row.context_pointer_set("keymap", km)
-                    row.prop(kmi, "type", text="", full_event=True, emboss=True)
-        leader_box.separator()
+            if found_kmi:
+                break
+        
+        if found_kmi and found_km:
+            row = leader_box.row(align=True)
+            row.scale_y = 1.5
+            row.label(text=f"{display_name}:")
+            row.context_pointer_set("keymap", found_km)
+            row.prop(found_kmi, "type", text="", full_event=True, emboss=True)
+    
+    leader_box.separator()
 
     col.separator()
 

@@ -140,28 +140,38 @@ def register():
 
     # handle the keymap
     wm = bpy.context.window_manager
-    kc = wm.keyconfigs.addon
-    if kc:
+    kc_addon = wm.keyconfigs.addon
+    
+    if kc_addon:
+        # Clear any stale references from previous registration
+        addon_keymaps.clear()
         # Register keymap for each editor type
         keymap_configs = [
             ('3D View', 'VIEW_3D'),
             ('Node Editor', 'NODE_EDITOR'),
             ('Image', 'IMAGE_EDITOR'),
         ]
-        
+
         for km_name, space_type in keymap_configs:
-            # Try to find existing keymap first
-            km = kc.keymaps.get(km_name)
-            if not km:
-                km = kc.keymaps.new(name=km_name, space_type=space_type)
-            
-            # Remove any existing keymap items with our operator (to prevent duplicates)
-            for kmi in list(km.keymap_items):
-                if kmi.idname == CHORDSONG_OT_Leader.bl_idname:
-                    km.keymap_items.remove(kmi)
-            
-            # Add our keymap item
-            kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
+            # Get or create keymap in addon keyconfig
+            km = kc_addon.keymaps.new(name=km_name, space_type=space_type)
+
+            # Check if our keymap item already exists in addon keyconfig
+            # Note: User customizations are stored separately in keyconfigs.user
+            # and will persist automatically. We only manage addon keyconfig here.
+            kmi = None
+            for item in km.keymap_items:
+                if item.idname == CHORDSONG_OT_Leader.bl_idname:
+                    kmi = item
+                    break
+
+            if not kmi:
+                # Create new default keymap item
+                # If user has customized this in keyconfigs.user, their version takes precedence
+                kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
+
+            # Only store references to items in addon keyconfig
+            # (User customizations in keyconfigs.user are managed by Blender)
             addon_keymaps.append((km, kmi))
 
     register_context_menu()
@@ -219,9 +229,20 @@ def unregister():
 
     unregister_context_menu()
 
-    # Clear keymap
-    for km, kmi in addon_keymaps:
-        km.keymap_items.remove(kmi)
+    # Clean up keymap items from addon keyconfig only
+    # Important: addon_keymaps only contains items from keyconfigs.addon, never from keyconfigs.user
+    # This ensures user customizations persist across addon disable/enable cycles
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    if kc:
+        for km, kmi in addon_keymaps:
+            try:
+                if km and kmi and km.keymap_items:
+                    km.keymap_items.remove(kmi)
+            except Exception:
+                # Item might have already been removed or is invalid
+                pass
+    
     addon_keymaps.clear()
 
     for cls in reversed(_classes):
