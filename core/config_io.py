@@ -2,7 +2,7 @@ import json
 
 # pylint: disable=broad-exception-caught
 
-from .engine import parse_kwargs, get_str_attr, get_leader_key_type, set_leader_key_in_keymap
+from .engine import parse_kwargs, get_str_attr
 
 CHORDSONG_CONFIG_VERSION = 1
 
@@ -113,7 +113,6 @@ def dump_prefs(prefs) -> dict:
         "version": CHORDSONG_CONFIG_VERSION,
         "scripts_folder": get_str_attr(prefs, "scripts_folder"),
         "allow_custom_user_scripts": bool(getattr(prefs, "allow_custom_user_scripts", False)),
-        "leader_key": get_leader_key_type(),
         "overlay": {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
             "fading_enabled": bool(getattr(prefs, "overlay_fading_enabled", True)),
@@ -166,7 +165,6 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             - groups: bool - include group definitions
             - overlay: bool - include overlay settings
             - scripts_folder: bool - include scripts folder
-            - leader_key: bool - include leader key
             - selected_group_names: set[str] - set of group names to include in mappings
     """
     result = {}
@@ -178,10 +176,6 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
     if filter_options.get("scripts_folder", True):
         result["scripts_folder"] = get_str_attr(prefs, "scripts_folder")
         result["allow_custom_user_scripts"] = bool(getattr(prefs, "allow_custom_user_scripts", False))
-    
-    # Leader key
-    if filter_options.get("leader_key", True):
-        result["leader_key"] = get_leader_key_type()
     
     # Overlay settings
     if filter_options.get("overlay", True):
@@ -376,21 +370,6 @@ def apply_config(prefs, data: dict) -> list[str]:
     else:
         # Explicitly set to False if not in config (for backward compatibility and security)
         prefs.allow_custom_user_scripts = False
-
-    # Leader key
-    if "leader_key" in data:
-        leader_key = data.get("leader_key", "SPACE")
-        if isinstance(leader_key, str):
-            # Validate it's a reasonable key type
-            valid_keys = {
-                "SPACE", "ACCENT_GRAVE", "QUOTE", "COMMA", "SEMI_COLON",
-                "PERIOD", "SLASH", "BACK_SLASH", "EQUAL", "MINUS",
-                "LEFT_BRACKET", "RIGHT_BRACKET"
-            }
-            if leader_key in valid_keys:
-                set_leader_key_in_keymap(leader_key)
-            else:
-                warnings.append(f'Unknown leader_key "{leader_key}", keeping current')
 
     overlay = data.get("overlay", {})
     if isinstance(overlay, dict):
@@ -592,7 +571,7 @@ def apply_config_append(prefs, data: dict) -> list[str]:
     if config_version not in (None, 1):
         warnings.append(f"Unsupported config version: {config_version} (current {CHORDSONG_CONFIG_VERSION})")
 
-    # Note: We don't merge scripts_folder, leader_key, or overlay settings
+    # Note: We don't merge scripts_folder or overlay settings
     # to preserve the user's current configuration
 
     # Merge groups: add if name doesn't exist, otherwise skip (keep existing)

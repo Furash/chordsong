@@ -502,7 +502,7 @@ def set_leader_key_in_keymap(key_type: str):
             return
 
         # Update leader key in all registered keymaps
-        keymap_names = ["3D View", "Node Editor", "UV Editor"]
+        keymap_names = ["3D View", "Node Editor", "Image"]
         for km_name in keymap_names:
             km = kc.keymaps.get(km_name)
             if km:

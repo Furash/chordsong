@@ -140,21 +140,29 @@ def register():
 
     # handle the keymap
     wm = bpy.context.window_manager
-
-    # 3D View
-    km = wm.keyconfigs.addon.keymaps.new(name='3D View', space_type='VIEW_3D')
-    kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
-    addon_keymaps.append((km, kmi))
-
-    # Node Editor
-    km = wm.keyconfigs.addon.keymaps.new(name='Node Editor', space_type='NODE_EDITOR')
-    kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
-    addon_keymaps.append((km, kmi))
-
-    # Image Editor
-    km = wm.keyconfigs.addon.keymaps.new(name='Image Editor', space_type='IMAGE_EDITOR')
-    kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
-    addon_keymaps.append((km, kmi))
+    kc = wm.keyconfigs.addon
+    if kc:
+        # Register keymap for each editor type
+        keymap_configs = [
+            ('3D View', 'VIEW_3D'),
+            ('Node Editor', 'NODE_EDITOR'),
+            ('Image', 'IMAGE_EDITOR'),
+        ]
+        
+        for km_name, space_type in keymap_configs:
+            # Try to find existing keymap first
+            km = kc.keymaps.get(km_name)
+            if not km:
+                km = kc.keymaps.new(name=km_name, space_type=space_type)
+            
+            # Remove any existing keymap items with our operator (to prevent duplicates)
+            for kmi in list(km.keymap_items):
+                if kmi.idname == CHORDSONG_OT_Leader.bl_idname:
+                    km.keymap_items.remove(kmi)
+            
+            # Add our keymap item
+            kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
+            addon_keymaps.append((km, kmi))
 
     register_context_menu()
     # Initialize default config path early (so operators can use it before opening prefs UI).

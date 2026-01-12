@@ -12,37 +12,36 @@ def draw_mappings_tab(prefs, context, layout):
     # Leader Key section
     kc = context.window_manager.keyconfigs.addon
     if kc:
-        km = kc.keymaps.get("3D View")
-        if km:
-            kmi = None
-            for item in km.keymap_items:
-                if item.idname == "chordsong.leader":
-                    kmi = item
-                    break
+        leader_box = col.box()
 
-            if kmi:
-                leader_box = col.box()
-                split = leader_box.split(factor=0.5)
-
-                # Leader Key section
-                leader_col = split.column()
-                leader_row = leader_col.row(align=True)
-                leader_row.scale_y = 1.2
-                leader_row.label(text="Leader Key:")
-                leader_row.scale_y = 1.5
-                leader_row.scale_x = 1.5
-                leader_row.context_pointer_set("keymap", km)
-                leader_row.prop(kmi, "type", text="", full_event=True, emboss=True)
-                leader_row.separator()
-
-                # Conflict checker section
-                conflict_col = split.column()
-                conflict_row = conflict_col.row(align=True)
-                conflict_row.scale_y = 1.2
-                conflict_row.label(text="Conflict Checker:")
-                conflict_row.scale_y = 1.5
-                conflict_row.operator("chordsong.check_conflicts", text="Check for Conflicts", icon="ERROR")
-                leader_box.separator()
+        # Header
+        header_row = leader_box.row()
+        header_row.alignment = 'CENTER'
+        header_row.label(text="Leader Key Bindings:", icon='KEYINGSET')
+        leader_box.separator()
+        
+        # Display all 3 keymaps
+        keymap_configs = [
+            ('3D View', '3D View'),
+            ('Node Editor', 'Node Editor | Geometry Nodes'),
+            ('Image', 'Image Editor | UV Editor'),
+        ]
+        
+        for km_name, display_name in keymap_configs:
+            km = kc.keymaps.get(km_name)
+            if km:
+                kmi = None
+                for item in km.keymap_items:
+                    if item.idname == "chordsong.leader":
+                        kmi = item
+                        break
+                if kmi:
+                    row = leader_box.row(align=True)
+                    row.scale_y = 1.5
+                    row.label(text=f"{display_name}:")
+                    row.context_pointer_set("keymap", km)
+                    row.prop(kmi, "type", text="", full_event=True, emboss=True)
+        leader_box.separator()
 
     col.separator()
 
@@ -58,9 +57,10 @@ def draw_mappings_tab(prefs, context, layout):
     # Action bar
     row = col.row(align=True)
     row.scale_y = 1.5
+    op = row.operator("chordsong.check_conflicts", text="Check for Conflicts", icon='ERROR')
+    row.separator()
     op = row.operator("chordsong.mapping_add", text="Add New Chord", icon="ADD")
     op.context = prefs.mapping_context_tab
-
     row.separator()
     op = row.operator("chordsong.group_add", text="Add New Group", icon="ADD")
     op.name = "New Group"
