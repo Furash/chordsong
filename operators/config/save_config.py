@@ -64,6 +64,11 @@ class CHORDSONG_OT_Save_Config(bpy.types.Operator, ExportHelper):
                 f.write(text)
                 f.write("\n")
             p.config_path = self.filepath
+            
+            # Persist the config path so it survives addon disable/enable
+            from ...ui.prefs import save_config_path_persistent
+            save_config_path_persistent(self.filepath)
+            
             self.report({"INFO"}, "Chord Song config saved")
             return {"FINISHED"}
         except Exception as ex:

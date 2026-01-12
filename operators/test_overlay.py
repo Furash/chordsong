@@ -59,7 +59,11 @@ def _fading_test_draw_callback():
     if not _fading_test_handler_ctx:
         return
 
-    p = prefs(bpy.context)
+    try:
+        p = prefs(bpy.context)
+    except (KeyError, AttributeError):
+        # Addon is being disabled/unregistered
+        return
     # Mock data for testing
     chord_text = "a b c"
     label = "Test Operator Action"
@@ -117,7 +121,11 @@ def _main_test_draw_callback():
     if not context or not hasattr(context, "preferences"):
         return
 
-    p = prefs(context)
+    try:
+        p = prefs(context)
+    except (KeyError, AttributeError):
+        # Addon is being disabled/unregistered
+        return
     if not p: return
 
     global _main_test_mappings

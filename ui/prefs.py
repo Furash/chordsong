@@ -22,6 +22,10 @@ from .layout import draw_addon_preferences
 from .nerd_icons import NERD_ICONS
 from ..utils.addon_package import addon_root_package
 
+# Module-level flag to suspend callbacks during bulk operations
+# This persists across prefs object reinitializations
+_SUSPEND_CALLBACKS = False
+
 def _addon_root_pkg() -> str:
     """Return the root package used to look up prefs in Blender.
 
@@ -61,6 +65,23 @@ def default_config_path() -> str:
         pass
     return ""
 
+def save_config_path_persistent(config_path: str):
+    """
+    Save the config path to a persistent file.
+    This allows the path to survive addon disable/enable and script reloads.
+    """
+    try:
+        if hasattr(bpy.utils, 'extension_path_user'):
+            root_pkg = _addon_root_pkg()
+            extension_dir = bpy.utils.extension_path_user(root_pkg, path="", create=True)
+            if extension_dir:
+                config_path_file = os.path.join(extension_dir, "config_path.txt")
+                os.makedirs(extension_dir, exist_ok=True)
+                with open(config_path_file, "w", encoding="utf-8") as f:
+                    f.write(config_path)
+    except Exception:
+        pass
+
 def _autosave_now(prefs):
     # Best effort debounced autosave, used by property update callbacks.
     try:
@@ -84,6 +105,11 @@ def _check_conflicts_silent(context):
 def _on_prefs_changed(self, _context):
     # Called when a preferences value changes.
     try:
+        # Skip callbacks during bulk operations (config loading, etc.)
+        global _SUSPEND_CALLBACKS
+        if _SUSPEND_CALLBACKS:
+            return
+        
         self.ensure_defaults()
         _autosave_now(self)
     except Exception:
@@ -91,9 +117,18 @@ def _on_prefs_changed(self, _context):
 
 def _on_mapping_changed(_self, context):
     try:
+        # Skip callbacks during bulk operations (config loading, etc.)
+        global _SUSPEND_CALLBACKS
+        if _SUSPEND_CALLBACKS:
+            return
+        
         prefs = context.preferences.addons[_addon_root_pkg()].preferences
         prefs.ensure_defaults()
         _autosave_now(prefs)
+        
+        # Clear overlay cache so changes appear immediately
+        from .overlay import clear_overlay_cache
+        clear_overlay_cache()
         
         # Sync groups after a short delay to avoid crashing during rapid typing/redraws
         prefs.sync_groups_delayed()
@@ -106,6 +141,11 @@ def _on_mapping_changed(_self, context):
 def _on_group_changed(_self, context):
     # Called when a group item changes; fetch prefs via context.
     try:
+        # Skip callbacks during bulk operations (config loading, etc.)
+        global _SUSPEND_CALLBACKS
+        if _SUSPEND_CALLBACKS:
+            return
+        
         prefs = context.preferences.addons[_addon_root_pkg()].preferences
         _autosave_now(prefs)
     except Exception:
@@ -672,6 +712,8 @@ class CHORDSONG_Preferences(AddonPreferences):
 
     def ensure_defaults(self):
         """Ensure default config path and nerd icons are initialized."""
+        # Only set config_path if it's truly empty (first time setup)
+        # Blender persists this value automatically, so we shouldn't overwrite it
         if not (self.config_path or "").strip():
             self.config_path = default_config_path()
 

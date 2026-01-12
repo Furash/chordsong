@@ -457,6 +457,10 @@ def apply_config(prefs, data: dict) -> list[str]:
         if isinstance(item, dict):
             _add_mapping_from_dict(prefs, item)
 
+    # Clear overlay cache so new mappings/icons appear immediately
+    from ..ui.overlay import clear_overlay_cache
+    clear_overlay_cache()
+
     return warnings
 
 def _add_mapping_from_dict(prefs, item: dict):
@@ -593,6 +597,10 @@ def apply_config_append(prefs, data: dict) -> list[str]:
         for item in mappings:
             if isinstance(item, dict):
                 _add_mapping_from_dict(prefs, item)
+
+    # Clear overlay cache so new mappings/icons appear immediately
+    from ..ui.overlay import clear_overlay_cache
+    clear_overlay_cache()
 
     return warnings
 

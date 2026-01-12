@@ -138,14 +138,14 @@ def register():
     for cls in _classes:
         _safe_register_class(cls)
 
-    # handle the keymap
+    # === Keymap Registration ===
+    # Register default SPACE key binding for leader operator
     wm = bpy.context.window_manager
     kc_addon = wm.keyconfigs.addon
-    
+
     if kc_addon:
-        # Clear any stale references from previous registration
         addon_keymaps.clear()
-        # Register keymap for each editor type
+
         keymap_configs = [
             ('3D View', 'VIEW_3D'),
             ('Node Editor', 'NODE_EDITOR'),
@@ -153,12 +153,9 @@ def register():
         ]
 
         for km_name, space_type in keymap_configs:
-            # Get or create keymap in addon keyconfig
             km = kc_addon.keymaps.new(name=km_name, space_type=space_type)
 
-            # Check if our keymap item already exists in addon keyconfig
-            # Note: User customizations are stored separately in keyconfigs.user
-            # and will persist automatically. We only manage addon keyconfig here.
+            # Check if keymap item already exists (avoid duplicates on reload)
             kmi = None
             for item in km.keymap_items:
                 if item.idname == CHORDSONG_OT_Leader.bl_idname:
@@ -166,72 +163,110 @@ def register():
                     break
 
             if not kmi:
-                # Create new default keymap item
-                # If user has customized this in keyconfigs.user, their version takes precedence
+                # Create default SPACE key binding
+                # User customizations in keyconfigs.user take precedence automatically
                 kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
 
-            # Only store references to items in addon keyconfig
-            # (User customizations in keyconfigs.user are managed by Blender)
             addon_keymaps.append((km, kmi))
 
     register_context_menu()
-    # Initialize default config path early (so operators can use it before opening prefs UI).
+
+    # Restore user's config and auto-load their mappings on addon enable
     try:
         package_name = addon_root_package(__package__)
         prefs = bpy.context.preferences.addons[package_name].preferences
-        if hasattr(prefs, "ensure_defaults"):
-            prefs.ensure_defaults()
 
-        # Load default config on first install (when no user config exists)
+        # Suspend all property update callbacks during initialization to prevent spam
+        # Must use module-level global because Blender reinitializes prefs during registration
+        from .ui import prefs as prefs_module
+        prefs_module._SUSPEND_CALLBACKS = True
+        prefs._chordsong_suspend_autosave = True
+
         import os
         from .core.config_io import apply_config, loads_json
         from .ui.prefs import default_config_path
 
-        # Check if user has any mappings (indicates they've already configured)
-        has_existing_config = len(getattr(prefs, "mappings", [])) > 0
+        # Restore user's config path from persistent storage
+        # (config_path property doesn't persist across addon disable/enable)
+        user_config_path = getattr(prefs, "config_path", "") or ""
+        has_existing_mappings = len(getattr(prefs, "mappings", [])) > 0
 
-        # Also check if a config file exists at the default path
-        default_path = default_config_path()
-        config_file_exists = default_path and os.path.exists(default_path)
+        try:
+            extension_dir = bpy.utils.extension_path_user(package_name, path="", create=True)
+            if extension_dir:
+                config_path_file = os.path.join(extension_dir, "config_path.txt")
+                if os.path.exists(config_path_file):
+                    with open(config_path_file, "r", encoding="utf-8") as f:
+                        saved_path = f.read().strip()
+                        if saved_path and os.path.exists(saved_path):
+                            user_config_path = saved_path
+        except Exception:
+            pass
 
-        # Only load default config if this appears to be a first install
-        if not has_existing_config and not config_file_exists:
-            # Load default config from bundled file
-            try:
-                # Get path to bundled default_mappings.json
-                from .operators.config.load_default import _get_default_config_path
-                bundled_config_path = _get_default_config_path()
+        user_config_exists = user_config_path and os.path.exists(user_config_path)
 
-                if os.path.exists(bundled_config_path):
-                    with open(bundled_config_path, "r", encoding="utf-8") as f:
+        try:
+            # Restore the user's config path
+            if user_config_path:
+                prefs.config_path = user_config_path
+
+            # Initialize defaults only on first install (no config path, no mappings)
+            if not user_config_path and not has_existing_mappings:
+                if hasattr(prefs, "ensure_defaults"):
+                    prefs.ensure_defaults()
+
+            # Auto-load user's config on addon enable
+            # (mappings collection is cleared on disable, but config_path.txt persists)
+            if not has_existing_mappings and user_config_exists:
+                try:
+                    with open(user_config_path, "r", encoding="utf-8") as f:
                         data = loads_json(f.read())
+                    apply_config(prefs, data)
+                except Exception:
+                    pass
 
-                    # Suspend autosave during initial load
-                    prefs._chordsong_suspend_autosave = True  # pylint: disable=protected-access
-                    try:
+            # Load bundled default config only on first install (no saved config found)
+            default_path = default_config_path()
+            config_file_exists = default_path and os.path.exists(default_path)
+
+            if not has_existing_mappings and not user_config_exists and not config_file_exists:
+                try:
+                    from .operators.config.load_default import _get_default_config_path
+                    bundled_config_path = _get_default_config_path()
+
+                    if os.path.exists(bundled_config_path):
+                        with open(bundled_config_path, "r", encoding="utf-8") as f:
+                            data = loads_json(f.read())
                         apply_config(prefs, data)
-                    finally:
-                        prefs._chordsong_suspend_autosave = False  # pylint: disable=protected-access
-            except Exception:
-                # Silently ignore errors during initial config load
-                # User can still load config manually if needed
-                pass
+                except Exception:
+                    pass
+        finally:
+            # Re-enable callbacks now that initialization is complete
+            prefs_module._SUSPEND_CALLBACKS = False
+            prefs._chordsong_suspend_autosave = False
     except Exception:
         pass
 
 def unregister():
     """Unregister addon classes and keymaps."""
-    # Clean up any active draw handlers/timers first to avoid draw-state conflicts
+    # Clean up active draw handlers to prevent callbacks accessing invalid prefs
     try:
         cleanup_all_handlers()
     except Exception:
         pass
 
+    # Cancel pending autosave timer to prevent crashes after disable
+    try:
+        from .core.autosave import _timer_cb
+        import bpy
+        if bpy.app.timers.is_registered(_timer_cb):
+            bpy.app.timers.unregister(_timer_cb)
+    except Exception:
+        pass
+
     unregister_context_menu()
 
-    # Clean up keymap items from addon keyconfig only
-    # Important: addon_keymaps only contains items from keyconfigs.addon, never from keyconfigs.user
-    # This ensures user customizations persist across addon disable/enable cycles
+    # Remove only addon keyconfig items (user customizations persist separately)
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
     if kc:
@@ -240,9 +275,8 @@ def unregister():
                 if km and kmi and km.keymap_items:
                     km.keymap_items.remove(kmi)
             except Exception:
-                # Item might have already been removed or is invalid
                 pass
-    
+
     addon_keymaps.clear()
 
     for cls in reversed(_classes):

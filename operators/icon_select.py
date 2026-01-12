@@ -102,6 +102,10 @@ class CHORDSONG_OT_Icon_Select_Apply(bpy.types.Operator):
         mapping = p.mappings[self.mapping_index]
         mapping.icon = icon_char
 
+        # Clear overlay cache so the new icon appears immediately
+        from ..ui.overlay import clear_overlay_cache
+        clear_overlay_cache()
+
         from .common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)
 

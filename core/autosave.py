@@ -62,6 +62,14 @@ def _timer_cb():
     try:
         if not prefs:
             return None
+        
+        # Check if prefs object is still valid (addon might be disabled)
+        try:
+            _ = prefs.bl_idname
+        except (ReferenceError, AttributeError):
+            # Prefs object is invalid, addon was disabled
+            return None
+        
         if getattr(prefs, "_chordsong_suspend_autosave", False):
             return None
         write_autosave(prefs)

@@ -48,7 +48,18 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
     def _draw_callback(self):
         """Draw callback for the recents overlay."""
-        p = prefs(bpy.context)
+        try:
+            # Check if self is still valid (operator not removed during addon disable)
+            try:
+                _ = self.bl_idname
+            except ReferenceError:
+                # Operator has been removed, stop drawing
+                return
+
+            p = prefs(bpy.context)
+        except (KeyError, AttributeError):
+            # Addon is being disabled/unregistered, preferences no longer available
+            return
         if not p.overlay_enabled:
             return
 

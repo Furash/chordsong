@@ -159,7 +159,11 @@ def _show_fading_overlay(_context, chord_tokens, label, icon):
                     if target_region:
                         # Create context override with target area and region
                         with bpy.context.temp_override(area=target_area, region=target_region):
-                            p = prefs(bpy.context)
+                            try:
+                                p = prefs(bpy.context)
+                            except (KeyError, AttributeError):
+                                # Addon is being disabled/unregistered
+                                return
                             if not p:
                                 return
                             
@@ -179,7 +183,11 @@ def _show_fading_overlay(_context, chord_tokens, label, icon):
                     pass
             
             # Fallback: use current context
-            p = prefs(bpy.context)
+            try:
+                p = prefs(bpy.context)
+            except (KeyError, AttributeError):
+                # Addon is being disabled/unregistered
+                return
             if not p:
                 return
             
@@ -388,7 +396,11 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         """Draw callback for the overlay."""
         # Use bpy.context directly - it's more reliable for draw handlers
         context = bpy.context
-        p = prefs(context)
+        try:
+            p = prefs(context)
+        except (KeyError, AttributeError):
+            # Addon is being disabled/unregistered, preferences no longer available
+            return
         if not p.overlay_enabled:
             return
 
