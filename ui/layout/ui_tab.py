@@ -83,6 +83,28 @@ def draw_ui_tab(prefs, layout):
     r.label(text="Folder Display Style:")
     r.prop(prefs, "overlay_folder_style", text="")
     box.separator()
+    
+    # Theme Presets Section
+    theme_box = box.box()
+    theme_row = theme_box.row()
+    theme_row.label(text="Theme", icon='COLOR')
+    
+    # Extract from Blender (primary option)
+    extract_row = theme_box.row()
+    extract_row.scale_y = 1.5
+    extract_row.operator("chordsong.extract_blender_theme", text="Match Current Blender Theme", icon='EYEDROPPER')
+    
+    theme_box.separator()
+    
+    # Import/Export and Preset
+    io_row = theme_box.row(align=True)
+    io_row.operator("chordsong.load_theme_preset", text="Reset to Default", icon='LOOP_BACK').preset_name = "default"
+    io_row.separator()
+    io_row.operator("chordsong.import_overlay_theme", text="Import", icon='IMPORT')
+    io_row.separator()
+    io_row.operator("chordsong.export_overlay_theme", text="Export", icon='EXPORT')
+    
+    box.separator()
 
     # Color table logic
     split = box.split(factor=0.3)
@@ -98,6 +120,7 @@ def draw_ui_tab(prefs, layout):
         ("Toggle OFF", "overlay_color_toggle_off"),
         ("Header Text", "overlay_color_header"),
         ("Recents Key", "overlay_color_recents_hotkey"),
+        ("Separators", "overlay_color_separator"),
         ("List Background", "overlay_list_background"),
         ("Header Background", "overlay_header_background"),
         ("Footer Background", "overlay_footer_background"),

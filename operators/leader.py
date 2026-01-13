@@ -141,18 +141,21 @@ def _show_fading_overlay(_context, chord_tokens, label, icon):
             # Otherwise use current context
             if target_area:
                 try:
-                    # Try to get region from target area (usually the first WINDOW region)
+                    # Try to get region from target area (usually the WINDOW region)
                     # Don't access region.type directly - it can crash
-                    # Instead, try to find a region by checking if it has width/height (WINDOW regions do)
+                    # Instead, find the largest region by area (width * height) which is typically the main viewport
                     target_region = None
+                    max_area = 0
                     for region in target_area.regions:
                         try:
                             # WINDOW regions have width and height, other regions might not
-                            # This is a safe way to identify WINDOW regions without accessing .type
-                            _ = region.width
-                            _ = region.height
-                            target_region = region
-                            break
+                            # Find the largest region to avoid using small toolbars/panels
+                            w = region.width
+                            h = region.height
+                            area = w * h
+                            if area > max_area:
+                                max_area = area
+                                target_region = region
                         except Exception:
                             continue
                     

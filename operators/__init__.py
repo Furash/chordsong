@@ -30,6 +30,12 @@ from .mapping.property_convert import CHORDSONG_OT_Property_Mapping_Convert
 from .mapping.subitem_ops import CHORDSONG_OT_SubItem_Add, CHORDSONG_OT_SubItem_Remove
 from .config.open_keymap import CHORDSONG_OT_Open_Keymap
 from .config.open_prefs import CHORDSONG_OT_Open_Prefs
+from .config.overlay_theme import (
+    CHORDSONG_OT_ExportOverlayTheme,
+    CHORDSONG_OT_ImportOverlayTheme,
+    CHORDSONG_OT_ExtractBlenderTheme,
+    CHORDSONG_OT_LoadThemePreset,
+)
 from .recents import CHORDSONG_OT_Recents
 from .config.save_config import CHORDSONG_OT_Save_Config
 from .script_select import CHORDSONG_OT_Script_Select, CHORDSONG_OT_Script_Select_Apply
@@ -74,6 +80,10 @@ __all__ = [
     "CHORDSONG_OT_Script_Select_Apply",
     "CHORDSONG_OT_TestFadingOverlay",
     "CHORDSONG_OT_TestMainOverlay",
+    "CHORDSONG_OT_ExportOverlayTheme",
+    "CHORDSONG_OT_ImportOverlayTheme",
+    "CHORDSONG_OT_ExtractBlenderTheme",
+    "CHORDSONG_OT_LoadThemePreset",
     "cleanup_all_handlers",
     "register_context_menu",
     "unregister_context_menu",

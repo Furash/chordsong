@@ -544,7 +544,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         size=4,
         min=0.0,
         max=1.0,
-        default=(0.80, 0.80, 0.80, 0.70),
+        default=(0.80, 0.80, 0.80, 1.00),
         update=_on_prefs_changed,
     )
     overlay_color_toggle_on: FloatVectorProperty(
@@ -575,6 +575,16 @@ class CHORDSONG_Preferences(AddonPreferences):
         min=0.0,
         max=1.0,
         default=(0.65, 0.80, 1.00, 1.00),
+        update=_on_prefs_changed,
+    )
+    overlay_color_separator: FloatVectorProperty(
+        name="Separator color",
+        description="Color for separator tokens (→, ::, etc.)",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(1.00, 1.00, 1.00, 0.20),
         update=_on_prefs_changed,
     )
     overlay_list_background: FloatVectorProperty(
