@@ -87,20 +87,22 @@ def draw_ui_tab(prefs, layout):
     # Theme Presets Section
     theme_box = box.box()
     theme_row = theme_box.row()
-    theme_row.label(text="Theme Presets", icon='COLOR')
+    theme_row.label(text="Theme", icon='COLOR')
     
-    # Built-in presets
-    preset_row = theme_box.row(align=True)
-    preset_row.operator("chordsong.load_theme_preset", text="Default").preset_name = "default"
-    preset_row.operator("chordsong.load_theme_preset", text="Dark").preset_name = "dark"
-    preset_row.operator("chordsong.load_theme_preset", text="Light").preset_name = "light"
-    preset_row.operator("chordsong.load_theme_preset", text="Neon").preset_name = "neon"
+    # Extract from Blender (primary option)
+    extract_row = theme_box.row()
+    extract_row.scale_y = 1.5
+    extract_row.operator("chordsong.extract_blender_theme", text="Match Current Blender Theme", icon='EYEDROPPER')
     
-    # Import/Export
+    theme_box.separator()
+    
+    # Import/Export and Preset
     io_row = theme_box.row(align=True)
-    io_row.operator("chordsong.export_overlay_theme", text="Export Theme", icon='EXPORT')
-    io_row.operator("chordsong.import_overlay_theme", text="Import Theme", icon='IMPORT')
-    io_row.operator("chordsong.extract_blender_theme", text="Extract from Blender", icon='EYEDROPPER')
+    io_row.operator("chordsong.load_theme_preset", text="Reset to Default", icon='LOOP_BACK').preset_name = "default"
+    io_row.separator()
+    io_row.operator("chordsong.import_overlay_theme", text="Import", icon='IMPORT')
+    io_row.separator()
+    io_row.operator("chordsong.export_overlay_theme", text="Export", icon='EXPORT')
     
     box.separator()
 
@@ -118,6 +120,7 @@ def draw_ui_tab(prefs, layout):
         ("Toggle OFF", "overlay_color_toggle_off"),
         ("Header Text", "overlay_color_header"),
         ("Recents Key", "overlay_color_recents_hotkey"),
+        ("Separators", "overlay_color_separator"),
         ("List Background", "overlay_list_background"),
         ("Header Background", "overlay_header_background"),
         ("Footer Background", "overlay_footer_background"),
