@@ -105,6 +105,7 @@ def dump_prefs(prefs) -> dict:
     for grp in getattr(prefs, "groups", []):
         groups.append({
             "name": (getattr(grp, "name", "") or "").strip(),
+            "icon": (getattr(grp, "icon", "") or "").strip(),
             "display_order": int(getattr(grp, "display_order", 0)),
             "expanded": bool(getattr(grp, "expanded", False)),
         })
@@ -131,9 +132,12 @@ def dump_prefs(prefs) -> dict:
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
             "color_header": list(getattr(prefs, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))),
             "color_icon": list(getattr(prefs, "overlay_color_icon", (0.8, 0.8, 0.8, 0.7))),
+            "color_group": list(getattr(prefs, "overlay_color_group", (0.90, 0.90, 0.50, 1.00))),
+            "color_counter": list(getattr(prefs, "overlay_color_counter", (0.80, 0.80, 0.80, 0.80))),
             "color_toggle_on": list(getattr(prefs, "overlay_color_toggle_on", (0.65, 0.8, 1.0, 0.4))),
             "color_toggle_off": list(getattr(prefs, "overlay_color_toggle_off", (1.0, 1.0, 1.0, 0.2))),
             "color_recents_hotkey": list(getattr(prefs, "overlay_color_recents_hotkey", (0.65, 0.8, 1.0, 1.0))),
+            "color_separator": list(getattr(prefs, "overlay_color_separator", (1.0, 1.0, 1.0, 0.20))),
             "color_list_background": list(getattr(prefs, "overlay_list_background", (0.0, 0.0, 0.0, 0.35))),
             "color_header_background": list(getattr(prefs, "overlay_header_background", (0.0, 0.0, 0.0, 0.35))),
             "color_footer_background": list(getattr(prefs, "overlay_footer_background", (0.0, 0.0, 0.0, 0.35))),
@@ -145,6 +149,11 @@ def dump_prefs(prefs) -> dict:
             "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
             "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
             "style": getattr(prefs, "overlay_folder_style", "GROUPS_FIRST"),
+            "format_folder": getattr(prefs, "overlay_format_folder", "C G S N"),
+            "format_item": getattr(prefs, "overlay_format_item", "C I L"),
+            "separator_a": getattr(prefs, "overlay_separator_a", "→"),
+            "separator_b": getattr(prefs, "overlay_separator_b", "::"),
+            "max_label_length": int(getattr(prefs, "overlay_max_label_length", 0)),
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
             "ungrouped_expanded": bool(getattr(prefs, "ungrouped_expanded", False)),
@@ -197,9 +206,12 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
             "color_header": list(getattr(prefs, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))),
             "color_icon": list(getattr(prefs, "overlay_color_icon", (0.8, 0.8, 0.8, 0.7))),
+            "color_group": list(getattr(prefs, "overlay_color_group", (0.90, 0.90, 0.50, 1.00))),
+            "color_counter": list(getattr(prefs, "overlay_color_counter", (0.80, 0.80, 0.80, 0.80))),
             "color_toggle_on": list(getattr(prefs, "overlay_color_toggle_on", (0.65, 0.8, 1.0, 0.4))),
             "color_toggle_off": list(getattr(prefs, "overlay_color_toggle_off", (1.0, 1.0, 1.0, 0.2))),
             "color_recents_hotkey": list(getattr(prefs, "overlay_color_recents_hotkey", (0.65, 0.8, 1.0, 1.0))),
+            "color_separator": list(getattr(prefs, "overlay_color_separator", (1.0, 1.0, 1.0, 0.20))),
             "color_list_background": list(getattr(prefs, "overlay_list_background", (0.0, 0.0, 0.0, 0.35))),
             "color_header_background": list(getattr(prefs, "overlay_header_background", (0.0, 0.0, 0.0, 0.35))),
             "color_footer_background": list(getattr(prefs, "overlay_footer_background", (0.0, 0.0, 0.0, 0.35))),
@@ -211,6 +223,11 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
             "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
             "style": getattr(prefs, "overlay_folder_style", "GROUPS_FIRST"),
+            "format_folder": getattr(prefs, "overlay_format_folder", "C G S N"),
+            "format_item": getattr(prefs, "overlay_format_item", "C I L"),
+            "separator_a": getattr(prefs, "overlay_separator_a", "→"),
+            "separator_b": getattr(prefs, "overlay_separator_b", "::"),
+            "max_label_length": int(getattr(prefs, "overlay_max_label_length", 0)),
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
             "ungrouped_expanded": bool(getattr(prefs, "ungrouped_expanded", False)),
@@ -226,6 +243,7 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             if selected_group_names is None or group_name in selected_group_names:
                 groups.append({
                     "name": group_name,
+                    "icon": (getattr(grp, "icon", "") or "").strip(),
                     "display_order": int(getattr(grp, "display_order", 0)),
                     "expanded": bool(getattr(grp, "expanded", False)),
                 })
@@ -399,6 +417,7 @@ def apply_config(prefs, data: dict) -> list[str]:
             "footer_gap": "overlay_footer_gap",
             "footer_token_gap": "overlay_footer_token_gap",
             "footer_label_gap": "overlay_footer_label_gap",
+            "max_label_length": "overlay_max_label_length",
             "offset_x": "overlay_offset_x",
             "offset_y": "overlay_offset_y",
             "font_size_toggle": "overlay_font_size_toggle",
@@ -418,8 +437,9 @@ def apply_config(prefs, data: dict) -> list[str]:
         color_props = {
             "color_chord": "overlay_color_chord", "color_label": "overlay_color_label",
             "color_header": "overlay_color_header", "color_icon": "overlay_color_icon",
+            "color_group": "overlay_color_group", "color_counter": "overlay_color_counter",
             "color_toggle_on": "overlay_color_toggle_on", "color_toggle_off": "overlay_color_toggle_off",
-            "color_recents_hotkey": "overlay_color_recents_hotkey",
+            "color_recents_hotkey": "overlay_color_recents_hotkey", "color_separator": "overlay_color_separator",
             "color_list_background": "overlay_list_background",
             "color_header_background": "overlay_header_background",
             "color_footer_background": "overlay_footer_background",
@@ -437,6 +457,18 @@ def apply_config(prefs, data: dict) -> list[str]:
         style = overlay.get("style", "GROUPS_FIRST")
         if style in _enum_items_as_set(prefs, "overlay_folder_style"):
             prefs.overlay_folder_style = style
+        
+        # Load format strings and separators
+        string_props = {
+            "format_folder": "overlay_format_folder",
+            "format_item": "overlay_format_item",
+            "separator_a": "overlay_separator_a",
+            "separator_b": "overlay_separator_b",
+        }
+        for key, attr in string_props.items():
+            if key in overlay:
+                try: setattr(prefs, attr, str(overlay[key]))
+                except: pass
 
     groups_data = data.get("groups", None)
     if isinstance(groups_data, list):
@@ -445,6 +477,7 @@ def apply_config(prefs, data: dict) -> list[str]:
             if isinstance(grp_item, dict):
                 grp = prefs.groups.add()
                 grp.name = (grp_item.get("name", "") or "").strip()
+                grp.icon = (grp_item.get("icon", "") or "").strip()
                 grp.display_order = int(grp_item.get("display_order", 0))
                 grp.expanded = bool(grp_item.get("expanded", False))
 

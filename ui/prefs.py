@@ -172,6 +172,12 @@ class CHORDSONG_PG_Group(PropertyGroup):
         default="",
         update=_on_group_changed,
     )
+    icon: StringProperty(
+        name="Icon",
+        description="Nerd Fonts emoji/icon for this group (e.g. '', '', '', '')",
+        default="",
+        update=_on_group_changed,
+    )
     display_order: IntProperty(
         name="Display Order",
         description="Order in which groups are displayed",
@@ -587,6 +593,26 @@ class CHORDSONG_Preferences(AddonPreferences):
         default=(1.00, 1.00, 1.00, 0.20),
         update=_on_prefs_changed,
     )
+    overlay_color_group: FloatVectorProperty(
+        name="Group color",
+        description="Color for group names in overlay",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(0.90, 0.90, 0.50, 1.00),
+        update=_on_prefs_changed,
+    )
+    overlay_color_counter: FloatVectorProperty(
+        name="Counter color",
+        description="Color for keymap counter (+N keymaps)",
+        subtype="COLOR",
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(0.80, 0.80, 0.80, 0.80),
+        update=_on_prefs_changed,
+    )
     overlay_list_background: FloatVectorProperty(
         name="List background",
         description="Background color for the chords list area",
@@ -704,8 +730,53 @@ class CHORDSONG_Preferences(AddonPreferences):
             ("GROUPS_AFTER", "→ +N keymaps :: Groups", "Count followed by a summary of groups"),
             ("GROUPS_FIRST", "→ Groups → N keymaps", "Summary of groups followed by a vertically aligned count"),
             ("HYBRID", "→ Groups :: N", "Groups followed by a simple count with :: symbol"),
+            ("CUSTOM", "Custom Format", "Use custom format string"),
         ),
         default="GROUPS_FIRST",
+        update=_on_prefs_changed,
+    )
+    
+    # Custom format strings
+    overlay_format_folder: StringProperty(
+        name="Folder Format",
+        description=(
+            "Custom format for folder items (multiple keymaps)\n"
+            "Tokens: I=Icon, C=Chord, G=All Groups, g=First Group, L=Label, N=Verbose Count (+3 keymaps), n=Compact Count (+3), S=Separator A, s=Separator a"
+        ),
+        default="C G S N",
+        update=_on_prefs_changed,
+    )
+    
+    overlay_format_item: StringProperty(
+        name="Item Format",
+        description=(
+            "Custom format for single items\n"
+            "Tokens: I=Icon, C=Chord, G=All Groups, g=First Group, L=Label, S=Separator A, s=Separator a"
+        ),
+        default="C I L",
+        update=_on_prefs_changed,
+    )
+    
+    overlay_separator_a: StringProperty(
+        name="Separator A",
+        description="Primary separator (used by S token)",
+        default="→",
+        update=_on_prefs_changed,
+    )
+    
+    overlay_separator_b: StringProperty(
+        name="Separator B", 
+        description="Secondary separator (used by s token)",
+        default="::",
+        update=_on_prefs_changed,
+    )
+    
+    overlay_max_label_length: IntProperty(
+        name="Max Label Length",
+        description="Maximum character length for labels before truncation. The longest label in each column sets the width for toggle icon alignment. Set to 0 for no limit.",
+        default=0,
+        min=0,
+        max=200,
         update=_on_prefs_changed,
     )
 

@@ -138,48 +138,161 @@ def _main_test_draw_callback():
     draw_overlay(context, p, [], _main_test_mappings)
 
 class DummyMapping:
-    """Mock mapping object for testing."""
+    """Mock mapping object for testing - 100 items total (80 regular + 20 toggles)."""
     def __init__(self, i):
-        # Generate unique starting token so all items appear in the top-level list.
-        # Vary FIRST token length to test column width calculation
-
-        if i < 8:
-             # Force multiple identical prefixes to test summary (+8 keymaps)
-             prefix = "a"
-             self.chord = f"a {chr(97+i)}"
-             self.label = f"Sub Action {i+1}"
-        elif i % 3 == 0:
-             # Long first token (simulating modifiers)
-             prefix = f"ctrl+shift+k{i+1:02d}"
-             self.chord = f"{prefix} a b c"
-             self.label = f"Long Token {i+1:02d}"
-        elif i % 3 == 1:
-             # Short first token (simulating single digit)
-             prefix = f"{i+1}"
-             self.chord = f"{prefix}"
-             self.label = f"Short {i+1:02d}"
+        # Modifier syntax: ^ = Ctrl, ! = Alt, + = Shift, # = Win
+        
+        # Define 20 toggle items (every 5th item) with alternating ON/OFF states
+        # Toggle ON: 󰨚  Toggle OFF: 󰨙
+        toggle_indices = [4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79, 84, 89, 94, 99]
+        is_toggle = i in toggle_indices
+        toggle_on = (toggle_indices.index(i) % 2 == 0) if is_toggle else False
+        
+        # Generate diverse chords - mix of single keys, modifiers, and a few nested items
+        # Most have unique starting tokens so they appear at top level
+        chords = [
+            # Mix of folders (will show nested) and direct actions
+            ("m", "Modeling"),           # Folder - will show m x, m w, m s below
+            ("m x", "X-Ray"),            # Nested under 'm'
+            ("m w", "Wireframe"),        # Nested under 'm'  
+            ("m s", "Snap"),             # Nested under 'm'
+            ("g", "General"),            # Toggle - Folder
+            ("g x", "X-Ray View"),       # Nested under 'g'
+            ("g o", "Overlays"),         # Nested under 'g'
+            ("g c", "Cavity"),           # Nested under 'g'
+            ("g n", "Normals"),          # Toggle - nested under 'g'
+            ("g f", "Face Orient"),      # Nested under 'g'
+            # Unique top-level items (different starting keys)
+            ("e", "Extrude"),
+            ("i", "Inset"),
+            ("b", "Bevel"),
+            ("l", "Loop Cut"),
+            ("^s", "Quick Save"),        # Toggle
+            ("^z", "Undo"),
+            ("^+z", "Redo"),
+            ("^c", "Copy"),
+            ("^v", "Paste"),
+            ("!d", "Duplicate"),         # Toggle
+            ("+a", "Add Menu"),
+            ("x", "Delete"),
+            ("h", "Hide"),
+            ("!h", "Unhide"),
+            ("^a", "Select All"),        # Toggle
+            ("!a", "Deselect"),
+            ("^i", "Invert Select"),
+            ("f", "Fill"),
+            ("k", "Knife Tool"),
+            ("j", "Join"),               # Toggle
+            # Some more nested for 's' prefix
+            ("s", "Shading"),            # Folder
+            ("s s", "Smooth"),           # Nested under 's'
+            ("s f", "Flat"),             # Nested under 's'
+            ("s a", "Auto Smooth"),      # Nested under 's'
+            ("s n", "Recalc Normals"),   # Toggle - nested
+            # More unique top-level
+            ("t", "Transform Menu"),
+            ("r", "Rotate"),
+            ("w", "Move"),
+            ("z", "Scale"),
+            ("^m", "Mirror"),            # Toggle
+            ("p", "Proportional"),
+            ("o", "Origin"),
+            ("^p", "Parent"),
+            ("!p", "Clear Parent"),
+            ("n", "New"),                # Toggle
+            ("^n", "New File"),
+            ("^o", "Open"),
+            ("!s", "Save As"),
+            ("^+s", "Save Copy"),
+            ("q", "Quit"),               # Toggle
+            # Some nested for 'c' prefix
+            ("c", "Camera"),             # Folder
+            ("c v", "Cam to View"),      # Nested under 'c'
+            ("c s", "Set Active"),       # Nested under 'c'
+            ("c t", "Track"),            # Nested under 'c'
+            ("c z", "Zoom"),             # Toggle - nested
+            # More unique
+            ("u", "Unwrap"),
+            ("^u", "UV Reset"),
+            ("a", "Animate"),
+            ("^k", "Keyframe"),
+            ("!k", "Clear Keys"),        # Toggle
+            ("d", "Subdivide"),
+            ("^d", "Duplicate Linked"),
+            ("y", "Redo"),
+            ("!z", "Redo Alt"),
+            ("^y", "Redo Panel"),        # Toggle
+            # Few more nested for 'v' prefix
+            ("v", "View"),               # Folder
+            ("v f", "Frame All"),        # Nested under 'v'
+            ("v s", "Frame Selected"),   # Nested under 'v'
+            ("v c", "View Camera"),      # Nested under 'v'
+            ("v a", "View All"),         # Toggle - nested
+            # More unique top-level
+            ("/", "Search"),
+            ("^f", "Find"),
+            ("^h", "Replace"),
+            ("^g", "Go To"),
+            ("^r", "Render"),            # Toggle
+            ("^b", "Border Render"),
+            ("^+b", "Box Select"),
+            ("^e", "Export"),
+            ("^+e", "Export FBX"),
+            ("!", "Info"),               # Toggle
+            ("^j", "Join as Shape"),
+            ("^l", "Make Links"),
+            ("^+l", "Link Transfer"),
+            ("^t", "Track Menu"),
+            ("^+t", "Track Clear"),      # Toggle
+            # Few remaining
+            ("1", "Front View"),
+            ("3", "Side View"),
+            ("7", "Top View"),
+            ("0", "Camera View"),
+            ("5", "Ortho Toggle"),       # Toggle
+            ("2", "Rotate View"),
+            ("4", "Pan View"),
+            ("6", "Right View"),
+            ("8", "Back View"),
+            ("9", "Opposite"),           # Toggle
+            (".", "Frame"),
+            (",", "Zoom All"),
+            (";", "Local View"),
+            ("'", "Lock Camera"),
+            ("[", "Prev Frame"),         # Toggle
+            ("]", "Next Frame"),
+            ("-", "Zoom Out"),
+            ("=", "Zoom In"),
+            ("`", "Console"),
+            ("~", "Manipulator"),        # Toggle
+        ]
+        
+        if i < len(chords):
+            self.chord, base_label = chords[i]
         else:
-             # Standard first token
-             prefix = f"k{i+1:02d}"
-             self.chord = f"{prefix} x"
-             self.label = f"Test Operator {i+1:02d}"
+            self.chord = f"k{i+1}"
+            base_label = f"Action {i+1}"
+        
+        # Apply toggle state to label if this is a toggle item
+        if is_toggle:
+            icon = "󰨚" if toggle_on else "󰨙"
+            self.label = f"{base_label}  {icon}"
+        else:
+            self.label = base_label
 
         # Common Nerd Font icons (Save, Folder, Code, Play, Gear, Search, Image, Bug)
         icons = ["\uf0c7", "\uf07b", "\uf1c9", "\uf04b", "\uf013", "\uf002", "\uf02e", "\uf188"]
         self.icon = icons[i % len(icons)]
 
-        # Assign groups to test grouping visualization
-        if i < 3:
-            self.group = "Common"
-        elif i < 5:
-            self.group = "UV"
-        elif i < 15:
-            self.group = "Modeling"
-        else:
-            self.group = "Rendering"
+        # Assign groups based on position (10 items per group)
+        groups = ["Modeling", "General", "Shading", "Transform", "Select", 
+                  "Render", "Camera", "Edit", "UV", "Animation"]
+        self.group = groups[(i // 10) % len(groups)]
 
         self.context = "VIEW_3D"
         self.enabled = True
+        # Mark toggle items as CONTEXT_TOGGLE type
+        self.mapping_type = "CONTEXT_TOGGLE" if is_toggle else "OPERATOR"
 
 class CHORDSONG_OT_TestMainOverlay(bpy.types.Operator):
     """Show the main overlay filled with dummy items for testing layout."""

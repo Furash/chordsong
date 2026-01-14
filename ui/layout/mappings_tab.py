@@ -145,12 +145,26 @@ def draw_mappings_tab(prefs, context, layout):
                 emboss=False,
             )
 
+        # Show group icon if available
+        group_icon = ""
+        if group_name != "Ungrouped":
+            for grp in prefs.groups:
+                if grp.name == group_name:
+                    group_icon = grp.icon
+                    break
+        
         # Show conflict indicator if group has conflicted chords
         if group_has_conflicts:
             row_left.alert = True
-            row_left.label(text=f"{group_name}", icon="ERROR")
+            if group_icon:
+                row_left.label(text=f"{group_icon} {group_name}", icon="ERROR")
+            else:
+                row_left.label(text=f"{group_name}", icon="ERROR")
         else:
-            row_left.label(text=f"{group_name}")
+            if group_icon:
+                row_left.label(text=f"{group_icon} {group_name}")
+            else:
+                row_left.label(text=f"{group_name}")
 
         # Right side: Buttons (compact and aligned right)
         row_right = split.row(align=True)
@@ -173,8 +187,8 @@ def draw_mappings_tab(prefs, context, layout):
                 op = row_right.operator("chordsong.group_move_down", text="", icon="TRIA_DOWN", emboss=False)
                 op.index = group_idx
                 row_right.separator()
-                # Rename group button
-                op = row_right.operator("chordsong.group_rename", text="", icon="EVENT_A", emboss=False)
+                # Edit group button (name and icon)
+                op = row_right.operator("chordsong.group_edit", text="", icon="GREASEPENCIL", emboss=False)
                 op.index = group_idx
                 row_right.separator()
                 # Delete group button

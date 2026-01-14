@@ -31,6 +31,9 @@ def draw_ui_tab(prefs, layout):
     
     r = box.row(align=True)
     r.prop(prefs, "overlay_column_gap", text="Horizontal Column Gap")
+    
+    r = box.row(align=True)
+    r.prop(prefs, "overlay_max_label_length", text="Max Label Length (0 = no limit)")
 
     # Section: Typography
     box = layout.box()
@@ -82,6 +85,39 @@ def draw_ui_tab(prefs, layout):
     r = box.row(align=True)
     r.label(text="Folder Display Style:")
     r.prop(prefs, "overlay_folder_style", text="")
+    
+    # Show custom format options if CUSTOM style is selected
+    if prefs.overlay_folder_style == "CUSTOM":
+        box.separator()
+        custom_box = box.box()
+        custom_box.label(text="Custom Format Strings:", icon='TEXT')
+        
+        col = custom_box.column(align=True)
+        col.prop(prefs, "overlay_format_folder", text="Folder Format")
+        col.prop(prefs, "overlay_format_item", text="Item Format")
+        
+        custom_box.separator()
+        custom_box.label(text="Available Tokens:")
+        
+        split = custom_box.split(factor=0.5)
+        col1 = split.column()
+        col2 = split.column()
+        
+        col1.label(text="I = Icon")
+        col1.label(text="C = Chord")
+        col1.label(text="G = All Groups")
+        col1.label(text="g = First Group")
+        
+        col2.label(text="L = Label")
+        col2.label(text="N = Verbose Count")
+        col2.label(text="n = Compact Count")
+        col2.label(text="S/s = Separators")
+        
+        custom_box.separator()
+        sep_row = custom_box.row(align=True)
+        sep_row.prop(prefs, "overlay_separator_a", text="Separator A")
+        sep_row.prop(prefs, "overlay_separator_b", text="Separator B")
+    
     box.separator()
     
     # Theme Presets Section
@@ -116,6 +152,8 @@ def draw_ui_tab(prefs, layout):
         ("Chord Color", "overlay_color_chord"),
         ("Label Color", "overlay_color_label"),
         ("Icon Color", "overlay_color_icon"),
+        ("Group Color", "overlay_color_group"),
+        ("Counter Color", "overlay_color_counter"),
         ("Toggle ON", "overlay_color_toggle_on"),
         ("Toggle OFF", "overlay_color_toggle_off"),
         ("Header Text", "overlay_color_header"),

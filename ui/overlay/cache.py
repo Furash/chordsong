@@ -21,8 +21,10 @@ def get_prefs_hash(p, region_w, region_h):
         p.overlay_font_size_header,
         p.overlay_font_size_chord,
         p.overlay_font_size_body,
+        p.overlay_font_size_toggle,  # Toggle icon size
         p.overlay_column_rows,
         p.overlay_max_items,
+        p.overlay_max_label_length,  # Include label truncation setting
         p.overlay_offset_x,
         p.overlay_offset_y,
         p.overlay_position,
@@ -33,6 +35,11 @@ def get_prefs_hash(p, region_w, region_h):
         p.overlay_footer_token_gap,
         p.overlay_footer_label_gap,
         p.overlay_folder_style,
+        # Format string settings (for CUSTOM style)
+        getattr(p, "overlay_format_item", "C I L"),
+        getattr(p, "overlay_format_folder", "C G S N"),
+        getattr(p, "overlay_separator_a", "→"),
+        getattr(p, "overlay_separator_b", "::"),
         p.overlay_list_background,
         p.overlay_header_background,
         p.overlay_footer_background,
