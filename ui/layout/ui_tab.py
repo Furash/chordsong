@@ -83,7 +83,7 @@ def draw_ui_tab(prefs, layout):
     header.label(text="Appearance", icon='BRUSH_DATA')
     
     r = box.row(align=True)
-    r.label(text="Folder Display Style:")
+    r.label(text="Item Display Style:")
     r.prop(prefs, "overlay_item_format", text="")
     
     # Show custom format options if CUSTOM style is selected
