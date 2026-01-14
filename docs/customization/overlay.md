@@ -61,6 +61,7 @@ Choose one of the 4 preset styles:
 When **Custom** style is selected, you can define your own format strings using a token system:
 
 **Available Tokens:**
+
 - `C` = Chord
 - `I` = Icon (mapping's icon)
 - `i` = Group Icon (first group's icon)
@@ -73,10 +74,12 @@ When **Custom** style is selected, you can define your own format strings using 
 - `s` = Separator B (default: `::`)
 
 **Format Strings:**
+
 - **Folder Format**: Controls how folders (prefixes with multiple mappings) are displayed
 - **Item Format**: Controls how individual chord items are displayed
 
 **Example Custom Formats:**
+
 - Folder: `C S G s n` → `a → Modeling :: +5`
 - Folder with group icon: `C i S G s n` → `a  Modeling :: +5` (shows group icon before group name)
 - Item: `C I L` → `a  Save`
@@ -98,6 +101,7 @@ The **Match Current Blender Theme** button automatically extracts colors from yo
 - **Import**: Load theme colors from a previously exported JSON file
 
 Theme files include all color settings:
+
 - Chord, Label, Icon, Group, Counter colors
 - Toggle states (ON/OFF)
 - Header, Footer, Recents key colors

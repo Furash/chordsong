@@ -34,6 +34,8 @@ class CHORDSONG_OT_Group_Edit(bpy.types.Operator):
         description="Nerd Fonts emoji/icon for this group",
         default="",
     )
+    
+    _initial_icon: str = ""  # Store initial icon value to detect external updates
 
     def invoke(self, context, _event):
         """Show dialog with current group properties."""
@@ -45,11 +47,21 @@ class CHORDSONG_OT_Group_Edit(bpy.types.Operator):
 
         self.new_name = p.groups[self.index].name
         self.new_icon = p.groups[self.index].icon
+        self._initial_icon = p.groups[self.index].icon
         return context.window_manager.invoke_props_dialog(self, width=400)
 
     def draw(self, context):
         """Draw the edit dialog."""
         layout = self.layout
+        
+        # Sync new_icon with group icon if it was updated externally (via icon_select)
+        # Only sync if group icon changed from initial value and differs from current new_icon
+        p = prefs(context)
+        if self.index >= 0 and self.index < len(p.groups):
+            current_group_icon = p.groups[self.index].icon
+            # If group icon was updated externally (different from initial) and differs from new_icon, sync it
+            if current_group_icon != self._initial_icon and current_group_icon != self.new_icon:
+                self.new_icon = current_group_icon
         
         col = layout.column()
         col.prop(self, "new_name")

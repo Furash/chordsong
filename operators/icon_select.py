@@ -15,6 +15,10 @@ class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
     bl_idname = "chordsong.icon_select"
     bl_label = "Select Icon"
     bl_options = {"REGISTER", "UNDO", "INTERNAL"}
+    
+    # Class variable to track if an icon was selected (to auto-close dialog)
+    _icon_selected = False
+    _close_timer_registered = False
 
     mapping_index: IntProperty(
         name="Mapping Index",
@@ -42,12 +46,39 @@ class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
 
     def invoke(self, context, _event):
         """Show grid popup dialog."""
+        # Reset the flags when dialog opens
+        CHORDSONG_OT_Icon_Select._icon_selected = False
+        CHORDSONG_OT_Icon_Select._close_timer_registered = False
         return context.window_manager.invoke_props_dialog(self, width=600)
 
     def draw(self, context):
         """Draw grid of icons."""
         layout = self.layout
         p = prefs(context)
+        
+        # Check if an icon was selected and close the dialog
+        if CHORDSONG_OT_Icon_Select._icon_selected and not CHORDSONG_OT_Icon_Select._close_timer_registered:
+            # Use a timer to close the dialog (only register once)
+            CHORDSONG_OT_Icon_Select._close_timer_registered = True
+            def close_self():
+                try:
+                    # Find this operator instance and cancel it to close the dialog
+                    wm = bpy.context.window_manager
+                    if hasattr(wm, 'operators'):
+                        for op_id, op in list(wm.operators.items()):
+                            try:
+                                if op == self:
+                                    op.cancel(bpy.context)
+                                    break
+                            except Exception:
+                                continue
+                except Exception:
+                    pass
+                # Reset flags
+                CHORDSONG_OT_Icon_Select._icon_selected = False
+                CHORDSONG_OT_Icon_Select._close_timer_registered = False
+                return None
+            bpy.app.timers.register(close_self, first_interval=0.01)
 
         # Search box
         layout.prop(self, "search_filter", text="", icon="VIEWZOOM")
@@ -87,7 +118,17 @@ class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
 
     def execute(self, context):
         """Execute is called when dialog is confirmed, but we handle selection in apply operator."""
+        # If an icon was selected, close the dialog
+        if CHORDSONG_OT_Icon_Select._icon_selected:
+            CHORDSONG_OT_Icon_Select._icon_selected = False
+            return {"FINISHED"}
         return {"FINISHED"}
+    
+    def cancel(self, context):
+        """Cancel is called when dialog is cancelled."""
+        CHORDSONG_OT_Icon_Select._icon_selected = False
+        CHORDSONG_OT_Icon_Select._close_timer_registered = False
+        pass
 
 class CHORDSONG_OT_Icon_Select_Apply(bpy.types.Operator):
     """Apply selected icon to mapping or group."""
@@ -177,39 +218,32 @@ class CHORDSONG_OT_Icon_Select_Apply(bpy.types.Operator):
         from .common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)
 
-        # Close the icon_select dialog by finishing it
-        # This allows the group_edit dialog to redraw and show the updated icon
-        if icon_select_op is not None:
+        # Set flag to indicate icon was selected
+        # The icon_select dialog's draw method will check this and close itself
+        CHORDSONG_OT_Icon_Select._icon_selected = True
+        
+        # Redraw all areas to update dialogs
+        # Use a timer to ensure this happens after the current operator finishes
+        def redraw_dialogs():
             try:
-                # Use a timer to close the dialog after this operator finishes
-                def close_dialog():
+                wm = bpy.context.window_manager
+                for window in wm.windows:
                     try:
-                        # Try to finish the operator by calling execute with FINISHED
-                        # Actually, we can't directly close another operator's dialog
-                        # Instead, we'll rely on the redraw to update the group_edit dialog
-                        pass
+                        screen = window.screen
+                        if not screen:
+                            continue
+                        for area in screen.areas:
+                            try:
+                                area.tag_redraw()
+                            except Exception:
+                                pass
                     except Exception:
                         pass
-                    return None
-                # Don't register timer - just rely on redraw
             except Exception:
                 pass
-
-        # Redraw all areas to update dialogs and preferences UI
-        try:
-            for window in context.window_manager.windows:
-                try:
-                    screen = window.screen
-                    if not screen:
-                        continue
-                    for area in screen.areas:
-                        try:
-                            area.tag_redraw()
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-        except Exception:
-            pass
+            return None  # Timer runs once
+        
+        # Use a small delay to ensure the operator finishes first
+        bpy.app.timers.register(redraw_dialogs, first_interval=0.01)
 
         return {"FINISHED"}
