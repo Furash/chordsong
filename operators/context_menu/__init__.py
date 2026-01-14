@@ -483,6 +483,13 @@ def button_context_menu_draw(self, context):
 
 def register_context_menu():
     """Register the context menu hook."""
+    # Register to UI_MT_button_context_menu (modern Blender API, works better on macOS)
+    if hasattr(bpy.types, "UI_MT_button_context_menu"):
+        try:
+            bpy.types.UI_MT_button_context_menu.append(button_context_menu_draw)
+        except Exception:
+            pass
+    
     # Prefer Blender's built-in menu when available; otherwise fall back to our own.
     # Some Blender builds / configurations may not expose WM_MT_button_context.
     menu_type = getattr(bpy.types, "WM_MT_button_context", None) or getattr(bpy.types, "W_MT_button_context", None)
@@ -499,6 +506,13 @@ def register_context_menu():
 
 def unregister_context_menu():
     """Unregister the context menu hook"""
+    # Remove from UI_MT_button_context_menu (modern Blender API)
+    if hasattr(bpy.types, "UI_MT_button_context_menu"):
+        try:
+            bpy.types.UI_MT_button_context_menu.remove(button_context_menu_draw)
+        except Exception:
+            pass
+    
     # Remove from whichever menu we appended to.
     if hasattr(bpy.types, "WM_MT_button_context"):
         try:
