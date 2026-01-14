@@ -104,6 +104,7 @@ def draw_ui_tab(prefs, layout):
         col2 = split.column()
         
         col1.label(text="I = Icon")
+        col1.label(text="i = Group Icon")
         col1.label(text="C = Chord")
         col1.label(text="G = All Groups")
         col1.label(text="g = First Group")

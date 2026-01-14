@@ -26,7 +26,7 @@ def _get_preset_formats(style):
     - CUSTOM: User-defined format strings
     
     Token types:
-    - C: Chord, I: Icon, G: Groups (all), g: Group (first only)
+    - C: Chord, I: Icon, i: Group Icon, G: Groups (all), g: Group (first only)
     - L: Label, N: Count (verbose), n: Count (compact)
     - S: Separator A (→), s: Separator B (::)
     - T: Toggle icon
@@ -64,6 +64,13 @@ def build_overlay_rows(cands, has_buffer, p=None):
         else:
             format_folder, format_item, separator_a, separator_b = "C S G S N", "C I L T", "→", "::"
     
+    # Build group icons dictionary from preferences
+    group_icons = {}
+    if p:
+        for grp in p.groups:
+            if grp.name and grp.icon:
+                group_icons[grp.name] = grp.icon
+    
     # Sort candidates by group then token
     sorted_cands = sorted(cands, key=lambda c: (c.group.lower(), c.next_token))
     
@@ -82,6 +89,7 @@ def build_overlay_rows(cands, has_buffer, p=None):
                 count=c.count,
                 separator_a=separator_a,
                 separator_b=separator_b,
+                group_icons=group_icons,
             )
             
             # Store tokens in the row for rendering
@@ -116,6 +124,7 @@ def build_overlay_rows(cands, has_buffer, p=None):
                 separator_a=separator_a,
                 separator_b=separator_b,
                 mapping_type=c.mapping_type,
+                group_icons=group_icons,
             )
             
             rows.append({
@@ -206,7 +215,7 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
                         # Set appropriate font size for this token type
                         if tok.type == 'C':  # Chord
                             blf.size(0, chord_size)
-                        elif tok.type == 'I':  # Icon
+                        elif tok.type in ('I', 'i'):  # Icon or Group Icon
                             blf.size(0, icon_size)
                             has_any_icon = True
                         elif tok.type in ('T', 't'):  # Toggle

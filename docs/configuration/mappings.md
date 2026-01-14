@@ -18,6 +18,37 @@ There are several ways to add chord mappings:
 - **Import/Append**: Load or merge configurations from JSON files (see [Import & Export](import_export.md)).
 - **Manual Editing**: Advanced users can edit the JSON configuration file directly. See [Configuration File Format](import_export.md#configuration-file-format) for details.
 
+## Context-Specific Organization
+
+The Mappings tab organizes chords by **Context** using tabs:
+
+- **3D View (Object)**: Mappings active in Object Mode
+- **3D View (Edit)**: Mappings active in Edit Mode
+- **Geometry Nodes**: Mappings active in Geometry Nodes editor
+- **Shader Editor**: Mappings active in Shader Editor
+- **UV Editor**: Mappings active in UV/Image Editor
+
+Each context tab shows only mappings relevant to that editor, making it easier to manage context-specific shortcuts. Mappings set to "All Contexts" appear in every tab.
+
+## Search Functionality
+
+The search box at the top of the Mappings tab provides advanced filtering across:
+
+- **Chords**: Search by key sequence (e.g., "g g")
+- **Labels**: Search by action description (e.g., "frame selected")
+- **Operators**: Search by operator ID (e.g., "view3d.view_selected")
+- **Properties**: Search by property path or value
+- **Toggles**: Search by toggle path
+- **Scripts**: Search by script file path
+
+Search is case-insensitive and filters mappings in real-time. Use the **X** button to clear the search.
+
+## Collapsible Items
+
+- **Fold All**: Collapse all groups to show headers only
+- **Unfold All**: Expand all groups to show all mappings
+- **Individual Groups**: Click the triangle icon next to each group name to expand/collapse
+
 ## Mapping Types
 
 Each chord mapping type has its own set of attributes and configuration options.

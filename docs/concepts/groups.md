@@ -42,14 +42,32 @@ Groups can be created:
 
 ### Renaming Groups
 
-1. Click the rename button (A icon) next to a group name.
-2. Enter the new name in the dialog.
+1. Click the edit button (pencil icon) next to a group name.
+2. Enter the new name and optionally select an icon in the dialog.
 3. Click **OK** to confirm.
 
 !!! tip "Naming Convention"
     Use descriptive names like "Editing" or "Navigation". Group names are case-sensitive.
 
 All mappings using the old group name are automatically updated to use the new name.
+
+### Group Icons
+
+Groups can have custom icons (Nerd Font symbols) that appear next to the group name in both the preferences UI and the overlay. This provides visual organization and makes groups easier to identify at a glance.
+
+To set or change a group icon:
+1. Click the edit button (pencil icon) next to a group name.
+2. Select an icon from the dropdown or enter a custom Nerd Font symbol.
+3. Click **OK** to confirm.
+
+### Reordering Groups
+
+Groups can be reordered to control their display order in the preferences UI:
+
+1. Use the **↑** (up) and **↓** (down) arrow buttons next to a group name.
+2. Groups appear in the order you define, with "Ungrouped" always appearing first.
+
+This is useful for organizing groups by frequency of use or logical workflow order.
 
 ### Cleaning Up Groups
 

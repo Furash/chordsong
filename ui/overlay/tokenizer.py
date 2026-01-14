@@ -6,7 +6,7 @@ from typing import List, Optional
 @dataclass
 class Token:
     """Represents a single token in the format string."""
-    type: str  # 'I', 'C', 'G', 'g', 'L', 'N', 'n', 'S', 's'
+    type: str  # 'I', 'C', 'G', 'g', 'i', 'L', 'N', 'n', 'S', 's', 'T'
     content: str  # The actual text content to display
     color_key: str  # Key to look up color in preferences
 
@@ -31,6 +31,7 @@ def generate_tokens_for_folder(
     count: int,
     separator_a: str,
     separator_b: str,
+    group_icons: Optional[dict] = None,
 ) -> List[Token]:
     """Generate tokens for a folder item (multiple keymaps).
     
@@ -70,6 +71,15 @@ def generate_tokens_for_folder(
             if groups_str:
                 tokens.append(Token(type='g', content=groups_str, color_key='overlay_color_group'))
         
+        elif token_type == 'i':
+            # Group icon (first group's icon)
+            if groups and group_icons:
+                first_group = groups[0] if groups else None
+                if first_group and first_group in group_icons:
+                    group_icon = group_icons[first_group]
+                    if group_icon:
+                        tokens.append(Token(type='i', content=group_icon, color_key='overlay_color_group'))
+        
         elif token_type == 'L':
             # Label - not typically used for folders, but we can show something
             tokens.append(Token(type='L', content="", color_key='overlay_color_label'))
@@ -108,6 +118,7 @@ def generate_tokens_for_item(
     separator_a: str,
     separator_b: str,
     mapping_type: Optional[str] = None,
+    group_icons: Optional[dict] = None,
 ) -> List[Token]:
     """Generate tokens for a single item.
     
@@ -147,6 +158,15 @@ def generate_tokens_for_item(
             groups_str = _format_groups_first(groups)
             if groups_str:
                 tokens.append(Token(type='g', content=groups_str, color_key='overlay_color_group'))
+        
+        elif token_type == 'i':
+            # Group icon (first group's icon)
+            if groups and group_icons:
+                first_group = groups[0] if groups else None
+                if first_group and first_group in group_icons:
+                    group_icon = group_icons[first_group]
+                    if group_icon:
+                        tokens.append(Token(type='i', content=group_icon, color_key='overlay_color_group'))
         
         elif token_type == 'L':
             # Label - remove toggle icons if present (they should be in 'T' token)

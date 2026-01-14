@@ -56,7 +56,9 @@ class CHORDSONG_OT_Group_Edit(bpy.types.Operator):
         
         row = col.row(align=True)
         row.prop(self, "new_icon", text="Icon")
-        row.operator("chordsong.icon_select", text="", icon="THREE_DOTS").target_prop = "new_icon"
+        op = row.operator("chordsong.icon_select", text="", icon="THREE_DOTS")
+        op.group_index = self.index
+        op.target_prop = "new_icon"
 
     def execute(self, context):
         """Update group properties and mappings."""
@@ -89,7 +91,7 @@ class CHORDSONG_OT_Group_Edit(bpy.types.Operator):
 
             p.groups[self.index].name = new_name
             
-        # Update icon
+        # Update icon - always use what the user entered in the dialog
         p.groups[self.index].icon = self.new_icon
 
         try:

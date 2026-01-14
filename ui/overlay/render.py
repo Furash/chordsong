@@ -436,7 +436,7 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                             if current_size != chord_size:
                                 blf.size(0, chord_size)
                                 current_size = chord_size
-                        elif tok.type == 'I':
+                        elif tok.type in ('I', 'i'):  # Icon or Group Icon
                             if current_size != icon_size:
                                 blf.size(0, icon_size)
                                 current_size = icon_size
