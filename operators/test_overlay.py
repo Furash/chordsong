@@ -142,129 +142,125 @@ class DummyMapping:
     def __init__(self, i):
         # Modifier syntax: ^ = Ctrl, ! = Alt, + = Shift, # = Win
         
-        # Define 20 toggle items (every 5th item) with alternating ON/OFF states
+        # Define toggle items - ensure at least 5 ON and 5 OFF visible at top level
         # Toggle ON: 󰨚  Toggle OFF: 󰨙
-        toggle_indices = [4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79, 84, 89, 94, 99]
+        # Put toggles at visible indices: 2, 5, 7, 10, 12, 15, 17, 20, 22, 25, etc.
+        toggle_indices = [2, 5, 7, 10, 12, 15, 17, 20, 22, 25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 55]
         is_toggle = i in toggle_indices
-        toggle_on = (toggle_indices.index(i) % 2 == 0) if is_toggle else False
+        # First 5 ON, next 5 OFF, then alternating
+        if is_toggle:
+            idx_pos = toggle_indices.index(i)
+            if idx_pos < 5:
+                toggle_on = True  # First 5 are ON
+            elif idx_pos < 10:
+                toggle_on = False  # Next 5 are OFF
+            else:
+                toggle_on = (idx_pos % 2 == 0)  # Then alternate
+        else:
+            toggle_on = False
         
-        # Generate diverse chords - mix of single keys, modifiers, and a few nested items
-        # Most have unique starting tokens so they appear at top level
+        # Generate diverse chords - ensure toggle items are at top level
+        # Indices 2, 5, 7, 10, 12, 15, 17, 20, 22, 25 are toggles
         chords = [
-            # Mix of folders (will show nested) and direct actions
-            ("m", "Modeling"),           # Folder - will show m x, m w, m s below
-            ("m x", "X-Ray"),            # Nested under 'm'
-            ("m w", "Wireframe"),        # Nested under 'm'  
-            ("m s", "Snap"),             # Nested under 'm'
-            ("g", "General"),            # Toggle - Folder
-            ("g x", "X-Ray View"),       # Nested under 'g'
-            ("g o", "Overlays"),         # Nested under 'g'
-            ("g c", "Cavity"),           # Nested under 'g'
-            ("g n", "Normals"),          # Toggle - nested under 'g'
-            ("g f", "Face Orient"),      # Nested under 'g'
-            # Unique top-level items (different starting keys)
-            ("e", "Extrude"),
-            ("i", "Inset"),
-            ("b", "Bevel"),
-            ("l", "Loop Cut"),
-            ("^s", "Quick Save"),        # Toggle
-            ("^z", "Undo"),
-            ("^+z", "Redo"),
-            ("^c", "Copy"),
-            ("^v", "Paste"),
-            ("!d", "Duplicate"),         # Toggle
-            ("+a", "Add Menu"),
-            ("x", "Delete"),
-            ("h", "Hide"),
-            ("!h", "Unhide"),
-            ("^a", "Select All"),        # Toggle
-            ("!a", "Deselect"),
-            ("^i", "Invert Select"),
-            ("f", "Fill"),
-            ("k", "Knife Tool"),
-            ("j", "Join"),               # Toggle
-            # Some more nested for 's' prefix
-            ("s", "Shading"),            # Folder
-            ("s s", "Smooth"),           # Nested under 's'
-            ("s f", "Flat"),             # Nested under 's'
-            ("s a", "Auto Smooth"),      # Nested under 's'
-            ("s n", "Recalc Normals"),   # Toggle - nested
-            # More unique top-level
-            ("t", "Transform Menu"),
-            ("r", "Rotate"),
-            ("w", "Move"),
-            ("z", "Scale"),
-            ("^m", "Mirror"),            # Toggle
-            ("p", "Proportional"),
-            ("o", "Origin"),
-            ("^p", "Parent"),
-            ("!p", "Clear Parent"),
-            ("n", "New"),                # Toggle
-            ("^n", "New File"),
-            ("^o", "Open"),
-            ("!s", "Save As"),
-            ("^+s", "Save Copy"),
-            ("q", "Quit"),               # Toggle
-            # Some nested for 'c' prefix
-            ("c", "Camera"),             # Folder
-            ("c v", "Cam to View"),      # Nested under 'c'
-            ("c s", "Set Active"),       # Nested under 'c'
-            ("c t", "Track"),            # Nested under 'c'
-            ("c z", "Zoom"),             # Toggle - nested
-            # More unique
-            ("u", "Unwrap"),
-            ("^u", "UV Reset"),
-            ("a", "Animate"),
-            ("^k", "Keyframe"),
-            ("!k", "Clear Keys"),        # Toggle
-            ("d", "Subdivide"),
-            ("^d", "Duplicate Linked"),
-            ("y", "Redo"),
-            ("!z", "Redo Alt"),
-            ("^y", "Redo Panel"),        # Toggle
-            # Few more nested for 'v' prefix
-            ("v", "View"),               # Folder
-            ("v f", "Frame All"),        # Nested under 'v'
-            ("v s", "Frame Selected"),   # Nested under 'v'
-            ("v c", "View Camera"),      # Nested under 'v'
-            ("v a", "View All"),         # Toggle - nested
-            # More unique top-level
-            ("/", "Search"),
-            ("^f", "Find"),
-            ("^h", "Replace"),
-            ("^g", "Go To"),
-            ("^r", "Render"),            # Toggle
-            ("^b", "Border Render"),
-            ("^+b", "Box Select"),
-            ("^e", "Export"),
-            ("^+e", "Export FBX"),
-            ("!", "Info"),               # Toggle
-            ("^j", "Join as Shape"),
-            ("^l", "Make Links"),
-            ("^+l", "Link Transfer"),
-            ("^t", "Track Menu"),
-            ("^+t", "Track Clear"),      # Toggle
-            # Few remaining
-            ("1", "Front View"),
-            ("3", "Side View"),
-            ("7", "Top View"),
-            ("0", "Camera View"),
-            ("5", "Ortho Toggle"),       # Toggle
-            ("2", "Rotate View"),
-            ("4", "Pan View"),
-            ("6", "Right View"),
-            ("8", "Back View"),
-            ("9", "Opposite"),           # Toggle
-            (".", "Frame"),
-            (",", "Zoom All"),
-            (";", "Local View"),
-            ("'", "Lock Camera"),
-            ("[", "Prev Frame"),         # Toggle
-            ("]", "Next Frame"),
-            ("-", "Zoom Out"),
-            ("=", "Zoom In"),
-            ("`", "Console"),
-            ("~", "Manipulator"),        # Toggle
+            # Index 0-1: Regular items
+            ("m", "Modeling"),           # 0: Folder
+            ("m x", "X-Ray"),            # 1: Nested under 'm'
+            ("e", "Extrude"),            # 2: Toggle ON
+            ("m w", "Wireframe"),        # 3: Nested under 'm'  
+            ("m s", "Snap"),             # 4: Nested under 'm'
+            ("w", "Wireframe Mode"),     # 5: Toggle ON
+            ("g", "General"),            # 6: Folder
+            ("o", "Overlays"),           # 7: Toggle ON
+            ("g x", "X-Ray View"),       # 8: Nested under 'g'
+            ("g o", "Cavity"),           # 9: Nested under 'g'
+            ("s", "Shading"),            # 10: Toggle ON
+            ("g c", "Face Orient"),      # 11: Nested under 'g'
+            ("n", "Normals"),            # 12: Toggle ON
+            ("i", "Inset"),              # 13: Regular
+            ("b", "Bevel"),              # 14: Regular
+            ("x", "X-Ray Toggle"),       # 15: Toggle OFF
+            ("l", "Loop Cut"),           # 16: Regular
+            ("z", "Proportional"),       # 17: Toggle OFF
+            ("^z", "Undo"),              # 18: Regular
+            ("^+z", "Redo"),             # 19: Regular
+            ("a", "Auto Smooth"),        # 20: Toggle OFF
+            ("^c", "Copy"),              # 21: Regular
+            ("v", "Backface Culling"),   # 22: Toggle OFF
+            ("^v", "Paste"),             # 23: Regular
+            ("!d", "Duplicate"),         # 24: Regular
+            ("h", "Hidden Wires"),       # 25: Toggle OFF
+            ("+a", "Add Menu"),          # 26: Regular
+            ("d", "Delete"),             # 27: Regular
+            ("^h", "Hide"),              # 28: Toggle (alternating - ON)
+            ("!h", "Unhide"),            # 29: Regular
+            ("!a", "Deselect"),          # 31: Toggle (alternating - ON)
+            ("^i", "Invert Select"),     # 32: Regular
+            ("f", "Fill"),               # 33: Regular
+            ("k", "Knife Tool"),         # 34: Toggle (alternating - OFF)
+            ("j", "Join"),               # 35: Regular
+            ("t", "Transform Menu"),     # 36: Regular
+            ("r", "Rotate"),             # 37: Toggle (alternating - ON)
+            ("u", "Move"),               # 38: Regular
+            ("y", "Scale"),              # 39: Regular
+            ("p", "Proportional Edit"),  # 41: Regular
+            ("q", "Origin"),             # 42: Regular
+            ("^p", "Parent"),            # 43: Toggle (alternating - ON)
+            ("!p", "Clear Parent"),      # 44: Regular
+            ("^n", "New File"),          # 45: Regular
+            ("^o", "Open"),              # 46: Toggle (alternating - OFF)
+            ("!s", "Save As"),           # 47: Regular
+            ("^+s", "Save Copy"),        # 48: Regular
+            ("^u", "Unwrap"),            # 49: Toggle (alternating - ON)
+            ("^k", "Keyframe"),          # 50: Regular
+            ("!k", "Clear Keys"),        # 51: Regular
+            ("^d", "Duplicate Linked"),  # 52: Toggle (alternating - OFF)
+            ("!z", "Redo Alt"),          # 53: Regular
+            ("^y", "Redo Panel"),        # 54: Regular
+            ("/", "Search"),             # 55: Toggle (alternating - ON)
+            ("^f", "Find"),              # 56: Regular
+            ("^g", "Go To"),             # 57: Regular
+            ("^r", "Render"),            # 58: Regular
+            ("^b", "Border Render"),     # 59: Regular
+            ("^+b", "Box Select"),       # 60: Regular
+            ("^e", "Export"),            # 61: Regular
+            ("^+e", "Export FBX"),       # 62: Regular
+            ("!", "Info"),               # 63: Regular
+            ("^j", "Join as Shape"),     # 64: Regular
+            ("^l", "Make Links"),        # 65: Regular
+            ("^+l", "Link Transfer"),    # 66: Regular
+            ("^t", "Track Menu"),        # 67: Regular
+            ("1", "Front View"),         # 68: Regular
+            ("3", "Side View"),          # 69: Regular
+            ("7", "Top View"),           # 70: Regular
+            ("0", "Camera View"),        # 71: Regular
+            ("5", "Ortho Toggle"),       # 72: Regular
+            ("2", "Rotate View"),        # 73: Regular
+            ("4", "Pan View"),           # 74: Regular
+            ("6", "Right View"),         # 75: Regular
+            ("8", "Back View"),          # 76: Regular
+            (".", "Frame"),              # 77: Regular
+            (",", "Zoom All"),           # 78: Regular
+            (";", "Local View"),         # 79: Regular
+            ("'", "Lock Camera"),        # 80: Regular
+            ("[", "Prev Frame"),         # 81: Regular
+            ("]", "Next Frame"),         # 82: Regular
+            ("-", "Zoom Out"),           # 83: Regular
+            ("=", "Zoom In"),            # 84: Regular
+            ("`", "Console"),            # 85: Regular
+            ("~", "Manipulator"),        # 86: Regular
+            ("9", "Opposite View"),      # 87: Regular
+            ("@", "Annotations"),        # 88: Regular
+            ("#", "Statistics"),         # 89: Regular
+            ("$", "Asset Browser"),      # 90: Regular
+            ("%", "Geometry Nodes"),     # 91: Regular
+            ("&", "Compositor"),         # 92: Regular
+            ("*", "Shader Editor"),      # 93: Regular
+            ("(", "UV Editor"),          # 94: Regular
+            (")", "Movie Clip"),         # 95: Regular
+            ("_", "Spreadsheet"),        # 96: Regular
+            ("+", "Preferences"),        # 97: Regular
+            ("{", "Timeline"),           # 98: Regular
+            ("}", "NLA Editor"),         # 99: Regular
         ]
         
         if i < len(chords):

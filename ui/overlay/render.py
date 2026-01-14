@@ -390,7 +390,7 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                 from .layout import _get_preset_formats
                 from .tokenizer import parse_format_string
                 
-                style = getattr(p, "overlay_folder_style", "GROUPS_FIRST")
+                style = getattr(p, "overlay_item_format", "GROUPS_FIRST")
                 
                 # Get format strings based on style
                 if style == "CUSTOM":

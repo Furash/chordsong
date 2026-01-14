@@ -722,7 +722,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
-    overlay_folder_style: EnumProperty(
+    overlay_item_format: EnumProperty(
         name="Overlay Style",
         description="Choose how folder/summary items (prefixes leading to multiple actions) are displayed",
         items=(
@@ -732,7 +732,7 @@ class CHORDSONG_Preferences(AddonPreferences):
             ("HYBRID", "→ Groups :: N", "Groups followed by a simple count with :: symbol"),
             ("CUSTOM", "Custom Format", "Use custom format string"),
         ),
-        default="GROUPS_FIRST",
+        default="DEFAULT",
         update=_on_prefs_changed,
     )
     

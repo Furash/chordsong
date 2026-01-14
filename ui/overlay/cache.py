@@ -34,7 +34,7 @@ def get_prefs_hash(p, region_w, region_h):
         p.overlay_footer_gap,
         p.overlay_footer_token_gap,
         p.overlay_footer_label_gap,
-        p.overlay_folder_style,
+        p.overlay_item_format,
         # Format string settings (for CUSTOM style)
         getattr(p, "overlay_format_item", "C I L"),
         getattr(p, "overlay_format_folder", "C G S N"),

@@ -26,11 +26,11 @@ def draw_ui_tab(prefs, layout):
     r.prop(prefs, "overlay_column_rows", text="Rows per Column")
     
     r = box.row(align=True)
-    r.prop(prefs, "overlay_gap", text="Vertical Gap")
-    r.prop(prefs, "overlay_line_height", text="Line Height")
+    r.prop(prefs, "overlay_gap", text="Elements Gap")
+    r.prop(prefs, "overlay_column_gap", text="Column Gap")
     
     r = box.row(align=True)
-    r.prop(prefs, "overlay_column_gap", text="Horizontal Column Gap")
+    r.prop(prefs, "overlay_line_height", text="Line Height")
     
     r = box.row(align=True)
     r.prop(prefs, "overlay_max_label_length", text="Max Label Length (0 = no limit)")
@@ -84,10 +84,10 @@ def draw_ui_tab(prefs, layout):
     
     r = box.row(align=True)
     r.label(text="Folder Display Style:")
-    r.prop(prefs, "overlay_folder_style", text="")
+    r.prop(prefs, "overlay_item_format", text="")
     
     # Show custom format options if CUSTOM style is selected
-    if prefs.overlay_folder_style == "CUSTOM":
+    if prefs.overlay_item_format == "CUSTOM":
         box.separator()
         custom_box = box.box()
         custom_box.label(text="Custom Format Strings:", icon='TEXT')

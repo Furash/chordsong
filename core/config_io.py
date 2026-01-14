@@ -148,7 +148,7 @@ def dump_prefs(prefs) -> dict:
             "footer_token_gap": int(getattr(prefs, "overlay_footer_token_gap", 10)),
             "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
             "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
-            "style": getattr(prefs, "overlay_folder_style", "GROUPS_FIRST"),
+            "style": getattr(prefs, "overlay_item_format", "GROUPS_FIRST"),
             "format_folder": getattr(prefs, "overlay_format_folder", "C G S N"),
             "format_item": getattr(prefs, "overlay_format_item", "C I L"),
             "separator_a": getattr(prefs, "overlay_separator_a", "→"),
@@ -222,7 +222,7 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             "footer_token_gap": int(getattr(prefs, "overlay_footer_token_gap", 10)),
             "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
             "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
-            "style": getattr(prefs, "overlay_folder_style", "GROUPS_FIRST"),
+            "style": getattr(prefs, "overlay_item_format", "GROUPS_FIRST"),
             "format_folder": getattr(prefs, "overlay_format_folder", "C G S N"),
             "format_item": getattr(prefs, "overlay_format_item", "C I L"),
             "separator_a": getattr(prefs, "overlay_separator_a", "→"),
@@ -455,8 +455,8 @@ def apply_config(prefs, data: dict) -> list[str]:
             prefs.overlay_position = pos
 
         style = overlay.get("style", "GROUPS_FIRST")
-        if style in _enum_items_as_set(prefs, "overlay_folder_style"):
-            prefs.overlay_folder_style = style
+        if style in _enum_items_as_set(prefs, "overlay_item_format"):
+            prefs.overlay_item_format = style
         
         # Load format strings and separators
         string_props = {

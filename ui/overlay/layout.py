@@ -47,7 +47,7 @@ def build_overlay_rows(cands, has_buffer, p=None):
     rows = []
     
     # Get style from prefs if available
-    style = getattr(p, "overlay_folder_style", "GROUPS_FIRST") if p else "GROUPS_FIRST"
+    style = getattr(p, "overlay_item_format", "GROUPS_FIRST") if p else "GROUPS_FIRST"
     
     # Get format strings based on style
     if style == "CUSTOM" and p:
