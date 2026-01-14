@@ -49,6 +49,8 @@ class CHORDSONG_OT_ExportOverlayTheme(bpy.types.Operator):
                 "label": list(p.overlay_color_label),
                 "header": list(p.overlay_color_header),
                 "icon": list(p.overlay_color_icon),
+                "group": list(p.overlay_color_group),
+                "counter": list(p.overlay_color_counter),
                 "toggle_on": list(p.overlay_color_toggle_on),
                 "toggle_off": list(p.overlay_color_toggle_off),
                 "recents_hotkey": list(p.overlay_color_recents_hotkey),
@@ -105,6 +107,10 @@ class CHORDSONG_OT_ImportOverlayTheme(bpy.types.Operator):
                 p.overlay_color_header = colors["header"]
             if "icon" in colors:
                 p.overlay_color_icon = colors["icon"]
+            if "group" in colors:
+                p.overlay_color_group = colors["group"]
+            if "counter" in colors:
+                p.overlay_color_counter = colors["counter"]
             if "toggle_on" in colors:
                 p.overlay_color_toggle_on = colors["toggle_on"]
             if "toggle_off" in colors:
@@ -167,6 +173,8 @@ class CHORDSONG_OT_ExtractBlenderTheme(bpy.types.Operator):
                 p.overlay_color_recents_hotkey = chord_color
 
             # Label, icon, header: ThemeUserInterface.wcol_regular.text
+            separator_color = None
+            label_color = None
             if wcol_regular := safe_getattr(ui, 'wcol_regular'):
                 if text := safe_getattr(wcol_regular, 'text'):
                     label_color = [srgb_to_linear(text[0]), srgb_to_linear(text[1]), srgb_to_linear(text[2]), 1.0]
@@ -193,11 +201,18 @@ class CHORDSONG_OT_ExtractBlenderTheme(bpy.types.Operator):
 
             # Toggle on: ThemeView3D.object_active
             if object_active := safe_getattr(view3d, 'object_active'):
-                p.overlay_color_toggle_on = [srgb_to_linear(object_active[0]), srgb_to_linear(object_active[1]), srgb_to_linear(object_active[2]), 1.0]
+                toggle_on_color = [srgb_to_linear(object_active[0]), srgb_to_linear(object_active[1]), srgb_to_linear(object_active[2]), 1.0]
+                p.overlay_color_toggle_on = toggle_on_color
+                # Group color: same as toggle on
+                p.overlay_color_group = toggle_on_color
 
-            # Toggle off: ThemeView3D.empty
-            if object_empty := safe_getattr(view3d, 'empty'):
-                p.overlay_color_toggle_off = [srgb_to_linear(object_empty[0]), srgb_to_linear(object_empty[1]), srgb_to_linear(object_empty[2]), 1.0]
+            # Toggle off: same as separator color
+            if separator_color:
+                p.overlay_color_toggle_off = separator_color
+            
+            # Counter color: same as label color
+            if label_color:
+                p.overlay_color_counter = label_color
 
             self.report({'INFO'}, "Overlay colors extracted from Blender theme")
             return {'FINISHED'}
@@ -216,8 +231,10 @@ BUILTIN_THEMES = {
             "label": [1.00, 1.00, 1.00, 1.00],
             "header": [1.00, 1.00, 1.00, 1.00],
             "icon": [0.80, 0.80, 0.80, 1.00],
+            "group": [1.00, 1.00, 1.00, 1.00],  # Same as label/text
+            "counter": [1.00, 1.00, 1.00, 1.00],  # Same as label
             "toggle_on": [0.65, 0.80, 1.00, 0.40],
-            "toggle_off": [1.00, 1.00, 1.00, 0.20],
+            "toggle_off": [1.00, 1.00, 1.00, 0.20],  # Same as separator
             "recents_hotkey": [0.65, 0.80, 1.00, 1.00],
             "separator": [1.00, 1.00, 1.00, 0.20],
             "list_background": [0.0, 0.0, 0.0, 0.35],
@@ -256,6 +273,9 @@ class CHORDSONG_OT_LoadThemePreset(bpy.types.Operator):
         p.overlay_color_label = colors["label"]
         p.overlay_color_header = colors["header"]
         p.overlay_color_icon = colors["icon"]
+        p.overlay_color_group = colors.get("group", colors["label"])  # Default to label if missing
+        p.overlay_color_counter = colors.get("counter", colors["label"])  # Default to label if missing
+        p.overlay_color_separator = colors.get("separator", [1.0, 1.0, 1.0, 0.20])  # Default separator
         p.overlay_color_toggle_on = colors["toggle_on"]
         p.overlay_color_toggle_off = colors["toggle_off"]
         p.overlay_color_recents_hotkey = colors["recents_hotkey"]

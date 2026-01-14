@@ -138,48 +138,157 @@ def _main_test_draw_callback():
     draw_overlay(context, p, [], _main_test_mappings)
 
 class DummyMapping:
-    """Mock mapping object for testing."""
+    """Mock mapping object for testing - 100 items total (80 regular + 20 toggles)."""
     def __init__(self, i):
-        # Generate unique starting token so all items appear in the top-level list.
-        # Vary FIRST token length to test column width calculation
-
-        if i < 8:
-             # Force multiple identical prefixes to test summary (+8 keymaps)
-             prefix = "a"
-             self.chord = f"a {chr(97+i)}"
-             self.label = f"Sub Action {i+1}"
-        elif i % 3 == 0:
-             # Long first token (simulating modifiers)
-             prefix = f"ctrl+shift+k{i+1:02d}"
-             self.chord = f"{prefix} a b c"
-             self.label = f"Long Token {i+1:02d}"
-        elif i % 3 == 1:
-             # Short first token (simulating single digit)
-             prefix = f"{i+1}"
-             self.chord = f"{prefix}"
-             self.label = f"Short {i+1:02d}"
+        # Modifier syntax: ^ = Ctrl, ! = Alt, + = Shift, # = Win
+        
+        # Define toggle items - ensure at least 5 ON and 5 OFF visible at top level
+        # Toggle ON: 󰨚  Toggle OFF: 󰨙
+        # Put toggles at visible indices: 2, 5, 7, 10, 12, 15, 17, 20, 22, 25, etc.
+        toggle_indices = [2, 5, 7, 10, 12, 15, 17, 20, 22, 25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 55]
+        is_toggle = i in toggle_indices
+        # First 5 ON, next 5 OFF, then alternating
+        if is_toggle:
+            idx_pos = toggle_indices.index(i)
+            if idx_pos < 5:
+                toggle_on = True  # First 5 are ON
+            elif idx_pos < 10:
+                toggle_on = False  # Next 5 are OFF
+            else:
+                toggle_on = (idx_pos % 2 == 0)  # Then alternate
         else:
-             # Standard first token
-             prefix = f"k{i+1:02d}"
-             self.chord = f"{prefix} x"
-             self.label = f"Test Operator {i+1:02d}"
+            toggle_on = False
+        
+        # Generate diverse chords - ensure toggle items are at top level
+        # Indices 2, 5, 7, 10, 12, 15, 17, 20, 22, 25 are toggles
+        chords = [
+            # Index 0-1: Regular items
+            ("m", "Modeling"),           # 0: Folder
+            ("m x", "X-Ray"),            # 1: Nested under 'm'
+            ("e", "Extrude"),            # 2: Toggle ON
+            ("m w", "Wireframe"),        # 3: Nested under 'm'  
+            ("m s", "Snap"),             # 4: Nested under 'm'
+            ("w", "Wireframe Mode"),     # 5: Toggle ON
+            ("g", "General"),            # 6: Folder
+            ("o", "Overlays"),           # 7: Toggle ON
+            ("g x", "X-Ray View"),       # 8: Nested under 'g'
+            ("g o", "Cavity"),           # 9: Nested under 'g'
+            ("s", "Shading"),            # 10: Toggle ON
+            ("g c", "Face Orient"),      # 11: Nested under 'g'
+            ("n", "Normals"),            # 12: Toggle ON
+            ("i", "Inset"),              # 13: Regular
+            ("b", "Bevel"),              # 14: Regular
+            ("x", "X-Ray Toggle"),       # 15: Toggle OFF
+            ("l", "Loop Cut"),           # 16: Regular
+            ("z", "Proportional"),       # 17: Toggle OFF
+            ("^z", "Undo"),              # 18: Regular
+            ("^+z", "Redo"),             # 19: Regular
+            ("a", "Auto Smooth"),        # 20: Toggle OFF
+            ("^c", "Copy"),              # 21: Regular
+            ("v", "Backface Culling"),   # 22: Toggle OFF
+            ("^v", "Paste"),             # 23: Regular
+            ("!d", "Duplicate"),         # 24: Regular
+            ("h", "Hidden Wires"),       # 25: Toggle OFF
+            ("+a", "Add Menu"),          # 26: Regular
+            ("d", "Delete"),             # 27: Regular
+            ("^h", "Hide"),              # 28: Toggle (alternating - ON)
+            ("!h", "Unhide"),            # 29: Regular
+            ("!a", "Deselect"),          # 31: Toggle (alternating - ON)
+            ("^i", "Invert Select"),     # 32: Regular
+            ("f", "Fill"),               # 33: Regular
+            ("k", "Knife Tool"),         # 34: Toggle (alternating - OFF)
+            ("j", "Join"),               # 35: Regular
+            ("t", "Transform Menu"),     # 36: Regular
+            ("r", "Rotate"),             # 37: Toggle (alternating - ON)
+            ("u", "Move"),               # 38: Regular
+            ("y", "Scale"),              # 39: Regular
+            ("p", "Proportional Edit"),  # 41: Regular
+            ("q", "Origin"),             # 42: Regular
+            ("^p", "Parent"),            # 43: Toggle (alternating - ON)
+            ("!p", "Clear Parent"),      # 44: Regular
+            ("^n", "New File"),          # 45: Regular
+            ("^o", "Open"),              # 46: Toggle (alternating - OFF)
+            ("!s", "Save As"),           # 47: Regular
+            ("^+s", "Save Copy"),        # 48: Regular
+            ("^u", "Unwrap"),            # 49: Toggle (alternating - ON)
+            ("^k", "Keyframe"),          # 50: Regular
+            ("!k", "Clear Keys"),        # 51: Regular
+            ("^d", "Duplicate Linked"),  # 52: Toggle (alternating - OFF)
+            ("!z", "Redo Alt"),          # 53: Regular
+            ("^y", "Redo Panel"),        # 54: Regular
+            ("/", "Search"),             # 55: Toggle (alternating - ON)
+            ("^f", "Find"),              # 56: Regular
+            ("^g", "Go To"),             # 57: Regular
+            ("^r", "Render"),            # 58: Regular
+            ("^b", "Border Render"),     # 59: Regular
+            ("^+b", "Box Select"),       # 60: Regular
+            ("^e", "Export"),            # 61: Regular
+            ("^+e", "Export FBX"),       # 62: Regular
+            ("!", "Info"),               # 63: Regular
+            ("^j", "Join as Shape"),     # 64: Regular
+            ("^l", "Make Links"),        # 65: Regular
+            ("^+l", "Link Transfer"),    # 66: Regular
+            ("^t", "Track Menu"),        # 67: Regular
+            ("1", "Front View"),         # 68: Regular
+            ("3", "Side View"),          # 69: Regular
+            ("7", "Top View"),           # 70: Regular
+            ("0", "Camera View"),        # 71: Regular
+            ("5", "Ortho Toggle"),       # 72: Regular
+            ("2", "Rotate View"),        # 73: Regular
+            ("4", "Pan View"),           # 74: Regular
+            ("6", "Right View"),         # 75: Regular
+            ("8", "Back View"),          # 76: Regular
+            (".", "Frame"),              # 77: Regular
+            (",", "Zoom All"),           # 78: Regular
+            (";", "Local View"),         # 79: Regular
+            ("'", "Lock Camera"),        # 80: Regular
+            ("[", "Prev Frame"),         # 81: Regular
+            ("]", "Next Frame"),         # 82: Regular
+            ("-", "Zoom Out"),           # 83: Regular
+            ("=", "Zoom In"),            # 84: Regular
+            ("`", "Console"),            # 85: Regular
+            ("~", "Manipulator"),        # 86: Regular
+            ("9", "Opposite View"),      # 87: Regular
+            ("@", "Annotations"),        # 88: Regular
+            ("#", "Statistics"),         # 89: Regular
+            ("$", "Asset Browser"),      # 90: Regular
+            ("%", "Geometry Nodes"),     # 91: Regular
+            ("&", "Compositor"),         # 92: Regular
+            ("*", "Shader Editor"),      # 93: Regular
+            ("(", "UV Editor"),          # 94: Regular
+            (")", "Movie Clip"),         # 95: Regular
+            ("_", "Spreadsheet"),        # 96: Regular
+            ("+", "Preferences"),        # 97: Regular
+            ("{", "Timeline"),           # 98: Regular
+            ("}", "NLA Editor"),         # 99: Regular
+        ]
+        
+        if i < len(chords):
+            self.chord, base_label = chords[i]
+        else:
+            self.chord = f"k{i+1}"
+            base_label = f"Action {i+1}"
+        
+        # Apply toggle state to label if this is a toggle item
+        if is_toggle:
+            icon = "󰨚" if toggle_on else "󰨙"
+            self.label = f"{base_label}  {icon}"
+        else:
+            self.label = base_label
 
         # Common Nerd Font icons (Save, Folder, Code, Play, Gear, Search, Image, Bug)
         icons = ["\uf0c7", "\uf07b", "\uf1c9", "\uf04b", "\uf013", "\uf002", "\uf02e", "\uf188"]
         self.icon = icons[i % len(icons)]
 
-        # Assign groups to test grouping visualization
-        if i < 3:
-            self.group = "Common"
-        elif i < 5:
-            self.group = "UV"
-        elif i < 15:
-            self.group = "Modeling"
-        else:
-            self.group = "Rendering"
+        # Assign groups based on position (10 items per group)
+        groups = ["Modeling", "General", "Shading", "Transform", "Select", 
+                  "Render", "Camera", "Edit", "UV", "Animation"]
+        self.group = groups[(i // 10) % len(groups)]
 
         self.context = "VIEW_3D"
         self.enabled = True
+        # Mark toggle items as CONTEXT_TOGGLE type
+        self.mapping_type = "CONTEXT_TOGGLE" if is_toggle else "OPERATOR"
 
 class CHORDSONG_OT_TestMainOverlay(bpy.types.Operator):
     """Show the main overlay filled with dummy items for testing layout."""

@@ -64,6 +64,52 @@ def linear_to_srgb(color):
             color[3] if len(color) > 3 else 1.0
         )
 
+def truncate_text_to_width(text, max_width, font_id=0):
+    """Truncate text to fit within max_width, adding ellipsis if needed.
+    
+    Args:
+        text: Text to truncate
+        max_width: Maximum width in pixels (0 means no limit)
+        font_id: Blender font ID (default 0)
+    
+    Returns:
+        Truncated text with "..." if needed, or original text if it fits
+    """
+    if max_width <= 0 or not text:
+        return text
+    
+    import blf  # type: ignore
+    
+    # Check if text fits without truncation
+    text_width, _ = blf.dimensions(font_id, text)
+    if text_width <= max_width:
+        return text
+    
+    # Text is too long, need to truncate with ellipsis
+    ellipsis = "..."
+    ellipsis_width, _ = blf.dimensions(font_id, ellipsis)
+    available_width = max_width - ellipsis_width
+    
+    if available_width <= 0:
+        return ellipsis
+    
+    # Binary search for the right length
+    left, right = 0, len(text)
+    best_fit = ""
+    
+    while left <= right:
+        mid = (left + right) // 2
+        candidate = text[:mid]
+        candidate_width, _ = blf.dimensions(font_id, candidate)
+        
+        if candidate_width <= available_width:
+            best_fit = candidate
+            left = mid + 1
+        else:
+            right = mid - 1
+    
+    return best_fit + ellipsis if best_fit else ellipsis
+
 def draw_icon(icon_text, x, y, size):
     """Draw a Nerd Fonts icon/emoji at the specified position."""
     if not icon_text:
@@ -323,7 +369,110 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             token_txt = r["token"]
             label_txt = r["label"]
             icon_text = r.get("icon", "")
+            custom_tokens = r.get("tokens", None)
 
+            # Check if this row uses custom tokenization
+            if custom_tokens:
+                # Render using custom tokens with column-based alignment
+                # Each token type gets its own column with calculated width
+                current_x = token_col_left_x
+                
+                # Get max label length setting (character count)
+                max_label_length = getattr(p, "overlay_max_label_length", 0)
+                
+                # Get token widths from metrics for alignment
+                token_widths = metrics.get("token_widths", {})
+                toggle_size_render = max(int(p.overlay_font_size_toggle * scale_factor), 6)
+                v_offset = int(p.overlay_toggle_offset_y * scale_factor)
+                
+                # Get format string to determine column order
+                # Use same logic as build_overlay_rows to get format strings
+                from .layout import _get_preset_formats
+                from .tokenizer import parse_format_string
+                
+                style = getattr(p, "overlay_item_format", "GROUPS_FIRST")
+                
+                # Get format strings based on style
+                if style == "CUSTOM":
+                    # Use user-defined format strings
+                    format_folder = getattr(p, "overlay_format_folder", "C G S N")
+                    format_item = getattr(p, "overlay_format_item", "C I L T")
+                else:
+                    # Use preset format strings
+                    preset = _get_preset_formats(style)
+                    if preset:
+                        format_folder, format_item, _, _ = preset
+                    else:
+                        format_folder, format_item = "C S G S N", "C I L T"
+                
+                # Check if this is a folder or item
+                # Folders don't have mapping_type set, items do
+                is_folder = not r.get("mapping_type")
+                format_str = format_folder if is_folder else format_item
+                
+                expected_token_types = parse_format_string(format_str)
+                
+                # Create a lookup dict for actual tokens
+                token_dict = {tok.type: tok for tok in custom_tokens}
+                
+                # Iterate through expected token types in format order
+                for token_type in expected_token_types:
+                    # Check if this token exists in the row
+                    tok = token_dict.get(token_type)
+                    
+                    if tok:
+                        # Token exists - draw it
+                        color_key = tok.color_key
+                        
+                        # Special handling for toggle tokens (state-based color)
+                        if tok.type == 'T':
+                            is_on = tok.content == "󰨚"
+                            col = linear_to_srgb(p.overlay_color_toggle_on if is_on else p.overlay_color_toggle_off)
+                        else:
+                            col = linear_to_srgb(getattr(p, color_key, (1.0, 1.0, 1.0, 1.0)))
+                        
+                        # Set appropriate font size
+                        if tok.type == 'C':
+                            if current_size != chord_size:
+                                blf.size(0, chord_size)
+                                current_size = chord_size
+                        elif tok.type == 'I':
+                            if current_size != icon_size:
+                                blf.size(0, icon_size)
+                                current_size = icon_size
+                        elif tok.type in ('T', 't'):
+                            if current_size != toggle_size_render:
+                                blf.size(0, toggle_size_render)
+                                current_size = toggle_size_render
+                        else:
+                            if current_size != body_size:
+                                blf.size(0, body_size)
+                                current_size = body_size
+                        
+                        # Apply truncation for label tokens
+                        display_text = tok.content
+                        if tok.type == 'L' and max_label_length > 0 and len(tok.content) > max_label_length:
+                            if max_label_length > 3:
+                                display_text = tok.content[:max_label_length-3] + "..."
+                            else:
+                                display_text = tok.content[:max_label_length]
+                        
+                        # Draw the token content
+                        blf.color(0, col[0], col[1], col[2], col[3])
+                        draw_y = cy + v_offset if tok.type in ('T', 't') else cy
+                        blf.position(0, current_x, draw_y, 0)
+                        blf.draw(0, display_text)
+                    
+                    # Always advance by the column width for this token type (even if token not present)
+                    # This ensures columns stay aligned across all rows
+                    col_width = token_widths.get(token_type, 0.0)
+                    if col_width > 0:
+                        current_x += col_width + gap
+                
+                cy -= line_h
+                continue
+
+            # Standard rendering (non-custom tokens)
             # Draw icon
             if icon_text:
                 try:
@@ -343,10 +492,38 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             # Calculate label position (aligned per column)
             label_x = token_col_left_x + metrics["token"] + gap
 
-            # Draw label
+            # Draw label (apply max_label_length truncation if set)
             if current_size != body_size:
                 blf.size(0, body_size)
                 current_size = body_size
+            
+            # Apply max label length truncation if enabled (value > 0)
+            max_label_length = getattr(p, "overlay_max_label_length", 0)
+            display_label = label_txt
+            if max_label_length > 0:
+                # For toggle items, check label without the toggle icon
+                has_toggle = ("󰨚" in label_txt or "󰨙" in label_txt)
+                if has_toggle:
+                    # Extract label part only (before toggle)
+                    label_parts = label_txt.split("  󰨚") if "  󰨚" in label_txt else label_txt.split("  󰨙")
+                    label_only = label_parts[0].rstrip()
+                    toggle_part = "  󰨚" if "  󰨚" in label_txt else "  󰨙"
+                    
+                    # Apply truncation to label part only
+                    if len(label_only) > max_label_length:
+                        if max_label_length > 3:
+                            label_only = label_only[:max_label_length-3] + "..."
+                        else:
+                            label_only = label_only[:max_label_length]
+                    
+                    display_label = label_only + toggle_part
+                else:
+                    # Non-toggle item, truncate directly
+                    if len(label_txt) > max_label_length:
+                        if max_label_length > 3:
+                            display_label = label_txt[:max_label_length-3] + "..."
+                        else:
+                            display_label = label_txt[:max_label_length]
             
             # Helper to draw text with specific alpha for the separator or toggle icon
             def draw_part_with_alpha(txt, start_x):
@@ -363,15 +540,27 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                     indicator = found_sep.strip()
                     if indicator in ("󰨚", "󰨙"):
                         # Toggle icon - use specific color and size from prefs
+                        # Align toggle icons vertically within the column
                         parts = txt.split(found_sep, 1)
+                        label_without_toggle = parts[0].rstrip()
+                        
                         # Draw base text
                         blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
                         blf.size(0, body_size)
                         blf.position(0, start_x, cy, 0)
-                        blf.draw(0, parts[0])
+                        blf.draw(0, label_without_toggle)
                         
-                        # Use manual offset from prefs
-                        base_w, _ = blf.dimensions(0, parts[0])
+                        # Use explicit 3-column layout: position toggle at label_w boundary
+                        # This ensures all toggle icons align vertically in the column
+                        label_column_w = metrics.get("label_w", 0)
+                        
+                        if label_column_w > 0:
+                            # Align toggle at the end of the label sub-column
+                            toggle_x = start_x + label_column_w + 4  # Small gap after label column
+                        else:
+                            # Fallback to inline positioning
+                            base_w, _ = blf.dimensions(0, label_without_toggle)
+                            toggle_x = start_x + base_w + 2
                         
                         # Determine color based on state (convert from linear to sRGB)
                         if indicator == "󰨚":
@@ -384,8 +573,8 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                         
                         blf.size(0, toggle_size)
                         blf.color(0, toggle_color[0], toggle_color[1], toggle_color[2], toggle_color[3])
-                        blf.position(0, start_x + base_w, cy + v_offset, 0)
-                        blf.draw(0, found_sep)
+                        blf.position(0, toggle_x, cy + v_offset, 0)
+                        blf.draw(0, indicator)  # Draw just the icon, not the separator
                         
                         # Reset size for subsequent calls in this row if any
                         blf.size(0, body_size)
@@ -409,8 +598,8 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                     blf.position(0, start_x, cy, 0)
                     blf.draw(0, txt)
 
-            # 1. Draw base label
-            draw_part_with_alpha(r["label"], label_x)
+            # 1. Draw base label (use truncated version if max_label_length is set)
+            draw_part_with_alpha(display_label, label_x)
             
             # 2. Draw extra label (aligned)
             if r.get("label_extra"):
@@ -509,7 +698,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         columns = wrap_into_columns(rows, max_rows)
 
         # Calculate dimensions
-        col_metrics, footer_metrics = calculate_column_widths(columns, footer, chord_size, body_size)
+        col_metrics, footer_metrics = calculate_column_widths(columns, footer, chord_size, body_size, p=p)
 
         # Calculate width per column
         total_cols_w = 0

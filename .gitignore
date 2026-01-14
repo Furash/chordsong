@@ -210,3 +210,4 @@ cython_debug/
 *.psd
 .agent/
 VIDEO_SCRIPT.md
+IMPLEMENTATION_NOTES.md
