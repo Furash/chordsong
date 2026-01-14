@@ -25,6 +25,7 @@ from .operators import (
     CHORDSONG_OT_Append_Config,
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_Clear_Search,
+    CHORDSONG_OT_Clear_Operator_Cache,
     CHORDSONG_OT_CheckConflicts,
     CHORDSONG_OT_MergeIdentical,
     CHORDSONG_OT_ContextMenu,
@@ -85,6 +86,7 @@ _classes = (
     CHORDSONG_OT_Append_Config,
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_Clear_Search,
+    CHORDSONG_OT_Clear_Operator_Cache,
     CHORDSONG_OT_CheckConflicts,
     CHORDSONG_OT_ContextMenu,
     CHORDSONG_OT_Export_Config,
@@ -153,6 +155,13 @@ def register():
     """Register addon classes and keymaps."""
     for cls in _classes:
         _safe_register_class(cls)
+    
+    # Clear operator cache on addon enable to ensure fresh operator list
+    try:
+        from .ui.prefs import _clear_operator_cache
+        _clear_operator_cache()
+    except Exception:
+        pass
 
     # === Keymap Registration ===
     # Register default SPACE key binding for leader operator
@@ -294,6 +303,13 @@ def unregister():
                 pass
 
     addon_keymaps.clear()
+    
+    # Clear operator cache on addon disable
+    try:
+        from .ui.prefs import _clear_operator_cache
+        _clear_operator_cache()
+    except Exception:
+        pass
 
     for cls in reversed(_classes):
         _safe_unregister_class(cls)

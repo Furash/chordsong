@@ -151,6 +151,129 @@ def _on_group_changed(_self, context):
     except Exception:
         pass
 
+def _group_search_callback(self, context, edit_text):
+    try:
+        pkg = _addon_root_pkg()
+        prefs = context.preferences.addons[pkg].preferences
+        return sorted([g.name for g in prefs.groups])
+    except Exception:
+        return []
+
+# Cache for operator idnames to avoid rebuilding on every keystroke
+_operator_cache = None
+
+def _clear_operator_cache():
+    """Clear the operator cache. Useful when operators may have changed (addon enable/disable)."""
+    global _operator_cache
+    _operator_cache = None
+
+def _build_operator_cache():
+    """
+    Build cached list of all operator idnames.
+    
+    Note: Cache persists until explicitly cleared. Operators registered/unregistered
+    after cache creation won't appear until cache is cleared. This is acceptable
+    since operator registration typically happens at addon enable time.
+    """
+    global _operator_cache
+    try:
+        # Return cached list if available
+        if _operator_cache is not None:
+            return _operator_cache
+        
+        operators = []
+        seen = set()
+        
+        # Iterate through bpy.ops modules (most reliable method)
+        # Cache module names to avoid repeated dir() calls
+        try:
+            op_modules = [name for name in dir(bpy.ops) if not name.startswith('_')]
+        except Exception:
+            # Fallback: return empty list if bpy.ops is not accessible
+            return []
+        
+        for module_name in op_modules:
+            try:
+                op_module = getattr(bpy.ops, module_name)
+                # Cache operator names per module
+                op_names = [name for name in dir(op_module) if not name.startswith('_')]
+                for op_name in op_names:
+                    full_idname = f"{module_name}.{op_name}"
+                    if full_idname not in seen:
+                        operators.append(full_idname)
+                        seen.add(full_idname)
+            except (AttributeError, TypeError):
+                # Skip modules that can't be accessed or aren't operator modules
+                continue
+            except Exception:
+                # Skip any other errors to prevent one bad module from breaking everything
+                continue
+        
+        _operator_cache = sorted(operators)
+        return _operator_cache
+    except Exception:
+        # Return empty list on any error to prevent UI crashes
+        return []
+
+def _fuzzy_match_operator(query: str, operator_idname: str) -> tuple[bool, int]:
+    """
+    Fuzzy match query against operator idname using the existing fuzzy_match function.
+    Normalizes dots and underscores to spaces before matching.
+    """
+    from ..utils.fuzzy import fuzzy_match
+    
+    # Normalize: treat dots and underscores as spaces (in addition to what fuzzy_match does)
+    query_normalized = query.replace('.', ' ').replace('_', ' ')
+    text_normalized = operator_idname.replace('.', ' ').replace('_', ' ')
+    
+    # Remove extra spaces
+    query_normalized = ' '.join(query_normalized.split())
+    text_normalized = ' '.join(text_normalized.split())
+    
+    # Use the existing fuzzy_match function
+    return fuzzy_match(query_normalized, text_normalized)
+
+def _operator_search_callback(self, context, edit_text):
+    """
+    Search callback for operator idname field - provides Blender's operator search.
+    
+    Returns a list of operator idnames matching the search text.
+    Uses cached operator list for performance.
+    Supports fuzzy matching: "iops f2" will match "iops.f2"
+    """
+    try:
+        # Get cached operator list
+        all_operators = _build_operator_cache()
+        
+        if not all_operators:
+            # Return empty if cache building failed
+            return []
+        
+        if not edit_text:
+            # Return all operators if no search text (limited to prevent UI lag)
+            # Limit to first 10 to prevent UI slowdown with very large lists
+            return all_operators[:10]
+        
+        edit_text_clean = edit_text.strip()
+        
+        # Use fuzzy matching for better search experience
+        matched_operators = []
+        for op in all_operators:
+            matched, score = _fuzzy_match_operator(edit_text_clean, op)
+            if matched:
+                matched_operators.append((score, op))
+        
+        # Sort by score (lower is better) and return just the operator names
+        matched_operators.sort(key=lambda x: x[0])
+        results = [op for _, op in matched_operators]
+        
+        # Limit results to prevent UI lag with very broad searches
+        # 50 is a reasonable limit that still shows plenty of results
+        return results[:50]
+    except Exception:
+        # Return empty list on any error to prevent UI crashes
+        return []
+
 class CHORDSONG_PG_NerdIcon(PropertyGroup):
     """Nerd Font icon definition for searchable dropdown."""
     name: StringProperty(
@@ -213,6 +336,7 @@ class CHORDSONG_PG_SubOperator(PropertyGroup):
         description="Blender operator id, e.g. 'view3d.view_selected'",
         default="",
         update=_on_mapping_changed,
+        search=_operator_search_callback,
     )
     call_context: EnumProperty(
         name="Call Context",
@@ -242,14 +366,6 @@ class CHORDSONG_PG_ScriptParam(PropertyGroup):
         default="",
         update=_on_mapping_changed,
     )
-
-def _group_search_callback(self, context, edit_text):
-    try:
-        pkg = _addon_root_pkg()
-        prefs = context.preferences.addons[pkg].preferences
-        return sorted([g.name for g in prefs.groups])
-    except Exception:
-        return []
 
 class CHORDSONG_PG_Mapping(PropertyGroup):
     """Mapping property group for chord-to-action mappings."""
@@ -310,6 +426,7 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         description="Blender operator id, e.g. 'view3d.view_selected'",
         default="",
         update=_on_mapping_changed,
+        search=_operator_search_callback,
     )
     python_file: StringProperty(
         name="Python File",
