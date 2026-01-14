@@ -15,6 +15,7 @@ from .group.group_select import CHORDSONG_OT_Group_Select
 from .icon_select import CHORDSONG_OT_Icon_Select, CHORDSONG_OT_Icon_Select_Apply
 from .leader import CHORDSONG_OT_Leader, cleanup_all_handlers
 from .config.append_config import CHORDSONG_OT_Append_Config
+from .config.clear_search import CHORDSONG_OT_Clear_Search
 from .config.export_config import (
     CHORDSONG_OT_Export_Config,
     CHORDSONG_OT_Export_Config_Toggle_Groups,
@@ -26,6 +27,7 @@ from .config.load_default import CHORDSONG_OT_Load_Default
 from .mapping.mapping_add import CHORDSONG_OT_Mapping_Add
 from .mapping.mapping_convert import CHORDSONG_OT_Mapping_Convert
 from .mapping.mapping_duplicate import CHORDSONG_OT_Mapping_Duplicate
+from .mapping.mapping_fold import CHORDSONG_OT_Mapping_Fold_All, CHORDSONG_OT_Mapping_Unfold_All
 from .mapping.mapping_remove import CHORDSONG_OT_Mapping_Remove
 from .mapping.property_convert import CHORDSONG_OT_Property_Mapping_Convert
 from .mapping.subitem_ops import CHORDSONG_OT_SubItem_Add, CHORDSONG_OT_SubItem_Remove
@@ -46,6 +48,7 @@ from .test_overlay import CHORDSONG_OT_TestFadingOverlay, CHORDSONG_OT_TestMainO
 __all__ = [
     "CHORDSONG_OT_Append_Config",
     "CHORDSONG_OT_ApplyConflictFix",
+    "CHORDSONG_OT_Clear_Search",
     "CHORDSONG_OT_Export_Config",
     "CHORDSONG_OT_MergeIdentical",
     "CHORDSONG_OT_Export_Config_Toggle_Groups",
@@ -71,7 +74,9 @@ __all__ = [
     "CHORDSONG_OT_Mapping_Add",
     "CHORDSONG_OT_Mapping_Convert",
     "CHORDSONG_OT_Mapping_Duplicate",
+    "CHORDSONG_OT_Mapping_Fold_All",
     "CHORDSONG_OT_Mapping_Remove",
+    "CHORDSONG_OT_Mapping_Unfold_All",
     "CHORDSONG_OT_Property_Mapping_Convert",
     "CHORDSONG_OT_SubItem_Add",
     "CHORDSONG_OT_SubItem_Remove",

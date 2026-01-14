@@ -60,8 +60,20 @@ def draw_mapping_item(prefs, m, idx, layout, all_mappings=None):
     # Wrap each mapping in its own box for clear visual separation
     item_box = layout.box()
     
-    # Main row with enabled, chord, label, and remove button
+    # Get expanded state (default to True if not set)
+    is_expanded = getattr(m, "expanded", True)
+    
+    # Main row with collapse/expand toggle, enabled, chord, label, and remove button
     r = item_box.row(align=True)
+    
+    # Collapse/expand toggle button
+    r.prop(
+        m, "expanded",
+        icon="TRIA_DOWN" if is_expanded else "TRIA_RIGHT",
+        text="",
+        emboss=False,
+    )
+    
     r.prop(m, "enabled", text="")
     
     # Chord field - highlight if conflicted
@@ -95,6 +107,10 @@ def draw_mapping_item(prefs, m, idx, layout, all_mappings=None):
     op.index = idx
     op = r.operator("chordsong.mapping_remove", text="", icon="X", emboss=True)
     op.index = idx
+
+    # Only show detailed content if expanded
+    if not is_expanded:
+        return
 
     # Second row with context and type selector and type-specific fields
     row2 = item_box.row(align=True)

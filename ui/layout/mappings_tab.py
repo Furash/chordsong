@@ -70,10 +70,10 @@ def draw_mappings_tab(prefs, context, layout):
     # Action bar
     row = col.row(align=True)
     row.scale_y = 1.5
-    op = row.operator("chordsong.check_conflicts", text="Check for Conflicts", icon='ERROR')
-    row.separator()
     op = row.operator("chordsong.mapping_add", text="Add New Chord", icon="ADD")
     op.context = prefs.mapping_context_tab
+    row.separator()
+    op = row.operator("chordsong.check_conflicts", text="Check for Conflicts", icon='ERROR')
     row.separator()
     op = row.operator("chordsong.group_add", text="Add New Group", icon="ADD")
     op.name = "New Group"
@@ -86,15 +86,96 @@ def draw_mappings_tab(prefs, context, layout):
 
     col.separator()
 
+    # Search box
+    search_row = col.row(align=True)
+    search_row.scale_y = 1.2
+    search_row.operator("chordsong.mapping_fold_all", text="", icon="TRIA_UP_BAR", emboss=False)
+    search_row.separator()
+    search_row.operator("chordsong.mapping_unfold_all", text="", icon="TRIA_DOWN_BAR", emboss=False)
+    search_row.separator()
+    search_row.prop(prefs, "chord_search", text="", icon="VIEWZOOM", placeholder="Search chords, labels, operators, properties, toggles, scripts...")
+    if prefs.chord_search:
+        search_row.operator("chordsong.clear_search", text="", icon="X", emboss=False)
 
-    # Filter mappings by selected context tab
+    col.separator()
+
+    # Filter mappings by selected context tab and search query
     current_context = prefs.mapping_context_tab
+    search_query = (prefs.chord_search or "").strip().lower()
+
+    def _matches_search(m, query):
+        """Check if a mapping matches the search query."""
+        if not query:
+            return True
+        
+        # Search in chord
+        chord_str = get_str_attr(m, "chord") or ""
+        if query in chord_str.lower():
+            return True
+        
+        # Search in label
+        label_str = get_str_attr(m, "label") or ""
+        if query in label_str.lower():
+            return True
+        
+        # Search based on mapping type
+        mapping_type = getattr(m, "mapping_type", "OPERATOR")
+        
+        if mapping_type == "OPERATOR":
+            # Search in operator ID
+            operator_str = get_str_attr(m, "operator") or ""
+            if query in operator_str.lower():
+                return True
+            # Search in sub-operators
+            for sub_op in getattr(m, "sub_operators", []):
+                sub_op_str = get_str_attr(sub_op, "operator") or ""
+                if query in sub_op_str.lower():
+                    return True
+        
+        elif mapping_type == "CONTEXT_PROPERTY":
+            # Search in property path
+            prop_path = get_str_attr(m, "context_path") or ""
+            if query in prop_path.lower():
+                return True
+            # Search in property value
+            prop_val = get_str_attr(m, "property_value") or ""
+            if query in prop_val.lower():
+                return True
+            # Search in sub-items
+            for sub_item in getattr(m, "sub_items", []):
+                sub_path = get_str_attr(sub_item, "path") or ""
+                sub_val = get_str_attr(sub_item, "value") or ""
+                if query in sub_path.lower() or query in sub_val.lower():
+                    return True
+        
+        elif mapping_type == "CONTEXT_TOGGLE":
+            # Search in toggle path
+            toggle_path = get_str_attr(m, "context_path") or ""
+            if query in toggle_path.lower():
+                return True
+            # Search in sub-items
+            for sub_item in getattr(m, "sub_items", []):
+                sub_path = get_str_attr(sub_item, "path") or ""
+                if query in sub_path.lower():
+                    return True
+        
+        elif mapping_type == "PYTHON_FILE":
+            # Search in script file path
+            script_file = get_str_attr(m, "python_file") or ""
+            if query in script_file.lower():
+                return True
+        
+        return False
 
     groups = {}
     for idx, m in enumerate(prefs.mappings):
         mapping_context = getattr(m, "context", "VIEW_3D")
         # Include mappings with matching context or "ALL" context
         if mapping_context != current_context and mapping_context != "ALL":
+            continue
+        
+        # Apply search filter
+        if not _matches_search(m, search_query):
             continue
 
         group = get_str_attr(m, "group") or "Ungrouped"

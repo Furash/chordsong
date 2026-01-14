@@ -362,6 +362,12 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         update=_on_mapping_changed,
     )
     enabled: BoolProperty(name="Enabled", default=True, update=_on_mapping_changed)
+    expanded: BoolProperty(
+        name="Expanded",
+        description="Whether this chord mapping is expanded in the UI",
+        default=True,
+        update=_on_mapping_changed,
+    )
 
 class CHORDSONG_Preferences(AddonPreferences):
     """Chord Song addon preferences."""
@@ -788,6 +794,13 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Ungrouped Expanded",
         description="Whether the Ungrouped section is expanded",
         default=False,
+        update=_on_prefs_changed,
+    )
+
+    chord_search: StringProperty(
+        name="Chord Search",
+        description="Search chords by chord, label, operator, property, toggle, or script",
+        default="",
         update=_on_prefs_changed,
     )
 
