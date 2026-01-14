@@ -466,13 +466,6 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
         self.report({'INFO'}, msg)
         return {"FINISHED"}
 
-class CHORDSONG_MT_button_context(bpy.types.Menu):
-    """Base menu class for button context menu"""
-    bl_label = "Button Context Menu"
-
-    def draw(self, context):
-        self.layout.separator()
-
 def button_context_menu_draw(self, context):
     """Draw function that adds our button to the right-click context menu."""
     layout = self.layout
@@ -482,63 +475,34 @@ def button_context_menu_draw(self, context):
     layout.operator(CHORDSONG_OT_ContextMenu.bl_idname, text="Add Chord Mapping", icon="EVENT_C")
 
 def register_context_menu():
-    """Register the context menu hook."""
-    # Register to UI_MT_button_context_menu (modern Blender API, works better on macOS)
+    """Register the context menu hook using UI_MT_button_context_menu (modern Blender API)."""
+    # Register to UI_MT_button_context_menu (works across all platforms including macOS)
     if hasattr(bpy.types, "UI_MT_button_context_menu"):
         try:
             bpy.types.UI_MT_button_context_menu.append(button_context_menu_draw)
         except Exception:
             pass
     
-    # Prefer Blender's built-in menu when available; otherwise fall back to our own.
-    # Some Blender builds / configurations may not expose WM_MT_button_context.
-    menu_type = getattr(bpy.types, "WM_MT_button_context", None) or getattr(bpy.types, "W_MT_button_context", None)
-    if menu_type is None:
-        if not hasattr(bpy.types, "CHORDSONG_MT_button_context"):
-            bpy.utils.register_class(CHORDSONG_MT_button_context)
-        menu_type = bpy.types.CHORDSONG_MT_button_context
-
-    menu_type.append(button_context_menu_draw)
-
-    # Also attempt to append to Info Editor context menu
+    # Also register to Info Editor context menu for Info panel compatibility
     if hasattr(bpy.types, "INFO_MT_context_menu"):
-        bpy.types.INFO_MT_context_menu.append(button_context_menu_draw)
+        try:
+            bpy.types.INFO_MT_context_menu.append(button_context_menu_draw)
+        except Exception:
+            pass
 
 def unregister_context_menu():
     """Unregister the context menu hook"""
-    # Remove from UI_MT_button_context_menu (modern Blender API)
+    # Remove from UI_MT_button_context_menu
     if hasattr(bpy.types, "UI_MT_button_context_menu"):
         try:
             bpy.types.UI_MT_button_context_menu.remove(button_context_menu_draw)
         except Exception:
             pass
-    
-    # Remove from whichever menu we appended to.
-    if hasattr(bpy.types, "WM_MT_button_context"):
-        try:
-            bpy.types.WM_MT_button_context.remove(button_context_menu_draw)
-        except Exception:
-            pass
-    if hasattr(bpy.types, "W_MT_button_context"):
-        try:
-            bpy.types.W_MT_button_context.remove(button_context_menu_draw)
-        except Exception:
-            pass
-    if hasattr(bpy.types, "CHORDSONG_MT_button_context"):
-        try:
-            bpy.types.CHORDSONG_MT_button_context.remove(button_context_menu_draw)
-        except Exception:
-            pass
 
+    # Remove from Info Editor context menu
     if hasattr(bpy.types, "INFO_MT_context_menu"):
         try:
             bpy.types.INFO_MT_context_menu.remove(button_context_menu_draw)
-        except Exception:
-            pass
-
-    if hasattr(bpy.types, "CHORDSONG_MT_button_context"):
-        try:
-            bpy.utils.unregister_class(CHORDSONG_MT_button_context)
         except Exception:
             pass
 
