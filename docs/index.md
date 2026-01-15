@@ -20,6 +20,7 @@ Traditional hotkey systems suffer from "keybind exhaustion," where users must me
 - **Leader Key System**: Initiate actions with a `<Leader>` key *(default: `Space`).*
 - **Context Awareness**: Mappings dynamically filter based on your active editor (e.g., 3D View, UV, Shader Editor).
 - **Smart Recents**: Double-tap the leader key to access your most recent actions.
+- **Scripts Overlay**: Quick access to custom Python scripts with fuzzy search and numbered execution (default: `<Leader> x`).
 - **Mapping System**: Bind chords to Operators, Properties, Toggles, or external Python files.
 
 ## Quick Start Guide

@@ -71,6 +71,7 @@ nav:
     - Context Menu: features/context_menu.md
     - Info Panel: features/info.md
     - Recents: features/recents.md
+    - Scripts Overlay: features/scripts_overlay.md
     - Conflict Detection: features/conflicts.md
   - Customization:
     - Overview: customization.md
