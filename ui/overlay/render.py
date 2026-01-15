@@ -292,11 +292,13 @@ def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_si
     return bg_y2 # Return top of footer bg (for list bg connection)
 
 def render_overlay(_context, p, columns, footer, x, y, header, header_size, chord_size, body_size,
-                   column_metrics, footer_metrics, gap, col_gap, line_h, icon_size, block_w, block_h, region_w, header_w, header_h):
+                   column_metrics, footer_metrics, gap, col_gap, line_h, icon_size, block_w, block_h, region_w, header_w, header_h,
+                   scripts_overlay_settings=None):
     """Render the overlay at the calculated position."""
     import blf  # type: ignore
 
     scale_factor = calculate_scale_factor(_context)
+    separator_size_render = max(int(getattr(p, "overlay_font_size_separator", body_size) * scale_factor), 6)
     col_chord = linear_to_srgb(p.overlay_color_chord)
     col_label = linear_to_srgb(p.overlay_color_label)
     col_icon = linear_to_srgb(p.overlay_color_icon)
@@ -378,7 +380,11 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                 current_x = token_col_left_x
                 
                 # Get max label length setting (character count)
-                max_label_length = getattr(p, "overlay_max_label_length", 0)
+                # Use scripts overlay setting if provided, otherwise use global setting
+                if scripts_overlay_settings and "max_label_length" in scripts_overlay_settings:
+                    max_label_length = scripts_overlay_settings["max_label_length"]
+                else:
+                    max_label_length = getattr(p, "overlay_max_label_length", 0)
                 
                 # Get token widths from metrics for alignment
                 token_widths = metrics.get("token_widths", {})
@@ -386,24 +392,23 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                 v_offset = int(p.overlay_toggle_offset_y * scale_factor)
                 
                 # Get format string to determine column order
-                # Use same logic as build_overlay_rows to get format strings
                 from .layout import _get_preset_formats
                 from .tokenizer import parse_format_string
                 
-                style = getattr(p, "overlay_item_format", "GROUPS_FIRST")
+                style = getattr(p, "overlay_item_format", "DEFAULT")
                 
                 # Get format strings based on style
                 if style == "CUSTOM":
                     # Use user-defined format strings
-                    format_folder = getattr(p, "overlay_format_folder", "C G S N")
-                    format_item = getattr(p, "overlay_format_item", "C I L T")
+                    format_folder = getattr(p, "overlay_format_folder", "C n s G L")
+                    format_item = getattr(p, "overlay_format_item", "C I S L T")
                 else:
                     # Use preset format strings
                     preset = _get_preset_formats(style)
                     if preset:
                         format_folder, format_item, _, _ = preset
                     else:
-                        format_folder, format_item = "C S G S N", "C I L T"
+                        format_folder, format_item = "C S N", "C I L T"
                 
                 # Check if this is a folder or item
                 # Folders don't have mapping_type set, items do
@@ -444,6 +449,10 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                             if current_size != toggle_size_render:
                                 blf.size(0, toggle_size_render)
                                 current_size = toggle_size_render
+                        elif tok.type in ('S', 's'):  # Separator
+                            if current_size != separator_size_render:
+                                blf.size(0, separator_size_render)
+                                current_size = separator_size_render
                         else:
                             if current_size != body_size:
                                 blf.size(0, body_size)
@@ -451,11 +460,16 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                         
                         # Apply truncation for label tokens
                         display_text = tok.content
-                        if tok.type == 'L' and max_label_length > 0 and len(tok.content) > max_label_length:
-                            if max_label_length > 3:
-                                display_text = tok.content[:max_label_length-3] + "..."
+                        # Use scripts overlay setting if provided, otherwise use global setting
+                        if scripts_overlay_settings and "max_label_length" in scripts_overlay_settings:
+                            label_max_length = scripts_overlay_settings["max_label_length"]
+                        else:
+                            label_max_length = getattr(p, "overlay_max_label_length", 0)
+                        if tok.type == 'L' and label_max_length > 0 and len(tok.content) > label_max_length:
+                            if label_max_length > 3:
+                                display_text = tok.content[:label_max_length-3] + "..."
                             else:
-                                display_text = tok.content[:max_label_length]
+                                display_text = tok.content[:label_max_length]
                         
                         # Draw the token content
                         blf.color(0, col[0], col[1], col[2], col[3])
@@ -498,7 +512,11 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                 current_size = body_size
             
             # Apply max label length truncation if enabled (value > 0)
-            max_label_length = getattr(p, "overlay_max_label_length", 0)
+            # Use scripts overlay setting if provided, otherwise use global setting
+            if scripts_overlay_settings and "max_label_length" in scripts_overlay_settings:
+                max_label_length = scripts_overlay_settings["max_label_length"]
+            else:
+                max_label_length = getattr(p, "overlay_max_label_length", 0)
             display_label = label_txt
             if max_label_length > 0:
                 # For toggle items, check label without the toggle icon
@@ -580,11 +598,14 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                         blf.size(0, body_size)
                     else:
                         # Prefix separator (like →) or ::
-                        # Draw separator with dedicated separator color
+                        # Draw separator with dedicated separator color and size
                         col_sep = linear_to_srgb(p.overlay_color_separator)
+                        blf.size(0, separator_size_render)
                         blf.color(0, col_sep[0], col_sep[1], col_sep[2], col_sep[3])
                         blf.position(0, start_x, cy, 0)
                         blf.draw(0, found_sep)
+                        # Reset to body size for remaining text
+                        blf.size(0, body_size)
                         
                         # Spacing after separator
                         sep_w, _ = blf.dimensions(0, found_sep + "  ")
@@ -611,7 +632,8 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
 
         current_x_offset += col_total_w + col_gap
 
-def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
+def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_header=None,
+                 scripts_overlay_settings=None):
     """Main draw callback for the overlay.
 
     Args:
@@ -619,6 +641,12 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         p: Addon preferences
         buffer_tokens: Current buffer of chord tokens
         filtered_mappings: Optional filtered mappings list (defaults to p.mappings)
+        custom_header: Optional custom header text (replaces blend filename)
+        scripts_overlay_settings: Optional dict with scripts overlay specific settings:
+            - column_rows: Override overlay_column_rows
+            - max_label_length: Override overlay_max_label_length
+            - line_height: Override overlay_line_height
+            - column_width: Override calculated column width
     """
     try:
         import blf  # type: ignore
@@ -649,12 +677,31 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         _overlay_cache["prefs_hash"] == prefs_hash and
         _overlay_cache.get("mappings_sig") == mappings_sig and
         _overlay_cache.get("filepath") == blend_filepath and
+        _overlay_cache.get("custom_header") == custom_header and
+        _overlay_cache.get("scripts_overlay_settings") == scripts_overlay_settings and
         _overlay_cache["layout_data"] is not None
     )
 
     if cache_valid:
         # Use cached layout data
         layout = _overlay_cache["layout_data"]
+        prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
+        if custom_header is not None:
+            header_left = custom_header
+        else:
+            if blend_filepath:
+                blend_filename = os.path.basename(blend_filepath)
+            else:
+                blend_filename = "<unsaved .blend file>"
+            header_left = blend_filename
+        layout["header"] = f"{header_left}  |  {prefix}"
+        scale_factor = calculate_scale_factor(context)
+        header_size = max(int(p.overlay_font_size_header * scale_factor), 12)
+        blf.size(0, header_size)
+        layout["header_w"], layout["header_h"] = blf.dimensions(0, layout["header"])
+        scripts_overlay_settings = _overlay_cache.get("scripts_overlay_settings")
+        if scripts_overlay_settings:
+            layout["scripts_overlay_settings"] = scripts_overlay_settings
     else:
         # Recalculate layout
         scale_factor = calculate_scale_factor(context)
@@ -669,13 +716,18 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         # Display buffer with + separator instead of spaces
         prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
         
-        # Get blend file name for header (blend_filepath already retrieved above)
-        if blend_filepath:
-            blend_filename = os.path.basename(blend_filepath)
+        # Use custom header if provided, otherwise use blend file name
+        if custom_header is not None:
+            header_left = custom_header
         else:
-            blend_filename = "<unsaved .blend file>"
+            # Get blend file name for header (blend_filepath already retrieved above)
+            if blend_filepath:
+                blend_filename = os.path.basename(blend_filepath)
+            else:
+                blend_filename = "<unsaved .blend file>"
+            header_left = blend_filename
         
-        header = f"{blend_filename}  |  {prefix}"
+        header = f"{header_left}  |  {prefix}"
 
         # Scale font sizes
         header_size = max(int(p.overlay_font_size_header * scale_factor), 12)
@@ -688,30 +740,55 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         header_w, header_h = blf.dimensions(0, header)
 
         # Scale spacing (using preferences)
-        gap = int(p.overlay_gap * scale_factor)
-        col_gap = int(p.overlay_column_gap * scale_factor)
+        # Use scripts overlay settings if provided, otherwise use global settings
+        if scripts_overlay_settings:
+            max_rows_setting = scripts_overlay_settings.get("column_rows", p.overlay_column_rows)
+            max_label_length_setting = scripts_overlay_settings.get("max_label_length", p.overlay_max_label_length)
+            gap = int(scripts_overlay_settings.get("gap", p.overlay_gap) * scale_factor)
+            col_gap = int(scripts_overlay_settings.get("column_gap", p.overlay_column_gap) * scale_factor)
+            column_width_override = None
+        else:
+            max_rows_setting = p.overlay_column_rows
+            max_label_length_setting = p.overlay_max_label_length
+            gap = int(p.overlay_gap * scale_factor)
+            col_gap = int(p.overlay_column_gap * scale_factor)
+            column_width_override = None
+        
+        # Always use global line height
         line_h = int(body_size * p.overlay_line_height)
 
         # Build rows and footer
         rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p)
-        max_rows = max(int(p.overlay_column_rows), 1)
+        max_rows = max(int(max_rows_setting), 1)
         columns = wrap_into_columns(rows, max_rows)
 
-        # Calculate dimensions
-        col_metrics, footer_metrics = calculate_column_widths(columns, footer, chord_size, body_size, p=p)
+        # Calculate dimensions - pass max_label_length override
+        # Create a temporary prefs-like object with the override
+        class TempPrefs:
+            def __init__(self, base_prefs, max_label_length_override):
+                self._base = base_prefs
+                self._max_label_length = max_label_length_override
+            
+            def __getattr__(self, name):
+                if name == "overlay_max_label_length":
+                    return self._max_label_length
+                return getattr(self._base, name)
+        
+        temp_p = TempPrefs(p, max_label_length_setting) if scripts_overlay_settings else p
+        col_metrics, footer_metrics = calculate_column_widths(columns, footer, chord_size, body_size, p=temp_p)
 
-        # Calculate width per column
         total_cols_w = 0
         for m in col_metrics:
             col_icon_w = (m["icon_w"] + gap) if m["has_icons"] else 0
             content_w = col_icon_w + m["token"] + gap + m["label"]
             width = max(content_w, m["header"])
+            if column_width_override is not None:
+                width = max(width, column_width_override * scale_factor)
             m["total_w"] = width
             total_cols_w += width
 
         num_cols = len(col_metrics)
 
-        # Calculate block width
         effective_header_w = header_w if p.overlay_show_header else 0
         cols_gap_total = (num_cols - 1) * col_gap if num_cols > 1 else 0
         block_w = max(effective_header_w, total_cols_w + cols_gap_total)
@@ -756,6 +833,10 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         _overlay_cache["prefs_hash"] = prefs_hash
         _overlay_cache["mappings_sig"] = mappings_sig
         _overlay_cache["filepath"] = blend_filepath
+        _overlay_cache["custom_header"] = custom_header
+        _overlay_cache["scripts_overlay_settings"] = scripts_overlay_settings
+        if scripts_overlay_settings:
+            layout["scripts_overlay_settings"] = scripts_overlay_settings
         _overlay_cache["layout_data"] = layout
 
     # Render (always done, only layout calculation is cached)
@@ -780,10 +861,22 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None):
         region_w,
         layout["header_w"],
         layout["header_h"],
+        layout.get("scripts_overlay_settings"),
     )
 
-def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_duration=1.5):
-    """Draw a fading overlay showing the executed chord."""
+def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_duration=1.5, show_chord=True):
+    """Draw a fading overlay showing the executed chord.
+    
+    Args:
+        context: Blender context
+        p: Addon preferences
+        chord_text: Chord text to display (ignored if show_chord=False)
+        label: Label text to display
+        icon: Icon to display
+        start_time: Start time for fade calculation
+        fade_duration: Duration of fade in seconds
+        show_chord: Whether to display the chord text (default True)
+    """
     # Check if fading overlay is enabled
     if not getattr(p, "overlay_fading_enabled", True):
         return False
@@ -817,7 +910,7 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
 
     # Measure text dimensions
     blf.size(0, header_size)
-    chord_w, _ = blf.dimensions(0, chord_text)
+    chord_w, _ = blf.dimensions(0, chord_text) if show_chord else (0, 0)
 
     blf.size(0, body_size)
     label_w, _ = blf.dimensions(0, label)
@@ -833,11 +926,9 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
         icon_w, _ = blf.dimensions(0, icon)
     else:
         icon_w = 0
-    content_w = icon_w + (gap if icon_w > 0 else 0) + chord_w + gap + label_w
+    content_w = icon_w + (gap if icon_w > 0 else 0) + (chord_w + gap if show_chord else 0) + label_w
 
-    # Position at the same level as the main overlay header
-    # Calculate position using same logic as main overlay
-    block_h = int(header_size * 1.8)  # Approximate height for positioning
+    block_h = int(header_size * 1.8)
     _, y = calculate_overlay_position(p, region_w, region_h, content_w, block_h, pad_x, pad_y)
 
     # User requested position "between footer and header", i.e., in the body area.
@@ -860,12 +951,8 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     bg_x1 = 0
     bg_x2 = region_w
 
-    # Vertically centered around text
     bg_y1 = text_center_y - (text_height * 0.75)
     bg_y2 = text_center_y + (text_height * 0.45)
-
-    # Draw semi-transparent background with fade (full width)
-    # Convert from linear to sRGB to match picker preview
     bg_color = list(linear_to_srgb(p.overlay_list_background))
     bg_color[3] *= fade_alpha
 
@@ -887,13 +974,14 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
             pass
         current_x += icon_w + gap
 
-    # Draw chord text (convert from linear to sRGB)
-    col_chord = linear_to_srgb(p.overlay_color_chord)
-    blf.size(0, header_size)
-    blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * fade_alpha)
-    blf.position(0, current_x, text_y, 0)
-    blf.draw(0, chord_text)
-    current_x += chord_w + gap
+    # Draw chord text only if show_chord is True
+    if show_chord:
+        col_chord = linear_to_srgb(p.overlay_color_chord)
+        blf.size(0, header_size)
+        blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * fade_alpha)
+        blf.position(0, current_x, text_y, 0)
+        blf.draw(0, chord_text)
+        current_x += chord_w + gap
 
     # Draw label (convert from linear to sRGB)
     col_label = linear_to_srgb(p.overlay_color_label)

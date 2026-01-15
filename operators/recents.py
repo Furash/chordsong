@@ -287,25 +287,41 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             blf.position(0, hotkey_col_x, current_y, 0)
             blf.draw(0, hotkey_text)
 
-            # Draw icon if present (50% alpha)
-            if entry.icon:
-                try:
-                    blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3] * 0.25)
-                    draw_icon(entry.icon, icon_col_x, current_y, icon_size)
-                except Exception:
-                    pass
+            # For scripts (PYTHON_FILE), draw icon in icon column and skip chord
+            is_script = entry.mapping_type == "PYTHON_FILE"
+            
+            if is_script:
+                # Draw Python icon in icon column (aligned with other icons)
+                if entry.icon:
+                    try:
+                        blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3])
+                        draw_icon(entry.icon, icon_col_x, current_y, icon_size)
+                    except Exception:
+                        pass
+                # Skip chord for scripts, label starts after icon column
+                label_start_x = icon_col_x + icon_part_w
+            else:
+                # Draw icon if present (50% alpha)
+                if entry.icon:
+                    try:
+                        blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3] * 0.25)
+                        draw_icon(entry.icon, icon_col_x, current_y, icon_size)
+                    except Exception:
+                        pass
 
-            # Draw chord (50% alpha)
-            chord_text = "+".join(entry.chord_tokens)
-            blf.size(0, chord_size)
-            blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * 0.25)
-            blf.position(0, chord_col_x, current_y, 0)
-            blf.draw(0, chord_text)
+                # Draw chord (50% alpha)
+                chord_text = "+".join(entry.chord_tokens)
+                blf.size(0, chord_size)
+                blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * 0.25)
+                blf.position(0, chord_col_x, current_y, 0)
+                blf.draw(0, chord_text)
+                
+                label_start_x = label_col_x
 
             # Draw label
             blf.size(0, body_size)
             blf.color(0, col_label[0], col_label[1], col_label[2], col_label[3])
-            blf.position(0, label_col_x, current_y, 0)
+            blf.position(0, label_start_x, current_y, 0)
             blf.draw(0, entry.label)
 
             current_y -= line_h

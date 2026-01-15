@@ -538,6 +538,50 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
+    # Scripts Overlay Settings
+    scripts_overlay_max_items: IntProperty(
+        name="Scripts Overlay Max Items",
+        description="Maximum number of scripts to show in the scripts overlay. "
+                    "Note: Actual display is also limited by 'Overlay max items' setting above. "
+                    "Only first 10 items get chord numbers (1-9, 0).",
+        default=50,
+        min=10,
+        max=100,
+        update=_on_prefs_changed,
+    )
+    scripts_overlay_gap: FloatProperty(
+        name="Elements Gap",
+        description="Gap between elements (icon, chord, label) in scripts overlay",
+        default=5.0,
+        min=0.0,
+        max=100.0,
+        update=_on_prefs_changed,
+    )
+    scripts_overlay_column_gap: FloatProperty(
+        name="Column Gap",
+        description="Gap between columns in scripts overlay",
+        default=25.0,
+        min=0.0,
+        max=200.0,
+        update=_on_prefs_changed,
+    )
+    scripts_overlay_max_label_length: IntProperty(
+        name="Max Label Length",
+        description="Maximum character length for script labels before truncation. Set to 0 for no limit.",
+        default=0,
+        min=0,
+        max=200,
+        update=_on_prefs_changed,
+    )
+    scripts_overlay_column_rows: IntProperty(
+        name="Rows Per Column",
+        description="Maximum number of rows per column in scripts overlay",
+        default=10,
+        min=1,
+        max=100,
+        update=_on_prefs_changed,
+    )
+
     overlay_enabled: BoolProperty(
         name="Overlay",
         description="Show which-key style overlay while capturing chords",
@@ -552,7 +596,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     )
     overlay_max_items: IntProperty(
         name="Overlay max items",
-        default=14,
+        default=50,
         min=1,
         max=100,
         update=_on_prefs_changed,
@@ -563,7 +607,7 @@ class CHORDSONG_Preferences(AddonPreferences):
             "Maximum number of rows per column in the overlay "
             "before wrapping to the next column"
         ),
-        default=12,
+        default=8,
         min=1,
         max=60,
         update=_on_prefs_changed,
@@ -571,7 +615,7 @@ class CHORDSONG_Preferences(AddonPreferences):
 
     overlay_font_size_header: IntProperty(
         name="Header font size",
-        default=18,
+        default=16,
         min=8,
         max=72,
         update=_on_prefs_changed,
@@ -586,7 +630,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     )
     overlay_font_size_body: IntProperty(
         name="Body font size",
-        default=14,
+        default=15,
         min=8,
         max=72,
         update=_on_prefs_changed,
@@ -609,7 +653,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     overlay_font_size_toggle: IntProperty(
         name="Toggle Icon Size",
         description="Font size for toggle switch icons in overlay",
-        default=12,
+        default=23,
         min=4,
         max=48,
         update=_on_prefs_changed,
@@ -617,9 +661,17 @@ class CHORDSONG_Preferences(AddonPreferences):
     overlay_toggle_offset_y: IntProperty(
         name="Toggle Y Offset",
         description="Vertical offset for toggle switch icons",
-        default=0,
+        default=-4,
         min=-50,
         max=50,
+        update=_on_prefs_changed,
+    )
+    overlay_font_size_separator: IntProperty(
+        name="Separator Size",
+        description="Font size for separator characters (→, ::, etc.)",
+        default=15,
+        min=4,
+        max=72,
         update=_on_prefs_changed,
     )
 
@@ -783,14 +835,14 @@ class CHORDSONG_Preferences(AddonPreferences):
     )
     overlay_offset_x: IntProperty(
         name="Offset X",
-        default=14,
+        default=65,
         min=-2000,
         max=2000,
         update=_on_prefs_changed,
     )
     overlay_offset_y: IntProperty(
         name="Offset Y",
-        default=14,
+        default=-15,
         min=-2000,
         max=2000,
         update=_on_prefs_changed,
@@ -807,7 +859,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     overlay_column_gap: IntProperty(
         name="Column Gap",
         description="Gap between columns",
-        default=30,
+        default=100,
         min=-100,
         max=200,
         update=_on_prefs_changed,
@@ -823,7 +875,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     overlay_footer_gap: IntProperty(
         name="Footer Gap",
         description="Gap between footer items",
-        default=20,
+        default=50,
         min=-50,
         max=200,
         update=_on_prefs_changed,
@@ -831,7 +883,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     overlay_footer_token_gap: IntProperty(
         name="Footer Token Gap",
         description="Gap between token and icon/label in footer",
-        default=10,
+        default=4,
         min=-50,
         max=100,
         update=_on_prefs_changed,
@@ -839,7 +891,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     overlay_footer_label_gap: IntProperty(
         name="Footer Label Gap",
         description="Gap between icon and label in footer",
-        default=10,
+        default=8,
         min=-50,
         max=100,
         update=_on_prefs_changed,
@@ -850,9 +902,6 @@ class CHORDSONG_Preferences(AddonPreferences):
         description="Choose how folder/summary items (prefixes leading to multiple actions) are displayed",
         items=(
             ("DEFAULT", "Default: → +N keymaps", "Classic count-only style"),
-            ("GROUPS_AFTER", "→ +N keymaps :: Groups", "Count followed by a summary of groups"),
-            ("GROUPS_FIRST", "→ Groups → N keymaps", "Summary of groups followed by a vertically aligned count"),
-            ("HYBRID", "→ Groups :: N", "Groups followed by a simple count with :: symbol"),
             ("CUSTOM", "Custom Format", "Use custom format string"),
         ),
         default="DEFAULT",
@@ -864,9 +913,9 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Folder Format",
         description=(
             "Custom format for folder items (multiple keymaps)\n"
-            "Tokens: I=Icon, C=Chord, G=All Groups, g=First Group, L=Label, N=Verbose Count (+3 keymaps), n=Compact Count (+3), S=Separator A, s=Separator a"
+            "Tokens: I=Icon, C=Chord, G=All Groups, g=First Group, L=Label, N=Verbose Count (+3 keymaps), n=Compact Count (+3), S=Separator A, s=Separator B"
         ),
-        default="C G S N",
+        default="C n s G L",
         update=_on_prefs_changed,
     )
     
@@ -874,9 +923,9 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Item Format",
         description=(
             "Custom format for single items\n"
-            "Tokens: I=Icon, C=Chord, G=All Groups, g=First Group, L=Label, S=Separator A, s=Separator a"
+            "Tokens: I=Icon, C=Chord, G=All Groups, g=First Group, L=Label, S=Separator A, s=Separator B, T=Toggle"
         ),
-        default="C I L",
+        default="C I S L T",
         update=_on_prefs_changed,
     )
     

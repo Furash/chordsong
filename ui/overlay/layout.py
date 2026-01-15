@@ -14,15 +14,6 @@ def _get_preset_formats(style):
     - DEFAULT: Simple count display
       Folder: "a → +5 keymaps"
       Item: "a  Save"
-    - GROUPS_AFTER: Count first, then groups
-      Folder: "a → +5 keymaps :: Modeling"
-      Item: "a  Save"
-    - GROUPS_FIRST: Groups first, then count
-      Folder: "a → Modeling → 5 keymaps"
-      Item: "a  Save"
-    - HYBRID: Minimal with groups and compact count
-      Folder: "a → Modeling :: +5"
-      Item: "a  Save"
     - CUSTOM: User-defined format strings
     
     Token types:
@@ -35,34 +26,31 @@ def _get_preset_formats(style):
     """
     presets = {
         "DEFAULT": ("C S N", "C I L T", "→", "::"),
-        "GROUPS_AFTER": ("C S N s G", "C I L T", "→", "::"),
-        "GROUPS_FIRST": ("C S G S N", "C I L T", "→", "::"),
-        "HYBRID": ("C S G s n", "C I L T", "→", "::"),
         "CUSTOM": None,  # Use user-defined formats
     }
-    return presets.get(style, presets["GROUPS_FIRST"])
+    return presets.get(style, presets["DEFAULT"])
 
 def build_overlay_rows(cands, has_buffer, p=None):
     """Build display rows from candidates, footer returned separately."""
     rows = []
     
     # Get style from prefs if available
-    style = getattr(p, "overlay_item_format", "GROUPS_FIRST") if p else "GROUPS_FIRST"
+    style = getattr(p, "overlay_item_format", "DEFAULT") if p else "DEFAULT"
     
     # Get format strings based on style
     if style == "CUSTOM" and p:
         # Use user-defined format strings
         separator_a = getattr(p, "overlay_separator_a", "→")
         separator_b = getattr(p, "overlay_separator_b", "::")
-        format_folder = getattr(p, "overlay_format_folder", "C G S N")
-        format_item = getattr(p, "overlay_format_item", "C I L T")
+        format_folder = getattr(p, "overlay_format_folder", "C n s G L")
+        format_item = getattr(p, "overlay_format_item", "C I S L T")
     else:
         # Use preset format strings
         preset = _get_preset_formats(style)
         if preset:
             format_folder, format_item, separator_a, separator_b = preset
         else:
-            format_folder, format_item, separator_a, separator_b = "C S G S N", "C I L T", "→", "::"
+            format_folder, format_item, separator_a, separator_b = "C S N", "C I L T", "→", "::"
     
     # Build group icons dictionary from preferences
     group_icons = {}

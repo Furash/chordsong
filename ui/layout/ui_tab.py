@@ -31,9 +31,24 @@ def draw_ui_tab(prefs, layout):
     
     r = box.row(align=True)
     r.prop(prefs, "overlay_line_height", text="Line Height")
+    r.separator()
+    r.prop(prefs, "overlay_max_label_length", text="Max Label Length (0 = no limit)")
+
+    # Section: Scripts Overlay
+    box = layout.box()
+    header = box.row()
+    header.label(text="Scripts Overlay", icon='SCRIPT')
     
     r = box.row(align=True)
-    r.prop(prefs, "overlay_max_label_length", text="Max Label Length (0 = no limit)")
+    r.prop(prefs, "scripts_overlay_max_items", text="Max Items")
+    r.prop(prefs, "scripts_overlay_column_rows", text="Rows Per Column")
+    
+    r = box.row(align=True)
+    r.prop(prefs, "scripts_overlay_gap", text="Elements Gap")
+    r.prop(prefs, "scripts_overlay_column_gap", text="Column Gap")
+    
+    r = box.row(align=True)
+    r.prop(prefs, "scripts_overlay_max_label_length", text="Max Label Length (0 = no limit)")
 
     # Section: Typography
     box = layout.box()
@@ -54,6 +69,9 @@ def draw_ui_tab(prefs, layout):
     r = box.row(align=True)
     r.prop(prefs, "overlay_font_size_toggle", text="Toggle Icon Size")
     r.prop(prefs, "overlay_toggle_offset_y", text="Toggle Vertical Offset")
+    
+    r = box.row(align=True)
+    r.prop(prefs, "overlay_font_size_separator", text="Separator Size")
 
     # Section: Positioning
     box = layout.box()

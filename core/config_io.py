@@ -127,6 +127,7 @@ def dump_prefs(prefs) -> dict:
             "font_size_footer": int(getattr(prefs, "overlay_font_size_footer", 12)),
             "font_size_fading": int(getattr(prefs, "overlay_font_size_fading", 24)),
             "font_size_toggle": int(getattr(prefs, "overlay_font_size_toggle", 12)),
+            "font_size_separator": int(getattr(prefs, "overlay_font_size_separator", 15)),
             "toggle_offset_y": int(getattr(prefs, "overlay_toggle_offset_y", 0)),
             "color_chord": list(getattr(prefs, "overlay_color_chord", (0.65, 0.8, 1.0, 1.0))),
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
@@ -157,6 +158,13 @@ def dump_prefs(prefs) -> dict:
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
             "ungrouped_expanded": bool(getattr(prefs, "ungrouped_expanded", False)),
+            "scripts_overlay": {
+                "max_items": int(getattr(prefs, "scripts_overlay_max_items", 20)),
+                "column_rows": int(getattr(prefs, "scripts_overlay_column_rows", 20)),
+                "gap": float(getattr(prefs, "scripts_overlay_gap", 8.0)),
+                "column_gap": float(getattr(prefs, "scripts_overlay_column_gap", 20.0)),
+                "max_label_length": int(getattr(prefs, "scripts_overlay_max_label_length", 0)),
+            },
         },
         "groups": groups,
         "mappings": mappings,
@@ -201,6 +209,7 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             "font_size_footer": int(getattr(prefs, "overlay_font_size_footer", 12)),
             "font_size_fading": int(getattr(prefs, "overlay_font_size_fading", 24)),
             "font_size_toggle": int(getattr(prefs, "overlay_font_size_toggle", 12)),
+            "font_size_separator": int(getattr(prefs, "overlay_font_size_separator", 15)),
             "toggle_offset_y": int(getattr(prefs, "overlay_toggle_offset_y", 0)),
             "color_chord": list(getattr(prefs, "overlay_color_chord", (0.65, 0.8, 1.0, 1.0))),
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
@@ -231,6 +240,13 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
             "ungrouped_expanded": bool(getattr(prefs, "ungrouped_expanded", False)),
+            "scripts_overlay": {
+                "max_items": int(getattr(prefs, "scripts_overlay_max_items", 20)),
+                "column_rows": int(getattr(prefs, "scripts_overlay_column_rows", 20)),
+                "gap": float(getattr(prefs, "scripts_overlay_gap", 8.0)),
+                "column_gap": float(getattr(prefs, "scripts_overlay_column_gap", 20.0)),
+                "max_label_length": int(getattr(prefs, "scripts_overlay_max_label_length", 0)),
+            },
         }
     
     # Groups
@@ -421,6 +437,7 @@ def apply_config(prefs, data: dict) -> list[str]:
             "offset_x": "overlay_offset_x",
             "offset_y": "overlay_offset_y",
             "font_size_toggle": "overlay_font_size_toggle",
+            "font_size_separator": "overlay_font_size_separator",
             "toggle_offset_y": "overlay_toggle_offset_y",
         }
         for key, attr in int_props.items():
@@ -469,6 +486,27 @@ def apply_config(prefs, data: dict) -> list[str]:
             if key in overlay:
                 try: setattr(prefs, attr, str(overlay[key]))
                 except: pass
+        
+        # Load scripts overlay settings
+        scripts_overlay = overlay.get("scripts_overlay", {})
+        if isinstance(scripts_overlay, dict):
+            scripts_int_props = {
+                "max_items": "scripts_overlay_max_items",
+                "column_rows": "scripts_overlay_column_rows",
+                "max_label_length": "scripts_overlay_max_label_length",
+            }
+            scripts_float_props = {
+                "gap": "scripts_overlay_gap",
+                "column_gap": "scripts_overlay_column_gap",
+            }
+            for key, attr in scripts_int_props.items():
+                if key in scripts_overlay:
+                    try: setattr(prefs, attr, int(scripts_overlay[key]))
+                    except: pass
+            for key, attr in scripts_float_props.items():
+                if key in scripts_overlay:
+                    try: setattr(prefs, attr, float(scripts_overlay[key]))
+                    except: pass
 
     groups_data = data.get("groups", None)
     if isinstance(groups_data, list):

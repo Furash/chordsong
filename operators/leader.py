@@ -28,13 +28,22 @@ _fading_overlay_state = {
     "label": "",
     "icon": "",
     "start_time": 0,
+    "show_chord": True,  # Whether to display the chord text
     "draw_handles": {},  # Dictionary of space_type -> handle
     "area": None,
     "invoke_area_ptr": None,  # Store area pointer for comparison
 }
 
-def _show_fading_overlay(_context, chord_tokens, label, icon):
-    """Start showing a fading overlay for the executed chord."""
+def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
+    """Start showing a fading overlay for the executed chord.
+    
+    Args:
+        _context: Blender context
+        chord_tokens: List of chord tokens
+        label: Label text to display
+        icon: Icon to display
+        show_chord: Whether to display the chord text (default True)
+    """
     state = _fading_overlay_state
 
     # Clean up any existing overlay
@@ -46,6 +55,7 @@ def _show_fading_overlay(_context, chord_tokens, label, icon):
     state["chord_text"] = humanize_chord(chord_tokens)
     state["label"] = label
     state["icon"] = icon
+    state["show_chord"] = show_chord
     state["start_time"] = time.time()
     # Store area pointer for comparison during draw
     # as_pointer() gives us a stable memory address for the area
@@ -175,7 +185,8 @@ def _show_fading_overlay(_context, chord_tokens, label, icon):
                                 state["chord_text"],
                                 state["label"],
                                 state["icon"],
-                                state["start_time"]
+                                state["start_time"],
+                                show_chord=state.get("show_chord", True)
                             )
                             
                             if not still_active:
@@ -199,7 +210,8 @@ def _show_fading_overlay(_context, chord_tokens, label, icon):
                 state["chord_text"],
                 state["label"],
                 state["icon"],
-                state["start_time"]
+                state["start_time"],
+                show_chord=state.get("show_chord", True)
             )
 
             if not still_active:
@@ -1036,46 +1048,51 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             success = True
 
                     if success:
-                        # Use the original captured viewport context (ctx_viewport) for overlay
-                        # This ensures we show overlay in the editor where leader was invoked
-                        # Validate it first to ensure it's still valid
-                        overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-                        if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
-                            try:
-                                # Get space_data directly from the area (area.spaces[0] is the active space)
-                                area = overlay_ctx["area"]
-                                region = overlay_ctx["region"]
-                                space_data = None
+                        # Skip fading overlay and history for scripts_overlay operator (it handles its own overlay and adds scripts to history)
+                        primary_operator = operators_to_run[0]["op"] if operators_to_run else None
+                        if primary_operator != "chordsong.scripts_overlay":
+                            # Use the original captured viewport context (ctx_viewport) for overlay
+                            # This ensures we show overlay in the editor where leader was invoked
+                            # Validate it first to ensure it's still valid
+                            overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                            if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
                                 try:
-                                    if area.spaces:
-                                        space_data = area.spaces[0]
-                                except Exception:
-                                    pass
-                                
-                                # Create a context-like object with the area from overlay_ctx
-                                class ContextWrapper:
-                                    def __init__(self, area, region, space_data):
-                                        self.area = area
-                                        self.region = region
-                                        self.space_data = space_data
-                                
-                                wrapped_ctx = ContextWrapper(area, region, space_data)
-                                _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
-                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                # Context became invalid, fall back to current context
+                                    # Get space_data directly from the area (area.spaces[0] is the active space)
+                                    area = overlay_ctx["area"]
+                                    region = overlay_ctx["region"]
+                                    space_data = None
+                                    try:
+                                        if area.spaces:
+                                            space_data = area.spaces[0]
+                                    except Exception:
+                                        pass
+                                    
+                                    # Create a context-like object with the area from overlay_ctx
+                                    class ContextWrapper:
+                                        def __init__(self, area, region, space_data):
+                                            self.area = area
+                                            self.region = region
+                                            self.space_data = space_data
+                                    
+                                    wrapped_ctx = ContextWrapper(area, region, space_data)
+                                    _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
+                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                    # Context became invalid, fall back to current context
+                                    _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                            else:
                                 _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        else:
-                            _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        add_to_history(
-                            chord_tokens=chord_tokens,
-                            label=label,
-                            icon=icon,
-                            mapping_type="OPERATOR",
-                            operator=operators_to_run[0]["op"], # Log the primary operator
-                            kwargs=operators_to_run[0]["kwargs"],
-                            call_context=operators_to_run[0]["call_ctx"],
-                            execution_context=ctx_viewport,
-                        )
+                            
+                            # Don't add scripts_overlay operator to history (scripts executed through it are added separately)
+                            add_to_history(
+                                chord_tokens=chord_tokens,
+                                label=label,
+                                icon=icon,
+                                mapping_type="OPERATOR",
+                                operator=operators_to_run[0]["op"], # Log the primary operator
+                                kwargs=operators_to_run[0]["kwargs"],
+                                call_context=operators_to_run[0]["call_ctx"],
+                                execution_context=ctx_viewport,
+                            )
 
                 except Exception as e:
                     import traceback
