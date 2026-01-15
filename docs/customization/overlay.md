@@ -6,10 +6,15 @@
 
 ## Display Control
 
+- **Hide T & N Panels During Leader**: Automatically hide Tool (T) and Properties (N) panels while the Leader key modal is active. Panels are restored when the modal finishes.
 - **Global Overlay Visibility**: Toggle main overlay.
 - **Enable Fading Overlay**: Show confirmation after executing a chord.
 - **Show Header**: Toggle header.
 - **Show Footer**: Toggle footer.
+
+### Panel Hiding
+
+Automatically hides Tool (T) and Properties (N) panels in the active editor (3D Viewport, Node Editor, UV/Image Editor) while any overlay modal is running. Panels are restored to their original state when the modal closes.
 
 ## Layout & Items
 
