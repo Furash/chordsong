@@ -102,6 +102,16 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         if not p.overlay_enabled:
             return
         
+        # Safety check: if script execution is disabled, clean up and exit
+        if not p.allow_custom_user_scripts:
+            self._remove_draw_handler()
+            return
+        
+        # Safety check: ensure scripts list is initialized (operator was properly invoked)
+        if not hasattr(self, '_all_scripts_list') or self._all_scripts_list is None:
+            self._remove_draw_handler()
+            return
+        
         # Only draw in the area where overlay was invoked
         if self._invoke_area_ptr is not None and context.area is not None:
             try:
@@ -211,15 +221,22 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         p = prefs(context)
         p.ensure_defaults()
         
+        # Check if custom scripts are enabled FIRST (before any other operations)
+        if not p.allow_custom_user_scripts:
+            # Show warning in fading overlay
+            from ..operators.leader import _show_fading_overlay
+            warning_message = "Script execution disabled. Enable in Preferences."
+            warning_icon = "󰀪"  # Nerd Font warning icon (or use empty string if not available)
+            _show_fading_overlay(context, [], warning_message, warning_icon, show_chord=False)
+            self.report({'WARNING'}, "Custom user scripts are disabled. Enable them in preferences.")
+            # Ensure any existing draw handlers are cleaned up
+            self._remove_draw_handler()
+            return {'CANCELLED'}
+        
         # Get scripts folder
         scripts_folder = p.scripts_folder
         if not scripts_folder or not os.path.isdir(scripts_folder):
             self.report({'WARNING'}, "Scripts folder not set or doesn't exist. Set it in preferences.")
-            return {'CANCELLED'}
-        
-        # Check if custom scripts are enabled
-        if not p.allow_custom_user_scripts:
-            self.report({'WARNING'}, "Custom user scripts are disabled. Enable them in preferences.")
             return {'CANCELLED'}
         
         # Scan scripts folder for .py files
@@ -256,6 +273,16 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         self._finish(context)
     
     def modal(self, context: bpy.types.Context, event: bpy.types.Event):
+        # Safety check: if script execution is disabled, cancel immediately
+        try:
+            p = prefs(context)
+            if not p.allow_custom_user_scripts:
+                self._finish(context)
+                return {"CANCELLED"}
+        except (KeyError, AttributeError):
+            self._finish(context)
+            return {"CANCELLED"}
+        
         # Cancel keys
         if event.type in {"ESC", "RIGHTMOUSE"} and event.value == "PRESS":
             self._finish(context)
