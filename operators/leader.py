@@ -34,6 +34,9 @@ _fading_overlay_state = {
     "invoke_area_ptr": None,  # Store area pointer for comparison
 }
 
+# Global state for panel visibility (shared between Leader and Recents)
+_panel_states_global = {}
+
 def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
     """Start showing a fading overlay for the executed chord.
     
@@ -317,6 +320,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     _scroll_offset = 0
     _context_type = None  # Store the detected context type
     _last_mod_type = None  # Store the type of the last modifier key
+    _panel_states = {}  # Store original panel visibility states: {area_ptr: {"n_panel": bool, "t_panel": bool}}
 
     def _is_area_valid(self, area):
         """Check if an area is still valid without accessing type (which can crash)."""
@@ -450,6 +454,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Detect the current editor context
         self._context_type = self._detect_context(context)
 
+        # Hide T & N panels if enabled
+        if p.overlay_hide_panels:
+            self._hide_panels(context)
+
         self._ensure_draw_handler(context)
         context.window_manager.modal_handler_add(self)
         self._tag_redraw()
@@ -478,7 +486,126 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Default to 3D View if we can't detect
         return "VIEW_3D"
 
-    def _finish(self, context: bpy.types.Context):  # pylint: disable=unused-argument
+    def _hide_panels(self, context: bpy.types.Context):
+        """Hide T and N panels in the editor where Leader was invoked and all matching editor types."""
+        self._panel_states = {}
+        
+        # Get the editor type where Leader was invoked
+        invoke_space = context.space_data
+        invoke_space_type = invoke_space.type if invoke_space else 'VIEW_3D'
+        
+        # Supported editor types that have T and N panels
+        supported_types = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
+        
+        # Iterate through all areas in all windows
+        for window in context.window_manager.windows:
+            try:
+                screen = window.screen
+                if not screen:
+                    continue
+                for area in screen.areas:
+                    if not self._is_area_valid(area):
+                        continue
+                    try:
+                        # Only hide panels in areas matching the invoke editor type
+                        if area.type != invoke_space_type:
+                            continue
+                        
+                        # Skip if this editor type doesn't support panels
+                        if area.type not in supported_types:
+                            continue
+                        
+                        # Get the space data
+                        space = None
+                        for s in area.spaces:
+                            if s.type == invoke_space_type:
+                                space = s
+                                break
+                        
+                        if not space:
+                            continue
+                        
+                        area_ptr = area.as_pointer()
+                        panel_state = {}
+                        
+                        # Store and hide N panel (Sidebar)
+                        if hasattr(space, 'show_region_ui'):
+                            panel_state['n_panel'] = space.show_region_ui
+                            if space.show_region_ui:
+                                space.show_region_ui = False
+                        
+                        # Store and hide T panel (Toolbar/Toolshelf)
+                        if hasattr(space, 'show_region_toolbar'):
+                            panel_state['t_panel'] = space.show_region_toolbar
+                            if space.show_region_toolbar:
+                                space.show_region_toolbar = False
+                        
+                        if panel_state:
+                            # Store space type for restoration
+                            panel_state['space_type'] = invoke_space_type
+                            self._panel_states[area_ptr] = panel_state
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+
+    def _restore_panels(self, context: bpy.types.Context):
+        """Restore T and N panels to their original visibility state."""
+        if not self._panel_states:
+            return
+        
+        # Iterate through all areas in all windows
+        for window in context.window_manager.windows:
+            try:
+                screen = window.screen
+                if not screen:
+                    continue
+                for area in screen.areas:
+                    if not self._is_area_valid(area):
+                        continue
+                    try:
+                        area_ptr = area.as_pointer()
+                        if area_ptr not in self._panel_states:
+                            continue
+                        
+                        panel_state = self._panel_states[area_ptr]
+                        space_type = panel_state.get('space_type', 'VIEW_3D')
+                        
+                        # Only restore panels in areas matching the stored space type
+                        if area.type != space_type:
+                            continue
+                        
+                        # Get the space data
+                        space = None
+                        for s in area.spaces:
+                            if s.type == space_type:
+                                space = s
+                                break
+                        
+                        if not space:
+                            continue
+                        
+                        # Restore N panel (Sidebar)
+                        if 'n_panel' in panel_state and hasattr(space, 'show_region_ui'):
+                            if space.show_region_ui != panel_state['n_panel']:
+                                space.show_region_ui = panel_state['n_panel']
+                        
+                        # Restore T panel (Toolbar/Toolshelf)
+                        if 't_panel' in panel_state and hasattr(space, 'show_region_toolbar'):
+                            if space.show_region_toolbar != panel_state['t_panel']:
+                                space.show_region_toolbar = panel_state['t_panel']
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+        
+        # Clear stored states
+        self._panel_states = {}
+
+    def _finish(self, context: bpy.types.Context, restore_panels=True):  # pylint: disable=unused-argument
+        # Restore T & N panels if they were hidden (unless transitioning to Recents)
+        if restore_panels:
+            self._restore_panels(context)
         self._remove_draw_handler()
         self._tag_redraw()
 
@@ -492,6 +619,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self._finish(context)
 
     def modal(self, context: bpy.types.Context, event: bpy.types.Event):
+        global _panel_states_global
         p = prefs(context)
 
         # Cancel keys
@@ -562,11 +690,26 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         leader_key = get_leader_key_type()
         if not self._buffer and event.type == leader_key:
             # Open recents instead of repeat
-            self._finish(context)
+            # Don't restore panels here - Recents will handle them
+            p = prefs(context)
+            global _panel_states_global
+            if p.overlay_hide_panels:
+                # Transfer panel state to Recents by storing it globally
+                # Recents will restore panels when it finishes
+                _panel_states_global = self._panel_states.copy()
+                # Clear our state so _finish doesn't restore
+                self._panel_states = {}
+            # Finish without restoring panels (they'll be handled by Recents)
+            self._finish(context, restore_panels=False)
             try:
                 bpy.ops.chordsong.recents('INVOKE_DEFAULT')
             except Exception as e:
                 print(f"Chord Song: Failed to open recents: {e}")
+                # If Recents failed, restore panels now
+                if p.overlay_hide_panels:
+                    self._panel_states = _panel_states_global.copy()
+                    self._restore_panels(context)
+                    _panel_states_global = {}
             return {"FINISHED"}
 
         self._buffer.append(tok)
@@ -1003,8 +1146,21 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             # Capture viewport context BEFORE finishing modal
             ctx_viewport = capture_viewport_context(context)
 
+            # Check if we're executing scripts_overlay - if so, transfer panel states
+            # (scripts_overlay will handle panel hiding/restoration)
+            primary_operator = operators_to_run[0]["op"] if operators_to_run else None
+            should_restore_panels = (primary_operator != "chordsong.scripts_overlay")
+            
+            # If executing scripts_overlay, transfer panel states to global storage
+            if not should_restore_panels and p.overlay_hide_panels:
+                # Transfer panel state to Scripts overlay by storing it globally
+                # Scripts overlay will restore panels when it finishes
+                _panel_states_global = self._panel_states.copy()
+                # Clear our state so _finish doesn't restore
+                self._panel_states = {}
+            
             # Finish the modal operator FIRST
-            self._finish(context)
+            self._finish(context, restore_panels=should_restore_panels)
 
             # Defer operator execution to next frame using a timer.
             def execute_operator_delayed():

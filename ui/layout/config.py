@@ -29,16 +29,23 @@ def draw_config_section(prefs, layout):
         r.prop(prefs, "allow_custom_user_scripts", icon="SCRIPT")
 
     r = box.row(align=True)
+    r.scale_y = 1.5
     r.operator("chordsong.save_config", text="Save Config", icon="FILE_TICK")
     r.separator()
+    r.scale_y = 1.5
     r.operator("chordsong.export_config", text="Export Config", icon="EXPORT")
+    r.scale_y = 1.5
     r.separator()
     r.operator("chordsong.load_config", text="Load Config", icon="FILE_FOLDER")
+    r.scale_y = 1.5
     r.separator()
+    r.scale_y = 1.5
     r.operator("chordsong.append_config", text="Append Config", icon="APPEND_BLEND")
     r.separator()
+    r.scale_y = 1.5
     r.operator("chordsong.load_default", text="Load Default Config", icon="LOOP_BACK")
     r.separator()
+    r.scale_y = 1.5
     r.operator("chordsong.load_autosave", text="Restore Autosave", icon="RECOVER_LAST")
 
     box.separator()

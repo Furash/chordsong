@@ -331,6 +331,15 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         p = prefs(context)
         p.ensure_defaults()
 
+        # If panels were hidden by Leader, keep them hidden
+        # Retrieve panel state from global storage if available
+        self._panel_states = {}
+        if p.overlay_hide_panels:
+            from ..operators.leader import _panel_states_global
+            self._panel_states = _panel_states_global.copy()
+            # Clear the stored state so it doesn't persist
+            _panel_states_global.clear()
+
         self._buffer = []
         self._draw_manager = DrawHandlerManager()
         self._draw_manager.ensure_handler(context, self._draw_callback, p)
@@ -340,10 +349,64 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         return {"RUNNING_MODAL"}
 
     def _finish(self, context: bpy.types.Context):
+        # Restore panels if they were hidden
+        if hasattr(self, '_panel_states') and self._panel_states:
+            self._restore_panels(context)
         if self._draw_manager:
             self._draw_manager.remove_handler()
             self._draw_manager.tag_redraw()
             self._draw_manager = None
+
+    def _restore_panels(self, context: bpy.types.Context):
+        """Restore T and N panels to their original visibility state."""
+        if not hasattr(self, '_panel_states') or not self._panel_states:
+            return
+        
+        # Iterate through all areas in all windows
+        for window in context.window_manager.windows:
+            try:
+                screen = window.screen
+                if not screen:
+                    continue
+                for area in screen.areas:
+                    try:
+                        area_ptr = area.as_pointer()
+                        if area_ptr not in self._panel_states:
+                            continue
+                        
+                        panel_state = self._panel_states[area_ptr]
+                        space_type = panel_state.get('space_type', 'VIEW_3D')
+                        
+                        # Only restore panels in areas matching the stored space type
+                        if area.type != space_type:
+                            continue
+                        
+                        # Get the space data
+                        space = None
+                        for s in area.spaces:
+                            if s.type == space_type:
+                                space = s
+                                break
+                        
+                        if not space:
+                            continue
+                        
+                        # Restore N panel (Sidebar)
+                        if 'n_panel' in panel_state and hasattr(space, 'show_region_ui'):
+                            if space.show_region_ui != panel_state['n_panel']:
+                                space.show_region_ui = panel_state['n_panel']
+                        
+                        # Restore T panel (Toolbar/Toolshelf)
+                        if 't_panel' in panel_state and hasattr(space, 'show_region_toolbar'):
+                            if space.show_region_toolbar != panel_state['t_panel']:
+                                space.show_region_toolbar = panel_state['t_panel']
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+        
+        # Clear stored states
+        self._panel_states = {}
 
     def cancel(self, context: bpy.types.Context):
         """Clean up when operator is interrupted."""

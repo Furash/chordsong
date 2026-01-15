@@ -709,9 +709,96 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         pad_y = int(p.overlay_offset_y * scale_factor)
 
         # Compute candidates from filtered mappings
-        cands = candidates_for_prefix(filtered_mappings, buffer_tokens, context=context)
-        cands.sort(key=lambda c: (c.group.lower(), c.next_token))
-        cands = cands[: p.overlay_max_items]
+        # For scripts overlay, bypass candidates_for_prefix to handle empty chords
+        if scripts_overlay_settings:
+            # Directly convert mappings to candidates for scripts overlay
+            # For scripts overlay, all items are already filtered and should be displayed
+            from ...core.engine import Candidate, split_chord, get_str_attr, tokens_match
+            cands = []
+            for m in filtered_mappings:
+                chord = get_str_attr(m, "chord", "")
+                tokens = split_chord(chord) if chord else []
+                
+                # For scripts overlay, handle empty chords (items beyond first 9)
+                if not tokens:
+                    # Empty chord means it's a display-only item (beyond first 9)
+                    # Mark as final so it displays as an item (not a folder)
+                    # Use empty token - rendering will skip chord display for empty tokens
+                    cands.append(Candidate(
+                        next_token="",  # Empty token - chord column will be empty
+                        label=get_str_attr(m, "label", ""),
+                        group=get_str_attr(m, "group", ""),
+                        icon=get_str_attr(m, "icon", ""),
+                        is_final=True,  # Mark as final so it displays as an item
+                        mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
+                        property_value=None,
+                        count=1,
+                        groups=()
+                    ))
+                elif len(tokens) == len(buffer_tokens) + 1:
+                    # This is a final item (one more token than buffer)
+                    # Check if buffer matches the prefix
+                    if buffer_tokens:
+                        if not all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(tokens[:len(buffer_tokens)], buffer_tokens)):
+                            continue  # Skip if prefix doesn't match
+                    # Final item - show the last token as next_token for display, but mark as final
+                    nxt = tokens[len(buffer_tokens)]
+                    cands.append(Candidate(
+                        next_token=nxt,
+                        label=get_str_attr(m, "label", ""),
+                        group=get_str_attr(m, "group", ""),
+                        icon=get_str_attr(m, "icon", ""),
+                        is_final=True,  # This is a final item
+                        mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
+                        property_value=None,
+                        count=1,
+                        groups=()
+                    ))
+                elif len(tokens) > len(buffer_tokens) + 1:
+                    # Has more tokens than buffer + 1, show next token (not final yet)
+                    # Check if buffer matches the prefix
+                    if buffer_tokens:
+                        if not all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(tokens[:len(buffer_tokens)], buffer_tokens)):
+                            continue  # Skip if prefix doesn't match
+                    # Show next token
+                    nxt = tokens[len(buffer_tokens)]
+                    cands.append(Candidate(
+                        next_token=nxt,
+                        label=get_str_attr(m, "label", ""),
+                        group=get_str_attr(m, "group", ""),
+                        icon=get_str_attr(m, "icon", ""),
+                        is_final=False,  # Not final yet
+                        mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
+                        property_value=None,
+                        count=1,
+                        groups=()
+                    ))
+                elif len(tokens) == len(buffer_tokens):
+                    # Exact match - final item (buffer fully matches chord)
+                    # Check if buffer matches exactly
+                    if buffer_tokens:
+                        if not all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(tokens, buffer_tokens)):
+                            continue  # Skip if doesn't match exactly
+                    # Exact match - final item
+                    cands.append(Candidate(
+                        next_token="",
+                        label=get_str_attr(m, "label", ""),
+                        group=get_str_attr(m, "group", ""),
+                        icon=get_str_attr(m, "icon", ""),
+                        is_final=True,
+                        mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
+                        property_value=None,
+                        count=1,
+                        groups=()
+                    ))
+            # Don't sort - maintain original order from filtered list to preserve numbered order
+            # Apply scripts overlay max items limit (use scripts_overlay_max_items preference)
+            max_items_limit = getattr(p, "scripts_overlay_max_items", p.overlay_max_items)
+            cands = cands[:max_items_limit]
+        else:
+            cands = candidates_for_prefix(filtered_mappings, buffer_tokens, context=context)
+            cands.sort(key=lambda c: (c.group.lower(), c.next_token))
+            cands = cands[: p.overlay_max_items]
 
         # Display buffer with + separator instead of spaces
         prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
@@ -758,7 +845,9 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         line_h = int(body_size * p.overlay_line_height)
 
         # Build rows and footer
-        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p)
+        # For scripts overlay, preserve order (don't sort) to maintain numbered order
+        preserve_order = bool(scripts_overlay_settings)
+        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, preserve_order=preserve_order)
         max_rows = max(int(max_rows_setting), 1)
         columns = wrap_into_columns(rows, max_rows)
 

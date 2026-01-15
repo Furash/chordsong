@@ -594,6 +594,12 @@ class CHORDSONG_Preferences(AddonPreferences):
         default=True,
         update=_on_prefs_changed,
     )
+    overlay_hide_panels: BoolProperty(
+        name="Hide T & N Panels",
+        description="Hide Tool (T) and Properties (N) panels while Leader key modal is active",
+        default=True,
+        update=_on_prefs_changed,
+    )
     overlay_max_items: IntProperty(
         name="Overlay max items",
         default=50,

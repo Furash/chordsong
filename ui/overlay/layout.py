@@ -30,8 +30,15 @@ def _get_preset_formats(style):
     }
     return presets.get(style, presets["DEFAULT"])
 
-def build_overlay_rows(cands, has_buffer, p=None):
-    """Build display rows from candidates, footer returned separately."""
+def build_overlay_rows(cands, has_buffer, p=None, preserve_order=False):
+    """Build display rows from candidates, footer returned separately.
+    
+    Args:
+        cands: List of Candidate objects
+        has_buffer: Whether there's a buffer (affects footer display)
+        p: Preferences object (optional)
+        preserve_order: If True, don't sort candidates (preserve original order)
+    """
     rows = []
     
     # Get style from prefs if available
@@ -59,8 +66,11 @@ def build_overlay_rows(cands, has_buffer, p=None):
             if grp.name and grp.icon:
                 group_icons[grp.name] = grp.icon
     
-    # Sort candidates by group then token
-    sorted_cands = sorted(cands, key=lambda c: (c.group.lower(), c.next_token))
+    # Sort candidates by group then token (unless preserve_order is True)
+    if preserve_order:
+        sorted_cands = cands
+    else:
+        sorted_cands = sorted(cands, key=lambda c: (c.group.lower(), c.next_token))
     
     for c in sorted_cands:
         token = c.next_token

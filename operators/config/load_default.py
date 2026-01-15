@@ -70,6 +70,9 @@ class CHORDSONG_OT_Load_Default(bpy.types.Operator):
     
     def _reset_prefs_to_defaults(self, prefs_obj):
         """Reset all UI preference properties to their default values."""
+        # Display Control Settings
+        prefs_obj.overlay_hide_panels = True
+        
         # Scripts Overlay Settings
         prefs_obj.scripts_overlay_max_items = 45
         prefs_obj.scripts_overlay_gap = 5.0

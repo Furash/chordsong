@@ -117,6 +117,7 @@ def dump_prefs(prefs) -> dict:
         "overlay": {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
             "fading_enabled": bool(getattr(prefs, "overlay_fading_enabled", True)),
+            "hide_panels": bool(getattr(prefs, "overlay_hide_panels", True)),
             "show_header": bool(getattr(prefs, "overlay_show_header", True)),
             "show_footer": bool(getattr(prefs, "overlay_show_footer", True)),
             "max_items": int(getattr(prefs, "overlay_max_items", 14)),
@@ -199,6 +200,7 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
         result["overlay"] = {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
             "fading_enabled": bool(getattr(prefs, "overlay_fading_enabled", True)),
+            "hide_panels": bool(getattr(prefs, "overlay_hide_panels", True)),
             "show_header": bool(getattr(prefs, "overlay_show_header", True)),
             "show_footer": bool(getattr(prefs, "overlay_show_footer", True)),
             "max_items": int(getattr(prefs, "overlay_max_items", 14)),
@@ -410,6 +412,7 @@ def apply_config(prefs, data: dict) -> list[str]:
         bool_props = {
             "enabled": "overlay_enabled",
             "fading_enabled": "overlay_fading_enabled",
+            "hide_panels": "overlay_hide_panels",
             "show_header": "overlay_show_header",
             "show_footer": "overlay_show_footer",
         }
