@@ -55,13 +55,17 @@ def _is_mapping_conflicted(m, all_mappings):
     
     return False
 
-def draw_mapping_item(prefs, m, idx, layout, all_mappings=None):
+def draw_mapping_item(prefs, m, idx, layout, all_mappings=None, search_query=""):
     """Draw a single mapping item box."""
     # Wrap each mapping in its own box for clear visual separation
     item_box = layout.box()
     
     # Get expanded state (default to True if not set)
     is_expanded = getattr(m, "expanded", True)
+    
+    # Auto-expand items when search is active
+    if search_query:
+        is_expanded = True
     
     # Main row with collapse/expand toggle, enabled, chord, label, and remove button
     r = item_box.row(align=True)

@@ -43,6 +43,19 @@ The search box at the top of the Mappings tab provides advanced filtering across
 
 Search is case-insensitive and filters mappings in real-time. Use the **X** button to clear the search.
 
+### Search Filters
+
+You can use prefix filters to search within specific fields:
+
+- **`c:`** - Search only in chords (e.g., `c: g` finds all chords starting with "g")
+- **`l:`** - Search only in labels (e.g., `l: frame` finds all labels containing "frame")
+- **`o:`** - Search only in operators (e.g., `o: view3d` finds all operators containing "view3d")
+- **`p:`** - Search only in properties (e.g., `p: space_data` finds all property mappings with "space_data")
+- **`t:`** - Search only in toggles (e.g., `t: overlay` finds all toggle mappings with "overlay")
+- **`s:`** - Search only in scripts (e.g., `s: node` finds all script mappings with "node" in the filename)
+
+When using a filter, groups and individual mappings containing matching results are automatically expanded for easy visibility.
+
 ## Collapsible Items
 
 - **Fold All**: Collapse all groups to show headers only
