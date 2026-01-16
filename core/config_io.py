@@ -6,6 +6,19 @@ from .engine import parse_kwargs, get_str_attr
 
 CHORDSONG_CONFIG_VERSION = 1
 
+def _normalize_order_indices(mappings):
+    """
+    Normalize order_index values to match array positions (0, 1, 2, ...).
+    
+    This ensures:
+    - No duplicate indices
+    - No gaps in the sequence
+    - Move operations work with single clicks
+    - Order matches the current array arrangement
+    """
+    for idx, m in enumerate(mappings):
+        m.order_index = idx
+
 def _ensure_json_serializable(obj):
     """Recursively convert sets to lists to ensure JSON serializability."""
     if isinstance(obj, dict):
@@ -19,9 +32,10 @@ def _ensure_json_serializable(obj):
 def dump_prefs(prefs) -> dict:
     """Serialize addon preferences to a JSON-serializable dict."""
     mappings = []
-    for m in getattr(prefs, "mappings", []):
+    for idx, m in enumerate(getattr(prefs, "mappings", [])):
         mapping_type = getattr(m, "mapping_type", "OPERATOR")
         mapping_dict = {
+            "order_index": int(getattr(m, "order_index", idx)),
             "enabled": bool(getattr(m, "enabled", True)),
             "chord": get_str_attr(m, "chord"),
             "label": get_str_attr(m, "label"),
@@ -534,9 +548,23 @@ def apply_config(prefs, data: dict) -> list[str]:
         return warnings
 
     prefs.mappings.clear()
-    for item in mappings:
+    
+    # Sort by order_index if present, otherwise preserve array order
+    mappings_to_load = []
+    for idx, item in enumerate(mappings):
         if isinstance(item, dict):
-            _add_mapping_from_dict(prefs, item)
+            order_idx = item.get("order_index", idx)
+            mappings_to_load.append((order_idx, item))
+    
+    # Sort by order index
+    mappings_to_load.sort(key=lambda x: x[0])
+    
+    # Add mappings in sorted order
+    for order_idx, item in mappings_to_load:
+        _add_mapping_from_dict(prefs, item, order_idx)
+    
+    # Normalize all order indices to match final array positions
+    _normalize_order_indices(prefs.mappings)
 
     # Clear overlay cache so new mappings/icons appear immediately
     from ..ui.overlay import clear_overlay_cache
@@ -544,9 +572,10 @@ def apply_config(prefs, data: dict) -> list[str]:
 
     return warnings
 
-def _add_mapping_from_dict(prefs, item: dict):
+def _add_mapping_from_dict(prefs, item: dict, order_index: int = 0):
     """Helper function to add a single mapping from a dict to prefs.mappings."""
     m = prefs.mappings.add()
+    m.order_index = order_index
     m.enabled = bool(item.get("enabled", True))
     m.chord = (item.get("chord", "") or "").strip()
     m.icon = (item.get("icon", "") or "").strip()
@@ -675,9 +704,15 @@ def apply_config_append(prefs, data: dict) -> list[str]:
     # Append mappings: add all new mappings without clearing existing ones
     mappings = data.get("mappings", None)
     if isinstance(mappings, list):
+        # Add all new mappings (order_index will be normalized after)
         for item in mappings:
             if isinstance(item, dict):
-                _add_mapping_from_dict(prefs, item)
+                _add_mapping_from_dict(prefs, item, 0)
+        
+        # Normalize all order indices to match array positions
+        # This prevents gaps and ensures move operations work correctly
+        for idx, m in enumerate(prefs.mappings):
+            m.order_index = idx
 
     # Clear overlay cache so new mappings/icons appear immediately
     from ..ui.overlay import clear_overlay_cache

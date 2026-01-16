@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "chords": [
+    {
+      "chord": "g g",
+      "label": "Frame Selected",
+      "icon": "󰆾",
+      "group": "View",
+      "context": "VIEW_3D",
+      "mapping_type": "OPERATOR",
+      "enabled": true,
+      "operator": "view3d.view_selected",
+      "call_context": "EXEC_DEFAULT"
+    },
+    {
+      "chord": "g a",
+      "label": "Frame All",
+      "icon": "󰆾",
+      "group": "View",
+      "context": "VIEW_3D",
+      "mapping_type": "OPERATOR",
+      "enabled": true,
+      "operator": "view3d.view_all",
+      "call_context": "EXEC_DEFAULT",
+      "kwargs_json": "use_all_regions=False"
+    },
+    {
+      "chord": "v s",
+      "label": "Solid Shading",
+      "icon": "󰏘",
+      "group": "Shading",
+      "context": "VIEW_3D",
+      "mapping_type": "CONTEXT_PROPERTY",
+      "enabled": true,
+      "context_path": "space_data.shading.type",
+      "property_value": "'SOLID'"
+    },
+    {
+      "chord": "v w",
+      "label": "Toggle Wireframe",
+      "icon": "󰙴",
+      "group": "Overlay",
+      "context": "VIEW_3D",
+      "mapping_type": "CONTEXT_TOGGLE",
+      "enabled": true,
+      "context_path": "space_data.overlay.show_wireframes",
+      "sync_toggles": false
+    },
+    {
+      "chord": "m c",
+      "label": "Multi-Property Preset",
+      "icon": "󰒓",
+      "group": "Presets",
+      "context": "VIEW_3D",
+      "mapping_type": "CONTEXT_PROPERTY",
+      "enabled": true,
+      "context_path": "space_data.shading.type",
+      "property_value": "'SOLID'",
+      "sub_items": [
+        {
+          "path": "space_data.shading.light",
+          "value": "'STUDIO'"
+        },
+        {
+          "path": "space_data.shading.studio_light",
+          "value": "'Default'"
+        }
+      ]
+    }
+  ]
+}

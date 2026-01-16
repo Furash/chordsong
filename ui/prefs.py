@@ -98,7 +98,7 @@ def _check_conflicts_silent(context):
         prefs = context.preferences.addons[_addon_root_pkg()].preferences
         
         conflicts = find_conflicts(prefs.mappings)
-        CHORDSONG_OT_CheckConflicts._conflicts = conflicts
+        CHORDSONG_OT_CheckConflicts.conflicts = conflicts
     except Exception:
         pass
 
@@ -106,7 +106,6 @@ def _on_prefs_changed(self, _context):
     # Called when a preferences value changes.
     try:
         # Skip callbacks during bulk operations (config loading, etc.)
-        global _SUSPEND_CALLBACKS
         if _SUSPEND_CALLBACKS:
             return
         
@@ -118,7 +117,6 @@ def _on_prefs_changed(self, _context):
 def _on_mapping_changed(_self, context):
     try:
         # Skip callbacks during bulk operations (config loading, etc.)
-        global _SUSPEND_CALLBACKS
         if _SUSPEND_CALLBACKS:
             return
         
@@ -142,7 +140,6 @@ def _on_group_changed(_self, context):
     # Called when a group item changes; fetch prefs via context.
     try:
         # Skip callbacks during bulk operations (config loading, etc.)
-        global _SUSPEND_CALLBACKS
         if _SUSPEND_CALLBACKS:
             return
         
@@ -151,7 +148,7 @@ def _on_group_changed(_self, context):
     except Exception:
         pass
 
-def _group_search_callback(self, context, edit_text):
+def _group_search_callback(_self, context, _edit_text):
     try:
         pkg = _addon_root_pkg()
         prefs = context.preferences.addons[pkg].preferences
@@ -162,7 +159,7 @@ def _group_search_callback(self, context, edit_text):
 # Cache for operator idnames to avoid rebuilding on every keystroke
 _operator_cache = None
 
-def _clear_operator_cache():
+def clear_operator_cache():
     """Clear the operator cache. Useful when operators may have changed (addon enable/disable)."""
     global _operator_cache
     _operator_cache = None
@@ -233,7 +230,7 @@ def _fuzzy_match_operator(query: str, operator_idname: str) -> tuple[bool, int]:
     # Use the existing fuzzy_match function
     return fuzzy_match(query_normalized, text_normalized)
 
-def _operator_search_callback(self, context, edit_text):
+def _operator_search_callback(_self, _context, edit_text):
     """
     Search callback for operator idname field - provides Blender's operator search.
     
@@ -370,6 +367,12 @@ class CHORDSONG_PG_ScriptParam(PropertyGroup):
 class CHORDSONG_PG_Mapping(PropertyGroup):
     """Mapping property group for chord-to-action mappings."""
 
+    order_index: IntProperty(
+        name="Order Index",
+        description="Explicit order index for manual sorting (lower = earlier)",
+        default=0,
+        min=0,
+    )
     chord: StringProperty(
         name="Chord",
         description="Chord sequence, space-separated tokens (e.g. 'g g')",
@@ -399,12 +402,12 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         name="Context",
         description="Editor context where this chord mapping is active",
         items=(
-            ("ALL", "All Contexts", "Active in all editor contexts"),
-            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)"),
-            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)"),
-            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor"),
-            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor"),
-            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor"),
+            ("ALL", "All Contexts", "Active in all editor contexts", "WORLD", 0),
+            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)", "OBJECT_DATAMODE", 1),
+            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)", "EDITMODE_HLT", 2),
+            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor", "GEOMETRY_NODES", 3),
+            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor", "NODE_MATERIAL", 4),
+            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor", "UV", 5),
         ),
         default="VIEW_3D",
         update=_on_mapping_changed,
@@ -485,6 +488,11 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
         default=True,
         update=_on_mapping_changed,
     )
+    selected: BoolProperty(
+        name="Selected",
+        description="Whether this chord mapping is selected for copy/paste operations",
+        default=False,
+    )
 
 class CHORDSONG_Preferences(AddonPreferences):
     """Chord Song addon preferences."""
@@ -511,6 +519,12 @@ class CHORDSONG_Preferences(AddonPreferences):
             ("IMAGE_EDITOR", "UV Editor", "UV Editor chord mappings"),
         ),
         default="VIEW_3D",
+    )
+
+    selection_mode: BoolProperty(
+        name="Selection Mode",
+        description="Toggle selection mode for copying mappings",
+        default=False,
     )
 
     config_path: StringProperty(

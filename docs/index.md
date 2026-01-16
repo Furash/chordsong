@@ -3,11 +3,10 @@
     <img src="/chordsong/logo/chordsong_logo_inv.png" alt="Logo" class="logo-light">
 </div>
 
-
-
 **Chord Song** is an efficiency-focused Blender add-on that introduces `<Leader>` key functionality and chord-based mappings. Inspired by Neovim addon `which-key.nvim`, it allows you to trigger operators, execute custom Python scripts, and modify properties using short, memorable key sequences known as `chords`.
 
 ### Why Chords?
+
 Traditional hotkey systems suffer from "keybind exhaustion," where users must memorize awkward combinations like `Ctrl+Alt+Shift+F12`. Chord Song solves this by:
 
 - Reducing cognitive load: Use intuitive sequences (e.g., `m c` for **M**esh > **C**ube).
@@ -22,12 +21,15 @@ Traditional hotkey systems suffer from "keybind exhaustion," where users must me
 - **Smart Recents**: Double-tap the leader key to access your most recent actions.
 - **Scripts Overlay**: Quick access to custom Python scripts with fuzzy search and numbered execution (default: `<Leader> x`).
 - **Mapping System**: Bind chords to Operators, Properties, Toggles, or external Python files.
+- **Manual Sorting**: Organize chords with move up/down buttons or alphabetically sort entire groups. The overlay respects your custom order.
+- **Copy & Paste Sharing**: Share chord snippets with others via clipboard using compact JSON format.
 
 ## Quick Start Guide
 
 To get started with Chord Song, follow these steps:
 
 ### 1. Project Prerequisites (Required for Icons)
+
 Chord Song uses **Nerd Font** icons to provide visual cues in the overlay. Without this, icons will appear as missing character boxes.
 
 **Installation Steps:**
@@ -40,6 +42,7 @@ Chord Song uses **Nerd Font** icons to provide visual cues in the overlay. Witho
 ![Text Rendering](/chordsong/scr/text_rendering.png){ width="640" }
 
 ### 2. Download the Add-on
+
 Choose your preferred platform to download the latest `.zip` release:
 
 <!-- markdownlint-disable -->
@@ -76,6 +79,7 @@ Choose your preferred platform to download the latest `.zip` release:
 <!-- markdownlint-enable -->
 
 ### 3. Installation
+
 1. In Blender go to **Edit > Preferences > Extensions**.
 2. Click **Install...** and select the downloaded `.zip` file.
 3. Search for "Chord Song" and ensure the checkbox is enabled.
@@ -92,5 +96,6 @@ Chord Song allows for the execution of arbitrary Python scripts via chord mappin
 - **Identify Your Scripts**: Only map chords to `.py` files you have written or audited.
 - **Permission Boundary**: The add-on executes scripts within the standard Blender Python environment.
 
-Always review the source code of any script before adding it to your library. See [Script Mappings](configuration/mappings/script.md#security-safeguard) for details on enabling script execution.
+Always review the source code of any script before adding it to your library. 
+See [Script Mappings](configuration/mappings/script.md#security-safeguard) for details on enabling script execution.
 

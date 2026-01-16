@@ -469,7 +469,7 @@ class CHORDSONG_OT_ApplyConflictFix(bpy.types.Operator):
     def execute(self, context: bpy.types.Context):
         """Apply the fix."""
         # pylint: disable=protected-access
-        conflicts_raw = CHORDSONG_OT_CheckConflicts._conflicts
+        conflicts_raw = CHORDSONG_OT_CheckConflicts.conflicts
         if not conflicts_raw or not isinstance(conflicts_raw, dict):
             self.report({"WARNING"}, "No conflicts data available")
             return {"CANCELLED"}
@@ -516,7 +516,7 @@ class CHORDSONG_OT_ApplyConflictFix(bpy.types.Operator):
             new_conflicts = find_conflicts_util(p_fresh.mappings, generate_fixes=True)
 
             # Update the class variable reference directly
-            CHORDSONG_OT_CheckConflicts._conflicts = new_conflicts
+            CHORDSONG_OT_CheckConflicts.conflicts = new_conflicts
 
             # Also update the in-place lists if someone is holding a reference to the old dict
             if conflicts and isinstance(conflicts, dict):
@@ -565,7 +565,7 @@ class CHORDSONG_OT_MergeIdentical(bpy.types.Operator):
     def execute(self, context: bpy.types.Context):
         """Merge identical mappings."""
         # pylint: disable=protected-access,unsubscriptable-object
-        conflicts_raw = CHORDSONG_OT_CheckConflicts._conflicts
+        conflicts_raw = CHORDSONG_OT_CheckConflicts.conflicts
         if not conflicts_raw or not isinstance(conflicts_raw, dict):
             self.report({"WARNING"}, "No conflicts data available")
             return {"CANCELLED"}
@@ -671,7 +671,7 @@ class CHORDSONG_OT_MergeIdentical(bpy.types.Operator):
             p_fresh = prefs(bpy.context)
             new_conflicts = find_conflicts_util(p_fresh.mappings, generate_fixes=True)
 
-            CHORDSONG_OT_CheckConflicts._conflicts = new_conflicts
+            CHORDSONG_OT_CheckConflicts.conflicts = new_conflicts
 
             if conflicts and isinstance(conflicts, dict):
                 conflicts["prefix_conflicts"][:] = new_conflicts["prefix_conflicts"]
@@ -726,7 +726,7 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
     bl_label = "Check Chord Conflicts"
     bl_options = {"REGISTER"}
 
-    _conflicts = None
+    conflicts = None  # Shared conflict state cache
     _recheck_pending = False
     _prefs_context = None
     _popup_region = None
@@ -735,8 +735,8 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
         """Show dialog with conflicts."""
         p = prefs(context)
 
-        self._conflicts = self._find_conflicts(p.mappings)
-        CHORDSONG_OT_CheckConflicts._conflicts = self._conflicts
+        self.conflicts = self._find_conflicts(p.mappings)
+        CHORDSONG_OT_CheckConflicts.conflicts = self.conflicts
 
         # Store preferences context for re-running
         prefs_context = {}
@@ -747,9 +747,9 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                     prefs_context[key] = val
         CHORDSONG_OT_CheckConflicts._prefs_context = prefs_context or None
 
-        if not self._conflicts["prefix_conflicts"] and not self._conflicts["duplicates"]:
+        if not self.conflicts["prefix_conflicts"] and not self.conflicts["duplicates"]:
             self.report({"INFO"}, "No chord conflicts found! ✓")
-            CHORDSONG_OT_CheckConflicts._conflicts = None
+            CHORDSONG_OT_CheckConflicts.conflicts = None
             return {"FINISHED"}
 
         self._print_to_console()
@@ -769,7 +769,7 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
             CHORDSONG_OT_CheckConflicts._popup_region = region_popup
 
         # Always use class variable to ensure we see latest data
-        conflicts_raw = CHORDSONG_OT_CheckConflicts._conflicts
+        conflicts_raw = CHORDSONG_OT_CheckConflicts.conflicts
         if not conflicts_raw or not isinstance(conflicts_raw, dict):
             return
 
@@ -897,27 +897,27 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
 
     def _print_to_console(self):
         """Print detailed report to console."""
-        if not self._conflicts:
+        if not self.conflicts:
             return
 
-        total = len(self._conflicts["prefix_conflicts"]) + len(self._conflicts["duplicates"])
+        total = len(self.conflicts["prefix_conflicts"]) + len(self.conflicts["duplicates"])
 
         print("\n" + "="*60)
         print("CHORD CONFLICT REPORT")
         print("="*60)
 
-        if self._conflicts["prefix_conflicts"]:
-            print(f"\n⚠ PREFIX CONFLICTS ({len(self._conflicts['prefix_conflicts'])})")
+        if self.conflicts["prefix_conflicts"]:
+            print(f"\n⚠ PREFIX CONFLICTS ({len(self.conflicts['prefix_conflicts'])})")
             print("-"*60)
-            for c in self._conflicts["prefix_conflicts"]:
+            for c in self.conflicts["prefix_conflicts"]:
                 print(f"\n  Prefix: '{c['prefix_chord']}' → {c['prefix_label']}")
                 print(f"  Blocks: '{c['full_chord']}' → {c['full_label']}")
                 print(f"  Context: {c['context']}")
 
-        if self._conflicts["duplicates"]:
-            print(f"\n⚠ DUPLICATE CHORDS ({len(self._conflicts['duplicates'])})")
+        if self.conflicts["duplicates"]:
+            print(f"\n⚠ DUPLICATE CHORDS ({len(self.conflicts['duplicates'])})")
             print("-"*60)
-            for d in self._conflicts["duplicates"]:
+            for d in self.conflicts["duplicates"]:
                 print(f"\n  Chord: '{d['chord']}' (Context: {d['context']})")
                 print(f"  Found {d['count']} times:")
                 for label in d['labels']:

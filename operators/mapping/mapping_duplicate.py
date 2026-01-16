@@ -46,6 +46,10 @@ class CHORDSONG_OT_Mapping_Duplicate(bpy.types.Operator):
         target_index = idx + 1
         if target_index < new_index:
             p.mappings.move(new_index, target_index)
+        
+        # Update order indices to match new positions
+        for i, mapping in enumerate(p.mappings):
+            mapping.order_index = i
 
         from ..common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)

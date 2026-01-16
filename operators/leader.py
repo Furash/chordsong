@@ -10,6 +10,7 @@ import bpy  # type: ignore
 from ..core.engine import (
     candidates_for_prefix,
     find_exact_mapping,
+    humanize_chord,
     normalize_token,
     parse_kwargs,
     filter_mappings_by_context,
@@ -39,7 +40,7 @@ _panel_states_global = {}
 
 def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
     """Start showing a fading overlay for the executed chord.
-    
+
     Args:
         _context: Blender context
         chord_tokens: List of chord tokens
@@ -53,7 +54,6 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
     _cleanup_fading_overlay()
 
     # Set up new fading overlay
-    from ..core.engine import humanize_chord
     state["active"] = True
     state["chord_text"] = humanize_chord(chord_tokens)
     state["label"] = label
@@ -72,13 +72,13 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
     # Only register handler for the specific space type where overlay was invoked
     space = None
     space_type_class = None
-    
+
     try:
         if _context:
             space = getattr(_context, 'space_data', None)
     except Exception:
         pass
-    
+
     if space:
         try:
             space_type = getattr(space, 'type', None)
@@ -101,7 +101,7 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
         # If there's no space_data (e.g., preferences window), fall back to View3D
         # The area pointer check will ensure we only draw in the correct area
         space_type_class = bpy.types.SpaceView3D
-    
+
     # If we still don't have a valid space type class, don't register handler
     if not space_type_class:
         return
@@ -136,7 +136,7 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
                             pass
                 except Exception:
                     pass
-            
+
             # If we couldn't find the target area, check if current context area matches
             if not target_area and state["invoke_area_ptr"] is not None:
                 try:
@@ -144,12 +144,12 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
                         target_area = bpy.context.area
                 except Exception:
                     pass
-            
+
             # If we still don't have a target area, skip drawing
             # (This prevents showing overlay in wrong areas)
             if state["invoke_area_ptr"] is not None and not target_area:
                 return
-            
+
             # Create a context override for the target area if we found it
             # Otherwise use current context
             if target_area:
@@ -171,7 +171,7 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
                                 target_region = region
                         except Exception:
                             continue
-                    
+
                     if target_region:
                         # Create context override with target area and region
                         with bpy.context.temp_override(area=target_area, region=target_region):
@@ -182,7 +182,7 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
                                 return
                             if not p:
                                 return
-                            
+
                             still_active = draw_fading_overlay(
                                 bpy.context, p,
                                 state["chord_text"],
@@ -191,14 +191,14 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
                                 state["start_time"],
                                 show_chord=state.get("show_chord", True)
                             )
-                            
+
                             if not still_active:
                                 _cleanup_fading_overlay()
                             return
                 except Exception:
                     # If temp_override fails, fall through to default context
                     pass
-            
+
             # Fallback: use current context
             try:
                 p = prefs(bpy.context)
@@ -207,7 +207,7 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
                 return
             if not p:
                 return
-            
+
             still_active = draw_fading_overlay(
                 bpy.context, p,
                 state["chord_text"],
@@ -243,7 +243,7 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
         else:
             # No stored area, tag all relevant areas
             tag_all_views()
-    
+
     # Helper function to tag all relevant areas for redraw
     def tag_all_views():
         try:
@@ -321,6 +321,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     _context_type = None  # Store the detected context type
     _last_mod_type = None  # Store the type of the last modifier key
     _panel_states = {}  # Store original panel visibility states: {area_ptr: {"n_panel": bool, "t_panel": bool}}
+    _ctrl_held = False  # Track modifier keys for multi-toggle feature
+    _alt_held = False
+    _shift_held = False
 
     def _is_area_valid(self, area):
         """Check if an area is still valid without accessing type (which can crash)."""
@@ -439,7 +442,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Use the buffer tokens for overlay rendering with filtered mappings
         # draw_overlay handles context.region being None gracefully (uses defaults: 600x400)
         buffer_tokens = self._buffer or []
-        
+
         draw_overlay(context, p, buffer_tokens, filtered_mappings)
 
     def invoke(self, context: bpy.types.Context, _event: bpy.types.Event):
@@ -451,7 +454,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         self._buffer = []
         self._scroll_offset = 0
-        # Track modifier keys for multi-toggle feature
         self._ctrl_held = False
         self._alt_held = False
         self._shift_held = False
@@ -494,14 +496,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     def _hide_panels(self, context: bpy.types.Context):
         """Hide T and N panels in the editor where Leader was invoked and all matching editor types."""
         self._panel_states = {}
-        
+
         # Get the editor type where Leader was invoked
         invoke_space = context.space_data
         invoke_space_type = invoke_space.type if invoke_space else 'VIEW_3D'
-        
+
         # Supported editor types that have T and N panels
         supported_types = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
-        
+
         # Iterate through all areas in all windows
         for window in context.window_manager.windows:
             try:
@@ -515,36 +517,36 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         # Only hide panels in areas matching the invoke editor type
                         if area.type != invoke_space_type:
                             continue
-                        
+
                         # Skip if this editor type doesn't support panels
                         if area.type not in supported_types:
                             continue
-                        
+
                         # Get the space data
                         space = None
                         for s in area.spaces:
                             if s.type == invoke_space_type:
                                 space = s
                                 break
-                        
+
                         if not space:
                             continue
-                        
+
                         area_ptr = area.as_pointer()
                         panel_state = {}
-                        
+
                         # Store and hide N panel (Sidebar)
                         if hasattr(space, 'show_region_ui'):
                             panel_state['n_panel'] = space.show_region_ui
                             if space.show_region_ui:
                                 space.show_region_ui = False
-                        
+
                         # Store and hide T panel (Toolbar/Toolshelf)
                         if hasattr(space, 'show_region_toolbar'):
                             panel_state['t_panel'] = space.show_region_toolbar
                             if space.show_region_toolbar:
                                 space.show_region_toolbar = False
-                        
+
                         if panel_state:
                             # Store space type for restoration
                             panel_state['space_type'] = invoke_space_type
@@ -558,7 +560,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         """Restore T and N panels to their original visibility state."""
         if not self._panel_states:
             return
-        
+
         # Iterate through all areas in all windows
         for window in context.window_manager.windows:
             try:
@@ -572,29 +574,29 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         area_ptr = area.as_pointer()
                         if area_ptr not in self._panel_states:
                             continue
-                        
+
                         panel_state = self._panel_states[area_ptr]
                         space_type = panel_state.get('space_type', 'VIEW_3D')
-                        
+
                         # Only restore panels in areas matching the stored space type
                         if area.type != space_type:
                             continue
-                        
+
                         # Get the space data
                         space = None
                         for s in area.spaces:
                             if s.type == space_type:
                                 space = s
                                 break
-                        
+
                         if not space:
                             continue
-                        
+
                         # Restore N panel (Sidebar)
                         if 'n_panel' in panel_state and hasattr(space, 'show_region_ui'):
                             if space.show_region_ui != panel_state['n_panel']:
                                 space.show_region_ui = panel_state['n_panel']
-                        
+
                         # Restore T panel (Toolbar/Toolshelf)
                         if 't_panel' in panel_state and hasattr(space, 'show_region_toolbar'):
                             if space.show_region_toolbar != panel_state['t_panel']:
@@ -603,7 +605,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         continue
             except Exception:
                 continue
-        
+
         # Clear stored states
         self._panel_states = {}
 
@@ -670,7 +672,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 self._ctrl_held = True
                 self._last_mod_type = event.type
                 return {"RUNNING_MODAL"}
-        
+
         # Track ALT
         if event.type in {"LEFT_ALT", "RIGHT_ALT"}:
             if event.value == "RELEASE":
@@ -681,7 +683,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 self._alt_held = True
                 self._last_mod_type = event.type
                 return {"RUNNING_MODAL"}
-        
+
         # Track SHIFT
         if event.type in {"LEFT_SHIFT", "RIGHT_SHIFT"}:
             if event.value == "RELEASE":
@@ -695,7 +697,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         if event.value != "PRESS":
             return {"RUNNING_MODAL"}
-        
+
         # Modifier keys are already handled above, no need to track them here
 
         # Determine the side of the relevant modifier
@@ -708,7 +710,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         # Normal token normalization - CTRL is always included in the token
         ctrl_held = getattr(self, '_ctrl_held', False) or event.ctrl
-        
+
         tok = normalize_token(
             event.type,
             shift=event.shift,
@@ -717,7 +719,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             oskey=event.oskey,
             mod_side=mod_side
         )
-        
+
         if tok is None:
             return {"RUNNING_MODAL"}
 
@@ -753,21 +755,21 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         # Normal mode - accumulate tokens in buffer
         self._buffer.append(tok)
-        
+
         self._scroll_offset = 0  # Reset scroll when adding to buffer
 
         # Filter mappings by context
         filtered_mappings = filter_mappings_by_context(p.mappings, self._context_type)
-        
+
         # Try exact match with current buffer
         m = find_exact_mapping(filtered_mappings, self._buffer)
-        
+
         # If no match and a modifier is held, try matching without that modifier token
         # This handles cases where user presses Modifier+key but the mapping is just "key"
         # Get the configured multi-toggle modifier
         p = prefs(context)
         toggle_modifier = p.toggle_multi_modifier
-        
+
         # Check if the configured modifier is held
         modifier_held = False
         modifier_symbol = ''
@@ -780,7 +782,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         elif toggle_modifier == 'SHIFT':
             modifier_held = getattr(self, '_shift_held', False) or event.shift
             modifier_symbol = '+'
-        
+
         if not m and modifier_held:
             # Extract base keys from tokens that have the configured modifier
             # Use _get_token_parts to properly parse tokens like <^b into base 'b'
@@ -791,14 +793,26 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 # Check if this token has the configured modifier
                 has_modifier = modifier_symbol in mods or f'<{modifier_symbol}' in mods or f'>{modifier_symbol}' in mods
                 if has_modifier:
-                    # Extract base key (e.g., 'b' from '<^b')
-                    if base:
+                    # Remove only the configured modifier, keep other modifiers
+                    # e.g., '^+A' with modifier_symbol '^' becomes '+A'
+                    remaining_mods = mods - {modifier_symbol, f'<{modifier_symbol}', f'>{modifier_symbol}'}
+                    if remaining_mods:
+                        # Reconstruct token with remaining modifiers in correct order
+                        # Order: #, ^, !, +
+                        ordered_mods = []
+                        for mod_sym in ['#', '<#', '>#', '^', '<^', '>^', '!', '<!', '>!', '+', '<+', '>+']:
+                            if mod_sym in remaining_mods:
+                                ordered_mods.append(mod_sym)
+                        reconstructed = ''.join(ordered_mods) + base
+                        buffer_without_modifier.append(reconstructed)
+                    elif base:
+                        # No modifiers left, just use base
                         buffer_without_modifier.append(base)
                     # If no base (shouldn't happen), skip this token
                 else:
                     # No matching modifier, keep token as-is
                     buffer_without_modifier.append(t)
-            
+
             if buffer_without_modifier != self._buffer:
                 # Buffer had modifier tokens, try matching without them
                 toggle_mappings = [m for m in filtered_mappings if getattr(m, 'mapping_type', None) == 'CONTEXT_TOGGLE']
@@ -826,7 +840,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     self.report({"ERROR"}, "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences.")
                     self._finish(context)
                     return {"CANCELLED"}
-                
+
                 python_file = (getattr(m, "python_file", "") or "").strip()
                 if not python_file:
                     self.report({"WARNING"}, f'Chord "{" ".join(self._buffer)}" has no script file')
@@ -859,16 +873,16 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                         # Execute using Blender's text editor (avoids exec/runpy)
                         success, error_msg = _execute_script_via_text_editor(
-                            python_file, 
-                            script_args=script_args, 
+                            python_file,
+                            script_args=script_args,
                             valid_ctx=valid_ctx,
                             context=bpy.context
                         )
-                        
+
                         if not success:
                             print(f"Chord Song: {error_msg}")
                             return None
-                        
+
                         # Show fading overlay using the original captured context (ctx_viewport)
                         # This ensures overlay appears in the editor where leader was invoked
                         overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
@@ -883,7 +897,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                         space_data = area.spaces[0]
                                 except Exception:
                                     pass
-                                
+
                                 # Create a context-like object with the area from overlay_ctx
                                 # This ensures we store the correct area pointer and space type
                                 class ContextWrapper:
@@ -891,7 +905,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                         self.area = area
                                         self.region = region
                                         self.space_data = space_data
-                                
+
                                 wrapped_ctx = ContextWrapper(area, region, space_data)
                                 _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
                             except (TypeError, RuntimeError, AttributeError, ReferenceError):
@@ -943,7 +957,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 # Get the configured modifier from preferences
                 p = prefs(context)
                 toggle_modifier = p.toggle_multi_modifier  # 'CTRL', 'ALT', 'SHIFT', or 'OSKEY'
-                
+
                 # Check if the configured modifier is held
                 modifier_held = False
                 if toggle_modifier == 'CTRL':
@@ -952,7 +966,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     modifier_held = getattr(self, '_alt_held', False) or event.alt
                 elif toggle_modifier == 'SHIFT':
                     modifier_held = getattr(self, '_shift_held', False) or event.shift
-                
+
                 if not modifier_held:
                     # Normal behavior: finish modal after toggle
                     self._finish(context)
@@ -972,12 +986,15 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             obj = bpy.context
                             for part in parts[:-1]:
                                 next_obj = getattr(obj, part, None)
-                                if next_obj is None: return None
+                                if next_obj is None:
+                                    return None
                                 obj = next_obj
                             prop_name = parts[-1]
-                            if not hasattr(obj, prop_name): return None
+                            if not hasattr(obj, prop_name):
+                                return None
                             current_value = getattr(obj, prop_name)
-                            if not isinstance(current_value, bool): return None
+                            if not isinstance(current_value, bool):
+                                return None
                             set_val = not current_value
                             setattr(obj, prop_name, set_val)
                             return set_val
@@ -987,10 +1004,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             obj = bpy.context
                             for part in parts[:-1]:
                                 next_obj = getattr(obj, part, None)
-                                if next_obj is None: return None
+                                if next_obj is None:
+                                    return None
                                 obj = next_obj
                             prop_name = parts[-1]
-                            if not hasattr(obj, prop_name): return None
+                            if not hasattr(obj, prop_name):
+                                return None
                             setattr(obj, prop_name, value)
                             return value
 
@@ -1036,7 +1055,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                 run_logic()
                         else:
                             run_logic()
-                        
+
                         # Show fading overlay with multi-status if applicable
                         # Skip fading overlay if modifier is held (modal stays open)
                         if results and not modifier_held:
@@ -1050,7 +1069,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                 off_count = len(results) - on_count
                                 status_str = f"{on_count} ON, {off_count} OFF"
                                 overlay_label = f"{label} ({status_str})"
-                            
+
                             # Use the original captured viewport context (ctx_viewport) for overlay
                             overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                             if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
@@ -1064,14 +1083,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                             space_data = area.spaces[0]
                                     except Exception:
                                         pass
-                                    
+
                                     # Create a context-like object with the area from overlay_ctx
                                     class ContextWrapper:
                                         def __init__(self, area, region, space_data):
                                             self.area = area
                                             self.region = region
                                             self.space_data = space_data
-                                    
+
                                     wrapped_ctx = ContextWrapper(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
@@ -1088,7 +1107,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             context_path=context_path,
                             execution_context=ctx_viewport,
                         )
-                        
+
                         # Clear overlay cache so toggle state is re-evaluated on next redraw
                         from ..ui.overlay.cache import clear_overlay_cache
                         clear_overlay_cache()
@@ -1103,7 +1122,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     return None
 
                 bpy.app.timers.register(execute_toggle_delayed, first_interval=0.01)
-                
+
                 # If modifier is held, keep modal running; otherwise finish
                 if modifier_held:
                     return {"RUNNING_MODAL"}
@@ -1131,7 +1150,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         def do_set_item(path, val_str):
                             if not path or not val_str:
                                 return False
-                                
+
                             try:
                                 val_to_set = ast.literal_eval(val_str)
                             except (ValueError, SyntaxError):
@@ -1141,7 +1160,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             obj = bpy.context
 
                             # Navigate to the parent object
-                            for i, part in enumerate(parts[:-1]):
+                            for _, part in enumerate(parts[:-1]):
                                 next_obj = getattr(obj, part, None)
                                 if next_obj is None:
                                     return False
@@ -1187,14 +1206,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             for p, v in items:
                                 if do_set_item(p, v):
                                     success_count += 1
-                        
+
                         if success_count > 0:
                             overlay_label = ""
                             if success_count == 1:
                                 overlay_label = f"{label}: {property_value}"
                             else:
                                 overlay_label = f"{label}: {success_count} values set"
-                            
+
                             # Use the original captured viewport context (ctx_viewport) for overlay
                             overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                             if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
@@ -1208,14 +1227,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                             space_data = area.spaces[0]
                                     except Exception:
                                         pass
-                                    
+
                                     # Create a context-like object with the area from overlay_ctx
                                     class ContextWrapper:
                                         def __init__(self, area, region, space_data):
                                             self.area = area
                                             self.region = region
                                             self.space_data = space_data
-                                    
+
                                     wrapped_ctx = ContextWrapper(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
@@ -1245,7 +1264,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
             # Handle operator execution
             operators_to_run = []
-            
+
             primary_op = (m.operator or "").strip()
             if primary_op:
                 operators_to_run.append({
@@ -1253,7 +1272,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     "kwargs": parse_kwargs(getattr(m, "kwargs_json", "{}")),
                     "call_ctx": (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
                 })
-            
+
             for sub in m.sub_operators:
                 sub_op = (sub.operator or "").strip()
                 if sub_op:
@@ -1275,7 +1294,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             # (scripts_overlay will handle panel hiding/restoration)
             primary_operator = operators_to_run[0]["op"] if operators_to_run else None
             should_restore_panels = (primary_operator != "chordsong.scripts_overlay")
-            
+
             # If executing scripts_overlay, transfer panel states to global storage
             if not should_restore_panels and p.overlay_hide_panels:
                 # Transfer panel state to Scripts overlay by storing it globally
@@ -1283,7 +1302,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 _panel_states_global = self._panel_states.copy()
                 # Clear our state so _finish doesn't restore
                 self._panel_states = {}
-            
+
             # Finish the modal operator FIRST
             self._finish(context, restore_panels=should_restore_panels)
 
@@ -1295,12 +1314,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
                     success = False
-                    
+
                     for op_data in operators_to_run:
                         op = op_data["op"]
                         kwargs = op_data["kwargs"]
                         call_ctx = op_data["call_ctx"]
-                        
+
                         mod_name, fn_name = op.split(".", 1)
                         opmod = getattr(bpy.ops, mod_name)
                         opfn = getattr(opmod, fn_name)
@@ -1324,7 +1343,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                     result_set = opfn('EXEC_DEFAULT', **kwargs)
                             else:
                                 result_set = opfn('EXEC_DEFAULT', **kwargs)
-                                
+
                         if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
                             success = True
 
@@ -1347,14 +1366,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                             space_data = area.spaces[0]
                                     except Exception:
                                         pass
-                                    
+
                                     # Create a context-like object with the area from overlay_ctx
                                     class ContextWrapper:
                                         def __init__(self, area, region, space_data):
                                             self.area = area
                                             self.region = region
                                             self.space_data = space_data
-                                    
+
                                     wrapped_ctx = ContextWrapper(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
@@ -1362,7 +1381,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                     _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                             else:
                                 _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                            
+
                             # Don't add scripts_overlay operator to history (scripts executed through it are added separately)
                             add_to_history(
                                 chord_tokens=chord_tokens,
@@ -1391,7 +1410,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             return {"RUNNING_MODAL"}
 
         # No match
-        from ..core.engine import humanize_chord
         chord_str = humanize_chord(self._buffer)
         self.report({"WARNING"}, f'Unknown chord: "{chord_str}"')
         self._finish(context)

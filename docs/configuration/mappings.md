@@ -15,6 +15,7 @@ There are several ways to add chord mappings:
 - **Preferences**: Manually add and edit mappings in the Chord Song preferences tab.
 - **Context Menu**: Right-click any button or menu item in Blender and select **Add Chord Mapping**.
 - **Info Panel**: Select operator history rows in Blender's Info Editor, right-click, and select **Extract to Chord Mapping** for batch creation.
+- **Copy & Paste**: Copy and paste chord snippets from clipboard (see [Copy & Paste Sharing](chord_serialization.md)).
 - **Import/Append**: Load or merge configurations from JSON files (see [Import & Export](import_export.md)).
 - **Manual Editing**: Advanced users can edit the JSON configuration file directly. See [Configuration File Format](import_export.md#configuration-file-format) for details.
 
@@ -61,6 +62,11 @@ When using a filter, groups and individual mappings containing matching results 
 - **Fold All**: Collapse all groups to show headers only
 - **Unfold All**: Expand all groups to show all mappings
 - **Individual Groups**: Click the triangle icon next to each group name to expand/collapse
+
+## Sharing and Backup
+
+- **[Copy & Paste](chord_serialization.md)**: Share chord snippets with others or backup specific chords to clipboard
+- **[Import & Export](import_export.md)**: Save and load entire configurations or groups of chords
 
 ## Mapping Types
 

@@ -4,6 +4,9 @@ Configuration operations for chord mappings.
 
 ![Import & Export](/chordsong/scr/prefs_config.png)
 
+!!! tip "Quick Sharing"
+    For sharing small chord snippets, use [Copy & Paste](chord_serialization.md) instead. Import/Export is designed for complete configuration management.
+
 ## Operations
 
 - **Save Config**: Overwrites the current Config file with the current configuration.

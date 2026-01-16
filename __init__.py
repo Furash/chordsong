@@ -53,9 +53,18 @@ from .operators import (
     CHORDSONG_OT_LoadThemePreset,
     CHORDSONG_OT_Mapping_Add,
     CHORDSONG_OT_Mapping_Convert,
+    CHORDSONG_OT_Mapping_Copy,
+    CHORDSONG_OT_Mapping_Copy_Single,
+    CHORDSONG_OT_Mapping_Deselect_All,
     CHORDSONG_OT_Mapping_Duplicate,
     CHORDSONG_OT_Mapping_Fold_All,
+    CHORDSONG_OT_Mapping_Move_Down,
+    CHORDSONG_OT_Mapping_Move_Up,
+    CHORDSONG_OT_Mapping_Normalize_Indices,
+    CHORDSONG_OT_Mapping_Paste,
     CHORDSONG_OT_Mapping_Remove,
+    CHORDSONG_OT_Mapping_Sort_Group,
+    CHORDSONG_OT_Mapping_Toggle_Select,
     CHORDSONG_OT_Mapping_Unfold_All,
     CHORDSONG_OT_Property_Mapping_Convert,
     CHORDSONG_OT_Open_Keymap,
@@ -114,9 +123,18 @@ _classes = (
     CHORDSONG_OT_LoadThemePreset,
     CHORDSONG_OT_Mapping_Add,
     CHORDSONG_OT_Mapping_Convert,
+    CHORDSONG_OT_Mapping_Copy,
+    CHORDSONG_OT_Mapping_Copy_Single,
+    CHORDSONG_OT_Mapping_Deselect_All,
     CHORDSONG_OT_Mapping_Duplicate,
     CHORDSONG_OT_Mapping_Fold_All,
+    CHORDSONG_OT_Mapping_Move_Down,
+    CHORDSONG_OT_Mapping_Move_Up,
+    CHORDSONG_OT_Mapping_Normalize_Indices,
+    CHORDSONG_OT_Mapping_Paste,
     CHORDSONG_OT_Mapping_Remove,
+    CHORDSONG_OT_Mapping_Sort_Group,
+    CHORDSONG_OT_Mapping_Toggle_Select,
     CHORDSONG_OT_Mapping_Unfold_All,
     CHORDSONG_OT_MergeIdentical,
     CHORDSONG_OT_Property_Mapping_Convert,
@@ -160,8 +178,8 @@ def register():
     
     # Clear operator cache on addon enable to ensure fresh operator list
     try:
-        from .ui.prefs import _clear_operator_cache
-        _clear_operator_cache()
+        from .ui.prefs import clear_operator_cache
+        clear_operator_cache()
     except Exception:
         pass
 
@@ -251,6 +269,15 @@ def register():
                     apply_config(prefs, data)
                 except Exception:
                     pass
+            
+            # Normalize order indices (for existing blend files with old data)
+            # This ensures no gaps in the sequence even if loading old configs
+            from .core.config_io import _normalize_order_indices
+            if prefs.mappings:
+                _normalize_order_indices(prefs.mappings)
+                # Schedule an autosave to persist the normalized indices
+                from .operators.common import schedule_autosave_safe
+                schedule_autosave_safe(prefs, delay_s=2.0)
 
             # Load bundled default config only on first install (no saved config found)
             default_path = default_config_path()
@@ -308,8 +335,8 @@ def unregister():
     
     # Clear operator cache on addon disable
     try:
-        from .ui.prefs import _clear_operator_cache
-        _clear_operator_cache()
+        from .ui.prefs import clear_operator_cache
+        clear_operator_cache()
     except Exception:
         pass
 

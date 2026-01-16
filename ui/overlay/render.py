@@ -798,7 +798,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
             cands = cands[:max_items_limit]
         else:
             cands = candidates_for_prefix(filtered_mappings, buffer_tokens, context=context)
-            cands.sort(key=lambda c: (c.group.lower(), c.next_token))
+            # Don't sort - preserve the order from prefs.mappings (manual ordering)
             cands = cands[: p.overlay_max_items]
 
         # Display buffer with + separator instead of spaces
@@ -846,8 +846,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         line_h = int(body_size * p.overlay_line_height)
 
         # Build rows and footer
-        # For scripts overlay, preserve order (don't sort) to maintain numbered order
-        preserve_order = bool(scripts_overlay_settings)
+        # Preserve order to respect manual ordering from prefs.mappings
+        preserve_order = True
         rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, preserve_order=preserve_order)
         max_rows = max(int(max_rows_setting), 1)
         columns = wrap_into_columns(rows, max_rows)

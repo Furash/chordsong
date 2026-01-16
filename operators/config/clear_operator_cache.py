@@ -17,8 +17,8 @@ class CHORDSONG_OT_Clear_Operator_Cache(bpy.types.Operator):
     def execute(self, context: bpy.types.Context):
         """Clear the operator cache."""
         try:
-            from ...ui.prefs import _clear_operator_cache
-            _clear_operator_cache()
+            from ...ui.prefs import clear_operator_cache
+            clear_operator_cache()
             self.report({"INFO"}, "Operator cache cleared")
             return {"FINISHED"}
         except Exception as e:

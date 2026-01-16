@@ -5,6 +5,131 @@ Mappings tab for addon preferences.
 from ...core.engine import get_str_attr
 from .mapping_item import draw_mapping_item, _is_mapping_conflicted
 
+
+def _matches_search(m, query):
+    """Check if a mapping matches the search query.
+
+    Supports prefix filters:
+    - c: - search only in chords
+    - l: - search only in labels
+    - o: - search only in operators
+    - p: - search only in properties
+    - t: - search only in toggles
+    - s: - search only in scripts
+    """
+    if not query:
+        return True
+
+    # Parse prefix filter
+    search_filter = None
+    search_term = query
+
+    if len(query) >= 2 and query[1] == ':':
+        prefix = query[0]
+        if prefix in ('c', 'l', 'o', 'p', 't', 's'):
+            search_filter = prefix
+            search_term = query[2:].strip()
+            if not search_term:
+                # If only prefix with no term, show all items of that type
+                search_term = ""
+
+    # Get mapping type for type-specific filtering
+    mapping_type = getattr(m, "mapping_type", "OPERATOR")
+
+    # Search in chord
+    if search_filter is None or search_filter == 'c':
+        chord_str = get_str_attr(m, "chord") or ""
+        if not search_term or search_term in chord_str.lower():
+            if search_filter == 'c':
+                return True
+            elif search_term in chord_str.lower():
+                return True
+
+    # Search in label
+    if search_filter is None or search_filter == 'l':
+        label_str = get_str_attr(m, "label") or ""
+        if not search_term or search_term in label_str.lower():
+            if search_filter == 'l':
+                return True
+            elif search_term in label_str.lower():
+                return True
+
+    # Search based on mapping type
+    if mapping_type == "OPERATOR":
+        if search_filter is None or search_filter == 'o':
+            # Search in operator ID
+            operator_str = get_str_attr(m, "operator") or ""
+            if not search_term or search_term in operator_str.lower():
+                if search_filter == 'o':
+                    return True
+                elif search_term in operator_str.lower():
+                    return True
+            # Search in sub-operators
+            for sub_op in getattr(m, "sub_operators", []):
+                sub_op_str = get_str_attr(sub_op, "operator") or ""
+                if not search_term or search_term in sub_op_str.lower():
+                    if search_filter == 'o':
+                        return True
+                    elif search_term in sub_op_str.lower():
+                        return True
+
+    elif mapping_type == "CONTEXT_PROPERTY":
+        if search_filter is None or search_filter == 'p':
+            # Search in property path
+            prop_path = get_str_attr(m, "context_path") or ""
+            if not search_term or search_term in prop_path.lower():
+                if search_filter == 'p':
+                    return True
+                elif search_term in prop_path.lower():
+                    return True
+            # Search in property value
+            prop_val = get_str_attr(m, "property_value") or ""
+            if not search_term or search_term in prop_val.lower():
+                if search_filter == 'p':
+                    return True
+                elif search_term in prop_val.lower():
+                    return True
+            # Search in sub-items
+            for sub_item in getattr(m, "sub_items", []):
+                sub_path = get_str_attr(sub_item, "path") or ""
+                sub_val = get_str_attr(sub_item, "value") or ""
+                if not search_term or search_term in sub_path.lower() or search_term in sub_val.lower():
+                    if search_filter == 'p':
+                        return True
+                    elif search_term in sub_path.lower() or search_term in sub_val.lower():
+                        return True
+
+    elif mapping_type == "CONTEXT_TOGGLE":
+        if search_filter is None or search_filter == 't':
+            # Search in toggle path
+            toggle_path = get_str_attr(m, "context_path") or ""
+            if not search_term or search_term in toggle_path.lower():
+                if search_filter == 't':
+                    return True
+                elif search_term in toggle_path.lower():
+                    return True
+            # Search in sub-items
+            for sub_item in getattr(m, "sub_items", []):
+                sub_path = get_str_attr(sub_item, "path") or ""
+                if not search_term or search_term in sub_path.lower():
+                    if search_filter == 't':
+                        return True
+                    elif search_term in sub_path.lower():
+                        return True
+
+    elif mapping_type == "PYTHON_FILE":
+        if search_filter is None or search_filter == 's':
+            # Search in script file path
+            script_file = get_str_attr(m, "python_file") or ""
+            if not search_term or search_term in script_file.lower():
+                if search_filter == 's':
+                    return True
+                elif search_term in script_file.lower():
+                    return True
+
+    return False
+
+
 def draw_mappings_tab(prefs, context, layout):
     """Draw the Mappings tab content."""
     col = layout.column()
@@ -13,7 +138,7 @@ def draw_mappings_tab(prefs, context, layout):
     # Check user keyconfig first (contains user customizations), then addon keyconfig
     wm = context.window_manager
     keyconfigs = [wm.keyconfigs.user, wm.keyconfigs.addon]
-    
+
     leader_box = col.box()
 
     # Header
@@ -33,7 +158,7 @@ def draw_mappings_tab(prefs, context, layout):
         # Check both keyconfigs to find the keymap item
         found_kmi = None
         found_km = None
-        
+
         for kc in keyconfigs:
             if not kc:
                 continue
@@ -46,14 +171,14 @@ def draw_mappings_tab(prefs, context, layout):
                         break
             if found_kmi:
                 break
-        
+
         if found_kmi and found_km:
             row = leader_box.row(align=True)
             row.scale_y = 1.5
             row.label(text=f"{display_name}:")
             row.context_pointer_set("keymap", found_km)
             row.prop(found_kmi, "type", text="", full_event=True, emboss=True)
-    
+
 
 
     # Toggle Settings section
@@ -61,7 +186,7 @@ def draw_mappings_tab(prefs, context, layout):
     header_row = toggle_box.row()
     header_row.alignment = 'LEFT'
     toggle_box.separator()
-    
+
     r = toggle_box.row()
     r.alignment = 'LEFT'
     r.scale_y = 1.5
@@ -69,7 +194,7 @@ def draw_mappings_tab(prefs, context, layout):
     sub.alignment = 'LEFT'
     sub.label(text="Multi-Toggle Modifier:")
     sub.prop(prefs, "toggle_multi_modifier", text="")
-    
+
     toggle_box.separator()
 
     col.separator()
@@ -102,16 +227,43 @@ def draw_mappings_tab(prefs, context, layout):
 
     col.separator()
 
-    # Search box
-    search_row = col.row(align=True)
-    search_row.scale_y = 1.2
+
+    # Search box and Copy/Paste/Selection bar
+    search_main_row = col.row(align=True)
+    search_split = search_main_row.split(factor=0.75, align=True)
+
+    # Left side: Search bar (50%)
+    search_row = search_split.row(align=True)
+    search_row.scale_y = 1.3
     search_row.operator("chordsong.mapping_fold_all", text="", icon="TRIA_UP_BAR", emboss=False)
     search_row.separator()
     search_row.operator("chordsong.mapping_unfold_all", text="", icon="TRIA_DOWN_BAR", emboss=False)
     search_row.separator()
-    search_row.prop(prefs, "chord_search", text="", icon="VIEWZOOM", placeholder="Search... (c: chords | l: labels | o: operators | p: properties | t: toggles | s: scripts)")
+    search_row.prop(prefs, "chord_search", text="", icon="VIEWZOOM", placeholder="Search... (c: chords  l: labels  o: operators  p: properties  t: toggles  s: scripts)")
     if prefs.chord_search:
         search_row.operator("chordsong.clear_search", text="", icon="X", emboss=False)
+
+    search_row.separator()
+
+    # Right side: Copy/Paste/Selection buttons (50%)
+    button_row = search_split.row(align=True)
+    button_row.scale_y = 1.3
+
+    # Copy button changes appearance based on selection mode
+    copy_row = button_row.row(align=True)
+    if prefs.selection_mode:
+        copy_row.alert = True
+    copy_row.operator("chordsong.mapping_copy",
+                      text="Copy selected" if prefs.selection_mode else "Copy Start",
+                      icon="CHECKBOX_HLT" if prefs.selection_mode else "COPYDOWN")
+
+    button_row.separator()
+
+    # Paste button becomes Deselect All during selection mode
+    if prefs.selection_mode:
+        button_row.operator("chordsong.mapping_deselect_all", text="Deselect All", icon="CHECKBOX_DEHLT")
+    else:
+        button_row.operator("chordsong.mapping_paste", text="Paste", icon="PASTEDOWN")
 
     col.separator()
 
@@ -119,136 +271,13 @@ def draw_mappings_tab(prefs, context, layout):
     current_context = prefs.mapping_context_tab
     search_query = (prefs.chord_search or "").strip().lower()
 
-    def _matches_search(m, query):
-        """Check if a mapping matches the search query.
-        
-        Supports prefix filters:
-        - c: - search only in chords
-        - l: - search only in labels
-        - o: - search only in operators
-        - p: - search only in properties
-        - t: - search only in toggles
-        - s: - search only in scripts
-        """
-        if not query:
-            return True
-        
-        # Parse prefix filter
-        search_filter = None
-        search_term = query
-        
-        if len(query) >= 2 and query[1] == ':':
-            prefix = query[0]
-            if prefix in ('c', 'l', 'o', 'p', 't', 's'):
-                search_filter = prefix
-                search_term = query[2:].strip()
-                if not search_term:
-                    # If only prefix with no term, show all items of that type
-                    search_term = ""
-        
-        # Get mapping type for type-specific filtering
-        mapping_type = getattr(m, "mapping_type", "OPERATOR")
-        
-        # Search in chord
-        if search_filter is None or search_filter == 'c':
-            chord_str = get_str_attr(m, "chord") or ""
-            if not search_term or search_term in chord_str.lower():
-                if search_filter == 'c':
-                    return True
-                elif search_term in chord_str.lower():
-                    return True
-        
-        # Search in label
-        if search_filter is None or search_filter == 'l':
-            label_str = get_str_attr(m, "label") or ""
-            if not search_term or search_term in label_str.lower():
-                if search_filter == 'l':
-                    return True
-                elif search_term in label_str.lower():
-                    return True
-        
-        # Search based on mapping type
-        if mapping_type == "OPERATOR":
-            if search_filter is None or search_filter == 'o':
-                # Search in operator ID
-                operator_str = get_str_attr(m, "operator") or ""
-                if not search_term or search_term in operator_str.lower():
-                    if search_filter == 'o':
-                        return True
-                    elif search_term in operator_str.lower():
-                        return True
-                # Search in sub-operators
-                for sub_op in getattr(m, "sub_operators", []):
-                    sub_op_str = get_str_attr(sub_op, "operator") or ""
-                    if not search_term or search_term in sub_op_str.lower():
-                        if search_filter == 'o':
-                            return True
-                        elif search_term in sub_op_str.lower():
-                            return True
-        
-        elif mapping_type == "CONTEXT_PROPERTY":
-            if search_filter is None or search_filter == 'p':
-                # Search in property path
-                prop_path = get_str_attr(m, "context_path") or ""
-                if not search_term or search_term in prop_path.lower():
-                    if search_filter == 'p':
-                        return True
-                    elif search_term in prop_path.lower():
-                        return True
-                # Search in property value
-                prop_val = get_str_attr(m, "property_value") or ""
-                if not search_term or search_term in prop_val.lower():
-                    if search_filter == 'p':
-                        return True
-                    elif search_term in prop_val.lower():
-                        return True
-                # Search in sub-items
-                for sub_item in getattr(m, "sub_items", []):
-                    sub_path = get_str_attr(sub_item, "path") or ""
-                    sub_val = get_str_attr(sub_item, "value") or ""
-                    if not search_term or search_term in sub_path.lower() or search_term in sub_val.lower():
-                        if search_filter == 'p':
-                            return True
-                        elif search_term in sub_path.lower() or search_term in sub_val.lower():
-                            return True
-        
-        elif mapping_type == "CONTEXT_TOGGLE":
-            if search_filter is None or search_filter == 't':
-                # Search in toggle path
-                toggle_path = get_str_attr(m, "context_path") or ""
-                if not search_term or search_term in toggle_path.lower():
-                    if search_filter == 't':
-                        return True
-                    elif search_term in toggle_path.lower():
-                        return True
-                # Search in sub-items
-                for sub_item in getattr(m, "sub_items", []):
-                    sub_path = get_str_attr(sub_item, "path") or ""
-                    if not search_term or search_term in sub_path.lower():
-                        if search_filter == 't':
-                            return True
-                        elif search_term in sub_path.lower():
-                            return True
-        
-        elif mapping_type == "PYTHON_FILE":
-            if search_filter is None or search_filter == 's':
-                # Search in script file path
-                script_file = get_str_attr(m, "python_file") or ""
-                if not search_term or search_term in script_file.lower():
-                    if search_filter == 's':
-                        return True
-                    elif search_term in script_file.lower():
-                        return True
-        
-        return False
-
     groups = {}
     for idx, m in enumerate(prefs.mappings):
         mapping_context = getattr(m, "context", "VIEW_3D")
         # Include mappings with matching context or "ALL" context
         if mapping_context != current_context and mapping_context != "ALL":
             continue
-        
+
         # Apply search filter
         if not _matches_search(m, search_query):
             continue
@@ -271,15 +300,11 @@ def draw_mappings_tab(prefs, context, layout):
     # Draw grouped UI boxes
     for group_name in group_order:
         items = groups[group_name]
-        items.sort(
-            key=lambda im: (
-                get_str_attr(im[1], "chord").lower(),
-                get_str_attr(im[1], "label").lower(),
-            )
-        )
+        # Keep items in the order they appear in prefs.mappings (manual ordering)
+        # Don't sort automatically - users can use the sort button if they want alphabetical order
 
         is_expanded, expand_data, expand_prop = _get_group_expansion_state(prefs, group_name)
-        
+
         # Auto-expand groups when search is active
         if search_query:
             is_expanded = True
@@ -312,7 +337,7 @@ def draw_mappings_tab(prefs, context, layout):
                 if grp.name == group_name:
                     group_icon = grp.icon
                     break
-        
+
         # Show conflict indicator if group has conflicted chords
         if group_has_conflicts:
             row_left.alert = True
@@ -334,6 +359,11 @@ def draw_mappings_tab(prefs, context, layout):
         op = row_right.operator("chordsong.mapping_add", text="", icon="ADD", emboss=True)
         op.group = group_name
         op.context = prefs.mapping_context_tab
+        row_right.separator()
+        
+        # Sort group button
+        op = row_right.operator("chordsong.mapping_sort_group", text="", icon="SORTALPHA", emboss=True)
+        op.group_name = group_name
         row_right.separator()
 
         # Rename, Move, and Delete group buttons

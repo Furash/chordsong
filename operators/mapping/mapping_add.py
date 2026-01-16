@@ -47,6 +47,10 @@ class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
         last_index = len(p.mappings) - 1
         if last_index > 0:
             p.mappings.move(last_index, 0)
+        
+        # Update order indices to match new positions
+        for idx, mapping in enumerate(p.mappings):
+            mapping.order_index = idx
 
         # Autosave is handled by update callbacks, but adding a new item may not trigger them.
         from ..common import schedule_autosave_safe

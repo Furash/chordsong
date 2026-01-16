@@ -9,11 +9,11 @@ import bpy
 from ..common import prefs
 
 class CHORDSONG_OT_Group_Cleanup(bpy.types.Operator):
-    """Clean up duplicate groups and sync with mappings."""
+    """Clean up duplicate groups, normalize order indices, and sync with mappings."""
 
     bl_idname = "chordsong.group_cleanup"
     bl_label = "Clean Up Groups"
-    bl_description = "Remove duplicate groups and sync with mappings"
+    bl_description = "Remove duplicate groups, normalize order indices, and sync with mappings"
     bl_options = {"INTERNAL"}
 
     def execute(self, context):
@@ -46,10 +46,14 @@ class CHORDSONG_OT_Group_Cleanup(bpy.types.Operator):
             
             seen_names.add(name)
 
-        # 3. Trigger the actual sync via a delayed timer for stability
+        # 3. Normalize order indices for all mappings
+        from ...core.config_io import _normalize_order_indices
+        _normalize_order_indices(p.mappings)
+
+        # 4. Trigger the actual sync via a delayed timer for stability
         p.sync_groups_delayed(remove_unused=True)
 
-        # 4. Construct detailed report
+        # 5. Construct detailed report
         messages = []
         if duplicate_groups:
             messages.append(f"Merged duplicates: {', '.join(set(duplicate_groups))}")
@@ -61,7 +65,7 @@ class CHORDSONG_OT_Group_Cleanup(bpy.types.Operator):
             self.report({"INFO"}, report_str)
             print(f"CHORD SONG CLEANUP: {report_str}")
         else:
-            self.report({"INFO"}, "No empty or duplicate groups found")
+            self.report({"INFO"}, "Groups cleaned up")
 
         from ..common import schedule_autosave_safe
         schedule_autosave_safe(p, delay_s=5.0)

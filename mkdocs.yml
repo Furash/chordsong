@@ -65,6 +65,7 @@ nav:
     - Property: configuration/mappings/property.md
     - Toggle: configuration/mappings/toggle.md
     - Script: configuration/mappings/script.md
+    - Copy & Paste: configuration/chord_serialization.md
     - Autosave: configuration/autosave.md
     - Import & Export: configuration/import_export.md
   - Features:
@@ -73,6 +74,7 @@ nav:
     - Recents: features/recents.md
     - Scripts Overlay: features/scripts_overlay.md
     - Conflict Detection: features/conflicts.md
+    - Chords Sorting: features/sorting.md
   - Customization:
     - Overview: customization.md
     - Overlay: customization/overlay.md
