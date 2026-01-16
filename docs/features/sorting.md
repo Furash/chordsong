@@ -3,7 +3,7 @@
 Chord Song supports both **manual ordering** and **alphabetical sorting** of your chord mappings. The order you set in the preferences is reflected in both the UI and the main overlay.
 
 <!-- markdownlint-disable MD033 -->
-<video width="640" autoplay loop muted playsinline>
+<video autoplay loop muted playsinline>
   <source src="/chordsong/scr/chords_sorting.mp4" type="video/mp4">
 </video>
 <!-- markdownlint-enable MD033 -->

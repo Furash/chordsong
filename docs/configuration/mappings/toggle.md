@@ -40,7 +40,7 @@ Enable the **Sync** button (chain icon) on a mapping with multiple toggles to so
 **Multi-Toggle Mode** allows you to execute multiple toggle mappings sequentially without closing the overlay. This is useful when you need to adjust several toggles in quick succession.
 
 <!-- markdownlint-disable MD033 -->
-<video width="600" autoplay loop muted playsinline>
+<video autoplay loop muted playsinline>
   <source src="/chordsong/scr/multi_toggle.mp4" type="video/mp4">
 </video>
 <!-- markdownlint-enable MD033 -->

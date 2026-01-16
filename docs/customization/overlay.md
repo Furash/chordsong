@@ -17,7 +17,7 @@
 Automatically hides Tool (T) and Properties (N) panels in the active editor (3D Viewport, Node Editor, UV/Image Editor) while any overlay modal is running. Panels are restored to their original state when the modal closes.
 
 <!-- markdownlint-disable MD033 -->
-<video width="640" autoplay loop muted playsinline>
+<video autoplay loop muted playsinline>
   <source src="/chordsong/scr/panels_auto_hide.mp4" type="video/mp4">
 </video>
 <!-- markdownlint-enable MD033 -->
