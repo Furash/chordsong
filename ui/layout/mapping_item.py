@@ -253,7 +253,9 @@ def _draw_toggle_mapping(layout, m, idx):
             op.mapping_index = idx
             op.item_index = sub_idx
         
-        btns_split.label(text="") # Placeholder for 'Convert'
+        conv = btns_split.operator("chordsong.property_mapping_convert", text="Convert")
+        conv.index = idx
+        conv.sub_index = sub_idx
         
         op_block.separator(factor=0.4)
 

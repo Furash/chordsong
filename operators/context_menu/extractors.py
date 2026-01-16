@@ -2,6 +2,8 @@
 import re
 import bpy  # type: ignore
 
+from ...utils.context_path import normalize_bpy_data_path
+
 def parse_operator_from_text(text):
     """Parse operator ID and arguments from text like 'bpy.ops.uv.weld()' or 'bpy.ops.uv.weld(type="TEST")'.
 
@@ -69,12 +71,8 @@ def parse_property_from_text(text):
         path = match.group(1).strip()
         value = match.group(2).strip()
         
-        # Normalize some common bpy.data paths to context-relative paths if possible
-        # e.g. 'scenes["Scene"].cycles.use_denoising' -> 'scene.cycles.use_denoising'
-        if path.startswith('scenes['):
-            path = re.sub(r'^scenes\[.+?\]\.', 'scene.', path)
-        elif path.startswith('worlds['):
-            path = re.sub(r'^worlds\[.+?\]\.', 'world.', path)
+        # Normalize bpy.data paths using shared utility function
+        path = normalize_bpy_data_path(path)
 
         return path, value
 
@@ -219,8 +217,50 @@ def extract_from_button_pointer(button_pointer):
 
     return operator, button_operator, kwargs
 
-def extract_context_path(button_prop, button_pointer):
-    """Attempt to construct a context path for a property."""
+def extract_context_path(button_prop, button_pointer, context=None):
+    """Attempt to construct a context path for a property.
+    
+    First tries to get the full data path using bpy.ops.ui.copy_data_path_button,
+    then tries button_prop.data_path if available,
+    finally falls back to constructing the path from RNA type information.
+    """
+    # Try to get full data path using Blender's copy_data_path_button operator
+    # This gives us the complete path including intermediate properties
+    if context:
+        try:
+            wm = context.window_manager
+            old_clipboard = wm.clipboard
+            
+            # Use copy_data_path_button with context override to get the full path
+            with context.temp_override(button_prop=button_prop, button_pointer=button_pointer):
+                bpy.ops.ui.copy_data_path_button(full_path=True)
+            
+            new_clipboard = wm.clipboard
+            if new_clipboard and new_clipboard != old_clipboard:
+                # Restore clipboard
+                wm.clipboard = old_clipboard
+                
+                # Normalize bpy.data paths if present
+                normalized = normalize_bpy_data_path(new_clipboard)
+                if normalized:
+                    return normalized
+        except Exception:
+            pass
+    
+    # Fallback: Try to get full data path from button_prop if available
+    # This often contains the complete path including intermediate properties
+    if hasattr(button_prop, "data_path"):
+        data_path = button_prop.data_path
+        if data_path:
+            # Normalize bpy.data paths if present
+            normalized = normalize_bpy_data_path(data_path)
+            # Append property name if not already in the path
+            prop_name = button_prop.identifier
+            if not normalized.endswith(f".{prop_name}") and not normalized.endswith(prop_name):
+                return f"{normalized}.{prop_name}"
+            return normalized
+    
+    # Fallback to constructing path from RNA type information
     path_parts = []
     prop_name = button_prop.identifier
 

@@ -34,3 +34,43 @@ When multiple toggles are bound to one chord, they can get out of sync (e.g., Te
 Enable the **Sync** button (chain icon) on a mapping with multiple toggles to solve this:
 
 - **Enabled**: When pressed, all sub-toggles will match the state of the **primary** (first) toggle. On the first press, everything "snaps" to a unified state (all ON or all OFF), preventing the checker board effect.
+
+## Multi-Toggle Mode
+
+**Multi-Toggle Mode** allows you to execute multiple toggle mappings sequentially without closing the overlay. This is useful when you need to adjust several toggles in quick succession.
+
+<!-- markdownlint-disable MD033 -->
+<img src="/chordsong/scr/multi_toggle_mode.gif" alt="Multi-Toggle Mode" width="600">
+<!-- markdownlint-enable MD033 -->
+
+### How It Works
+
+1. Hold your configured modifier key (Ctrl, Alt, or Shift)
+2. Execute a toggle mapping
+3. The toggle flips, and the overlay remains open
+4. The buffer reverts to the previous state, ready for the next toggle
+5. Release the modifier to close the overlay
+
+### Configuration
+
+In **Preferences > Chord Song > Mappings tab > Toggle Settings section**, set your preferred **Multi-Toggle Modifier**:
+
+<!-- markdownlint-disable MD033 -->
+<img src="/chordsong/scr/multi_toggle_select.png" alt="Multi-Toggle Select" width="600">
+<!-- markdownlint-enable MD033 -->
+
+- **Ctrl** (default): Hold Ctrl while executing toggles
+- **Alt**: Hold Alt while executing toggles  
+- **Shift**: Hold Shift while executing toggles
+
+### Example Usage
+
+With a chord sequence like `t 1` for wireframe and `t 2` for overlays:
+
+1. Press `Space` (leader key)
+2. Press `t` (toggle prefix)
+3. Hold **Ctrl** and press `1` → wireframe toggles, overlay stays open at `t`
+4. Still holding **Ctrl**, press `2` → overlays toggle, overlay stays open at `t`
+5. Release **Ctrl** to close
+
+This allows rapid adjustment of multiple visual settings without re-entering the chord sequence each time.

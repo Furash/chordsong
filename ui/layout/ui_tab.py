@@ -12,6 +12,7 @@ def draw_ui_tab(prefs, layout):
     r = box.row(align=True)
     r.scale_y = 1.5
     r.prop(prefs, "overlay_hide_panels", toggle=True, text="Hide T & N Panels During Leader", icon='MENU_PANEL')
+    
     r = box.row(align=True)
     r.prop(prefs, "overlay_enabled", toggle=True, text="Global Overlay Visibility")
     r.prop(prefs, "overlay_fading_enabled", toggle=True, text="Enable Fading Overlay")

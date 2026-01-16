@@ -283,21 +283,35 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
         if context and mapping_type == "CONTEXT_TOGGLE":
             try:
                 path = get_str_attr(m, "context_path")
-                # Very basic evaluation
+                # Very basic evaluation - match the logic used in toggle execution
                 if path:
-                    # Resolve path against context
+                    # Resolve path against context (same logic as do_toggle_path)
                     obj = context
                     parts = path.split(".")
                     for part in parts[:-1]:
-                        obj = getattr(obj, part)
-                    val = getattr(obj, parts[-1])
+                        next_obj = getattr(obj, part, None)
+                        if next_obj is None:
+                            # Path resolution failed, fallback to switch icon
+                            raise AttributeError(f"Could not resolve path part: {part}")
+                        obj = next_obj
+                    prop_name = parts[-1]
+                    if not hasattr(obj, prop_name):
+                        # Property doesn't exist, fallback to switch icon
+                        raise AttributeError(f"Property not found: {prop_name}")
+                    val = getattr(obj, prop_name)
+                    if not isinstance(val, bool):
+                        # Not a boolean, fallback to switch icon
+                        raise TypeError(f"Property is not boolean: {prop_name}")
                     # User icons: 󰨙 (off) and 󰨚 (on/switch)
                     if bool(val):
                         label = f"{label}  󰨚"
                     else:
                         label = f"{label}  󰨙"
+            except (AttributeError, TypeError, ReferenceError):
+                # Path resolution failed or property doesn't exist, fallback to switch icon
+                label = f"{label}  󰨚"
             except Exception:
-                # Fallback to switch icon
+                # Other errors, fallback to switch icon
                 label = f"{label}  󰨚"
         elif mapping_type == "CONTEXT_TOGGLE":
              label = f"{label}  󰨚"

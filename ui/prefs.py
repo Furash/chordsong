@@ -239,7 +239,7 @@ def _operator_search_callback(self, context, edit_text):
     
     Returns a list of operator idnames matching the search text.
     Uses cached operator list for performance.
-    Supports fuzzy matching: "iops f2" will match "iops.f2"
+    Supports fuzzy matching: "add op" will match "addon.operator"
     """
     try:
         # Get cached operator list
@@ -598,6 +598,18 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Hide T & N Panels",
         description="Hide Tool (T) and Properties (N) panels while Leader key modal is active",
         default=True,
+        update=_on_prefs_changed,
+    )
+    
+    toggle_multi_modifier: EnumProperty(
+        name="Multi-Toggle Modifier",
+        description="Hold this modifier while executing a toggle to keep overlay open for multiple toggles",
+        items=[
+            ('CTRL', "Ctrl", "Hold Ctrl to execute multiple toggles"),
+            ('ALT', "Alt", "Hold Alt to execute multiple toggles"),
+            ('SHIFT', "Shift", "Hold Shift to execute multiple toggles"),
+        ],
+        default='CTRL',
         update=_on_prefs_changed,
     )
     overlay_max_items: IntProperty(

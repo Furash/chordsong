@@ -1,6 +1,7 @@
 """Utility modules for Chord Song."""
 
 from .fuzzy import fuzzy_match
+from .context_path import normalize_bpy_data_path
 from .render import (
     DrawHandlerManager,
     calculate_overlay_position,
@@ -13,6 +14,7 @@ from .render import (
 
 __all__ = [
     "fuzzy_match",
+    "normalize_bpy_data_path",
     "DrawHandlerManager",
     "calculate_overlay_position",
     "calculate_scale_factor",

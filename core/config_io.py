@@ -118,6 +118,7 @@ def dump_prefs(prefs) -> dict:
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
             "fading_enabled": bool(getattr(prefs, "overlay_fading_enabled", True)),
             "hide_panels": bool(getattr(prefs, "overlay_hide_panels", True)),
+            "toggle_multi_modifier": getattr(prefs, "toggle_multi_modifier", "CTRL"),
             "show_header": bool(getattr(prefs, "overlay_show_header", True)),
             "show_footer": bool(getattr(prefs, "overlay_show_footer", True)),
             "max_items": int(getattr(prefs, "overlay_max_items", 14)),
@@ -419,6 +420,12 @@ def apply_config(prefs, data: dict) -> list[str]:
         for key, attr in bool_props.items():
             if key in overlay:
                 setattr(prefs, attr, bool(overlay[key]))
+        
+        # Load toggle_multi_modifier (enum string, not bool)
+        if "toggle_multi_modifier" in overlay:
+            modifier = overlay["toggle_multi_modifier"]
+            if modifier in ["CTRL", "ALT", "SHIFT"]:
+                prefs.toggle_multi_modifier = modifier
         
         if "ungrouped_expanded" in overlay:
             prefs.ungrouped_expanded = bool(overlay["ungrouped_expanded"])

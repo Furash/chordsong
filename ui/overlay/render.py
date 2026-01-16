@@ -711,8 +711,9 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         # Compute candidates from filtered mappings
         # For scripts overlay, bypass candidates_for_prefix to handle empty chords
         if scripts_overlay_settings:
-            # Directly convert mappings to candidates for scripts overlay
+            # Directly convert mappings to candidates for scripts overlay or toggle multi-execution mode
             # For scripts overlay, all items are already filtered and should be displayed
+            # For toggle multi-execution mode with empty buffer, show all toggle mappings as final items
             from ...core.engine import Candidate, split_chord, get_str_attr, tokens_match
             cands = []
             for m in filtered_mappings:

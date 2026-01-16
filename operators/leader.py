@@ -439,6 +439,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Use the buffer tokens for overlay rendering with filtered mappings
         # draw_overlay handles context.region being None gracefully (uses defaults: 600x400)
         buffer_tokens = self._buffer or []
+        
         draw_overlay(context, p, buffer_tokens, filtered_mappings)
 
     def invoke(self, context: bpy.types.Context, _event: bpy.types.Event):
@@ -450,6 +451,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         self._buffer = []
         self._scroll_offset = 0
+        # Track modifier keys for multi-toggle feature
+        self._ctrl_held = False
+        self._alt_held = False
+        self._shift_held = False
 
         # Detect the current editor context
         self._context_type = self._detect_context(context)
@@ -603,6 +608,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self._panel_states = {}
 
     def _finish(self, context: bpy.types.Context, restore_panels=True):  # pylint: disable=unused-argument
+        # Finish modal cleanup - reset all modifier tracking
+        self._ctrl_held = False
+        self._alt_held = False
+        self._shift_held = False
         # Restore T & N panels if they were hidden (unless transitioning to Recents)
         if restore_panels:
             self._restore_panels(context)
@@ -650,18 +659,44 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 self._finish(context)
                 return {"CANCELLED"}
 
+        # Handle modifier key events BEFORE checking event.value to catch RELEASE events
+        # Track CTRL
+        if event.type in {"LEFT_CTRL", "RIGHT_CTRL"}:
+            if event.value == "RELEASE":
+                self._ctrl_held = False
+                self._last_mod_type = event.type
+                return {"RUNNING_MODAL"}
+            elif event.value == "PRESS":
+                self._ctrl_held = True
+                self._last_mod_type = event.type
+                return {"RUNNING_MODAL"}
+        
+        # Track ALT
+        if event.type in {"LEFT_ALT", "RIGHT_ALT"}:
+            if event.value == "RELEASE":
+                self._alt_held = False
+                self._last_mod_type = event.type
+                return {"RUNNING_MODAL"}
+            elif event.value == "PRESS":
+                self._alt_held = True
+                self._last_mod_type = event.type
+                return {"RUNNING_MODAL"}
+        
+        # Track SHIFT
+        if event.type in {"LEFT_SHIFT", "RIGHT_SHIFT"}:
+            if event.value == "RELEASE":
+                self._shift_held = False
+                self._last_mod_type = event.type
+                return {"RUNNING_MODAL"}
+            elif event.value == "PRESS":
+                self._shift_held = True
+                self._last_mod_type = event.type
+                return {"RUNNING_MODAL"}
+
         if event.value != "PRESS":
             return {"RUNNING_MODAL"}
-
-        # Track the last modifier key pressed to determine which side (left/right) it was on.
-        # This allows supporting AHK symbols like <^ (LCtrl) or >! (RAlt).
-        if event.type in {
-            "LEFT_SHIFT", "RIGHT_SHIFT",
-            "LEFT_CTRL", "RIGHT_CTRL",
-            "LEFT_ALT", "RIGHT_ALT",
-        }:
-            self._last_mod_type = event.type
-            return {"RUNNING_MODAL"}
+        
+        # Modifier keys are already handled above, no need to track them here
 
         # Determine the side of the relevant modifier
         mod_side = None
@@ -671,6 +706,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             elif "RIGHT" in self._last_mod_type:
                 mod_side = "RIGHT"
 
+        # Normal token normalization - CTRL is always included in the token
+        ctrl_held = getattr(self, '_ctrl_held', False) or event.ctrl
+        
         tok = normalize_token(
             event.type,
             shift=event.shift,
@@ -679,6 +717,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             oskey=event.oskey,
             mod_side=mod_side
         )
+        
         if tok is None:
             return {"RUNNING_MODAL"}
 
@@ -712,14 +751,64 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     _panel_states_global = {}
             return {"FINISHED"}
 
+        # Normal mode - accumulate tokens in buffer
         self._buffer.append(tok)
+        
         self._scroll_offset = 0  # Reset scroll when adding to buffer
 
         # Filter mappings by context
         filtered_mappings = filter_mappings_by_context(p.mappings, self._context_type)
-
-        # Exact match?
+        
+        # Try exact match with current buffer
         m = find_exact_mapping(filtered_mappings, self._buffer)
+        
+        # If no match and a modifier is held, try matching without that modifier token
+        # This handles cases where user presses Modifier+key but the mapping is just "key"
+        # Get the configured multi-toggle modifier
+        p = prefs(context)
+        toggle_modifier = p.toggle_multi_modifier
+        
+        # Check if the configured modifier is held
+        modifier_held = False
+        modifier_symbol = ''
+        if toggle_modifier == 'CTRL':
+            modifier_held = ctrl_held
+            modifier_symbol = '^'
+        elif toggle_modifier == 'ALT':
+            modifier_held = getattr(self, '_alt_held', False) or event.alt
+            modifier_symbol = '!'
+        elif toggle_modifier == 'SHIFT':
+            modifier_held = getattr(self, '_shift_held', False) or event.shift
+            modifier_symbol = '+'
+        
+        if not m and modifier_held:
+            # Extract base keys from tokens that have the configured modifier
+            # Use _get_token_parts to properly parse tokens like <^b into base 'b'
+            from ..core.engine import _get_token_parts
+            buffer_without_modifier = []
+            for t in self._buffer:
+                mods, base = _get_token_parts(t)
+                # Check if this token has the configured modifier
+                has_modifier = modifier_symbol in mods or f'<{modifier_symbol}' in mods or f'>{modifier_symbol}' in mods
+                if has_modifier:
+                    # Extract base key (e.g., 'b' from '<^b')
+                    if base:
+                        buffer_without_modifier.append(base)
+                    # If no base (shouldn't happen), skip this token
+                else:
+                    # No matching modifier, keep token as-is
+                    buffer_without_modifier.append(t)
+            
+            if buffer_without_modifier != self._buffer:
+                # Buffer had modifier tokens, try matching without them
+                toggle_mappings = [m for m in filtered_mappings if getattr(m, 'mapping_type', None) == 'CONTEXT_TOGGLE']
+                if toggle_mappings:
+                    toggle_match = find_exact_mapping(toggle_mappings, buffer_without_modifier)
+                    if toggle_match:
+                        # Found a toggle match without modifier - use that
+                        m = toggle_match
+                        # Update buffer to remove modifier tokens for consistency
+                        self._buffer = buffer_without_modifier
         if m:
             mapping_type = getattr(m, "mapping_type", "OPERATOR")
 
@@ -847,10 +936,33 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     self._finish(context)
                     return {"CANCELLED"}
 
-                # Capture viewport context BEFORE finishing modal
+                # Capture viewport context BEFORE modifying buffer
                 ctx_viewport = capture_viewport_context(context)
 
-                self._finish(context)
+                # Check if configured modifier is held - if so, remove last token and keep modal open
+                # Get the configured modifier from preferences
+                p = prefs(context)
+                toggle_modifier = p.toggle_multi_modifier  # 'CTRL', 'ALT', 'SHIFT', or 'OSKEY'
+                
+                # Check if the configured modifier is held
+                modifier_held = False
+                if toggle_modifier == 'CTRL':
+                    modifier_held = getattr(self, '_ctrl_held', False) or event.ctrl
+                elif toggle_modifier == 'ALT':
+                    modifier_held = getattr(self, '_alt_held', False) or event.alt
+                elif toggle_modifier == 'SHIFT':
+                    modifier_held = getattr(self, '_shift_held', False) or event.shift
+                
+                if not modifier_held:
+                    # Normal behavior: finish modal after toggle
+                    self._finish(context)
+                else:
+                    # Modifier held: remove the last token from buffer and keep modal open
+                    # This puts us back to the state before the last key was pressed
+                    if self._buffer:
+                        self._buffer.pop()
+                    self._scroll_offset = 0
+                    self._tag_redraw()
 
                 def execute_toggle_delayed():
                     try:
@@ -926,7 +1038,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             run_logic()
                         
                         # Show fading overlay with multi-status if applicable
-                        if results:
+                        # Skip fading overlay if modifier is held (modal stays open)
+                        if results and not modifier_held:
                             overlay_label = ""
                             if len(results) == 1:
                                 status = "ON" if results[0] else "OFF"
@@ -975,6 +1088,13 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             context_path=context_path,
                             execution_context=ctx_viewport,
                         )
+                        
+                        # Clear overlay cache so toggle state is re-evaluated on next redraw
+                        from ..ui.overlay.cache import clear_overlay_cache
+                        clear_overlay_cache()
+                        # Force redraw to update toggle icon immediately
+                        # In toggle multi-execution mode, ensure overlay refreshes with all toggle mappings
+                        self._tag_redraw()
 
                     except Exception as e:
                         import traceback
@@ -983,7 +1103,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     return None
 
                 bpy.app.timers.register(execute_toggle_delayed, first_interval=0.01)
-                return {"FINISHED"}
+                
+                # If modifier is held, keep modal running; otherwise finish
+                if modifier_held:
+                    return {"RUNNING_MODAL"}
+                else:
+                    return {"FINISHED"}
 
             # Handle context property execution
             if mapping_type == "CONTEXT_PROPERTY":
@@ -1260,13 +1385,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             return {"FINISHED"}
 
         # Still a prefix?
-        cands = candidates_for_prefix(filtered_mappings, self._buffer)
+        cands = candidates_for_prefix(filtered_mappings, self._buffer, context=context)
         if cands:
             self._tag_redraw()
             return {"RUNNING_MODAL"}
 
         # No match
         from ..core.engine import humanize_chord
-        self.report({"WARNING"}, f'Unknown chord: "{humanize_chord(self._buffer)}"')
+        chord_str = humanize_chord(self._buffer)
+        self.report({"WARNING"}, f'Unknown chord: "{chord_str}"')
         self._finish(context)
         return {"CANCELLED"}

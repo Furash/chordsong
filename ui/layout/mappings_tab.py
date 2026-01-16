@@ -18,7 +18,7 @@ def draw_mappings_tab(prefs, context, layout):
 
     # Header
     header_row = leader_box.row()
-    header_row.alignment = 'CENTER'
+    header_row.alignment = 'LEFT'
     header_row.label(text="Leader Key Bindings:", icon='KEYINGSET')
     leader_box.separator()
 
@@ -54,7 +54,23 @@ def draw_mappings_tab(prefs, context, layout):
             row.context_pointer_set("keymap", found_km)
             row.prop(found_kmi, "type", text="", full_event=True, emboss=True)
     
-    leader_box.separator()
+
+
+    # Toggle Settings section
+    toggle_box = col.box()
+    header_row = toggle_box.row()
+    header_row.alignment = 'LEFT'
+    toggle_box.separator()
+    
+    r = toggle_box.row()
+    r.alignment = 'LEFT'
+    r.scale_y = 1.5
+    sub = r.row(align=True)
+    sub.alignment = 'LEFT'
+    sub.label(text="Multi-Toggle Modifier:")
+    sub.prop(prefs, "toggle_multi_modifier", text="")
+    
+    toggle_box.separator()
 
     col.separator()
 

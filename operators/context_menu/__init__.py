@@ -14,6 +14,7 @@ from .extractors import (
     detect_editor_context
 )
 from .suggester import suggest_chord
+from ...utils.context_path import normalize_bpy_data_path
 
 class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
     """Add a chord mapping for this UI element"""
@@ -151,6 +152,7 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
                             self.sub_operators_json = json.dumps(results[1:])
                     
                     elif first['type'] == 'PROPERTY':
+                        # Path is already normalized by parse_property_from_text
                         self.context_path = first['path']
                         self.property_value = first['value']
                         
@@ -178,7 +180,10 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
 
             # 3. Check if it's a property (from UI interaction, not Info selection)
             if button_prop and button_pointer and not button_operator and not self.context_path:
-                self.context_path = extract_context_path(button_prop, button_pointer)
+                self.context_path = extract_context_path(button_prop, button_pointer, context=context)
+                # Normalize bpy.data paths if present (should already be normalized, but ensure it)
+                if self.context_path:
+                    self.context_path = normalize_bpy_data_path(self.context_path)
                 self.name = button_prop.name or button_prop.identifier.replace("_", " ").title()
                 self.editor_context = detect_editor_context(context, kwargs=self.kwargs)
 
@@ -304,10 +309,13 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
                 except Exception:
                     pass
             
+            # Use appropriate icon based on mapping type
+            path_icon = "CHECKBOX_HLT" if self.mapping_type == "CONTEXT_TOGGLE" else "PROPERTIES"
+            
             if sub_count > 0:
-                col.label(text=f"Multiple {self.mapping_type.split('_')[-1].title()}s: {self.context_path} + {sub_count} more", icon="CHECKBOX_HLT")
+                col.label(text=f"Multiple {self.mapping_type.split('_')[-1].title()}s: {self.context_path} + {sub_count} more", icon=path_icon)
             else:
-                col.label(text=f"Path: {self.context_path}", icon="CHECKBOX_HLT")
+                col.label(text=f"Path: {self.context_path}", icon=path_icon)
         else:
             if self.operator:
                 import json
@@ -339,6 +347,13 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
         col.prop(self, "chord", text="")
         col.separator()
 
+        # Show mapping type indicator
+        if self.mapping_type == "CONTEXT_TOGGLE":
+            col.label(text="Type: Toggle", icon="CHECKBOX_HLT")
+        elif self.mapping_type == "CONTEXT_PROPERTY":
+            col.label(text="Type: Property", icon="PROPERTIES")
+        col.separator()
+
         col.label(text="Editor Context:")
         row = col.row(align=True)
         row.prop(self, "editor_context", expand=True)
@@ -357,6 +372,11 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
         if not self.chord:
             self.report({'WARNING'}, "Please enter a chord")
             return {"CANCELLED"}
+
+        # Normalize context_path if it contains bpy.data or matches indexed collection pattern
+        # This handles both manually entered paths and paths from Info panel
+        if self.context_path:
+            self.context_path = normalize_bpy_data_path(self.context_path)
 
         if self.mapping_type == "CONTEXT_TOGGLE":
             if not self.context_path:
