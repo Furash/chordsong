@@ -22,6 +22,40 @@ def spacify(text):
     """Add spaces between each character."""
     return " ".join(text) if text else ""
 
+def has_prefix_conflict(candidate, existing_chords):
+    """Check if a candidate chord has a prefix conflict with existing chords.
+    
+    A conflict exists if:
+    - The candidate exactly matches an existing chord
+    - The candidate is a prefix of an existing chord (blocks it)
+    - An existing chord is a prefix of the candidate (blocks it)
+    
+    Args:
+        candidate: The chord to check
+        existing_chords: Set of existing chord strings
+        
+    Returns:
+        True if there's a conflict, False otherwise
+    """
+    candidate_lower = candidate.strip().lower()
+    
+    for existing in existing_chords:
+        existing_lower = existing.strip().lower()
+        
+        # Exact match
+        if candidate_lower == existing_lower:
+            return True
+        
+        # Check if candidate is a prefix of existing (e.g., "m p" blocks "m p c")
+        if existing_lower.startswith(candidate_lower + " "):
+            return True
+        
+        # Check if existing is a prefix of candidate (e.g., "m p c" blocked by "m p")
+        if candidate_lower.startswith(existing_lower + " "):
+            return True
+    
+    return False
+
 def suggest_chord(group, label):
     """Generate a smart chord suggestion based on group and label.
 
@@ -58,9 +92,9 @@ def suggest_chord(group, label):
             spacify(label_initials),  # Just label initials with spaces
         ]
 
-    # Find first non-conflicting chord
+    # Find first non-conflicting chord (including prefix conflicts)
     for candidate in candidates:
-        if candidate and candidate not in existing_chords:
+        if candidate and not has_prefix_conflict(candidate, existing_chords):
             return candidate
 
     # If all conflict, try adding a number suffix
@@ -69,7 +103,7 @@ def suggest_chord(group, label):
             continue
         for i in range(1, 10):
             numbered = f"{candidate} {i}"
-            if numbered not in existing_chords:
+            if not has_prefix_conflict(numbered, existing_chords):
                 return numbered
 
     # Last resort: return empty and let user decide

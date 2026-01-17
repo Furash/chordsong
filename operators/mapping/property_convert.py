@@ -92,9 +92,30 @@ class CHORDSONG_OT_Property_Mapping_Convert(bpy.types.Operator):
             if not m.group:
                 m.group = "Toggle" if is_toggle else "Property"
 
+            # Suggest chord only if:
+            # 1. There is no existing chord, OR
+            # 2. The existing chord conflicts with another mapping (exact or prefix)
             try:
-                from ..context_menu.suggester import suggest_chord
-                m.chord = suggest_chord(m.group, label)
+                from ..context_menu.suggester import suggest_chord, has_prefix_conflict
+                current_chord = m.chord.strip().lower()
+                should_suggest = False
+                
+                # Suggest if no chord exists
+                if not current_chord:
+                    should_suggest = True
+                else:
+                    # Check if current chord conflicts with another enabled mapping
+                    # (including prefix conflicts)
+                    other_chords = set()
+                    for other_m in p.mappings:
+                        if other_m != m and other_m.enabled and other_m.chord.strip():
+                            other_chords.add(other_m.chord.strip().lower())
+                    
+                    if has_prefix_conflict(current_chord, other_chords):
+                        should_suggest = True
+                
+                if should_suggest:
+                    m.chord = suggest_chord(m.group, label)
             except Exception:
                 pass
 

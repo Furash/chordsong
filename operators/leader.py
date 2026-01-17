@@ -1409,8 +1409,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             self._tag_redraw()
             return {"RUNNING_MODAL"}
 
-        # No match
+        # No match - remove only the last token and keep modal running so user can try again
         chord_str = humanize_chord(self._buffer)
         self.report({"WARNING"}, f'Unknown chord: "{chord_str}"')
-        self._finish(context)
-        return {"CANCELLED"}
+        if self._buffer:
+            self._buffer.pop()  # Remove only the last token
+        self._tag_redraw()
+        return {"RUNNING_MODAL"}
