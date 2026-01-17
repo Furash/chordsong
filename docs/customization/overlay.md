@@ -53,23 +53,23 @@ Controls overlay position.
 
 ### Overlay Style Presets
 
-Choose one of the 4 preset styles:
+Choose the display style:
 
 <!-- markdownlint-disable MD033 -->
-<img src="/chordsong/scr/overlay_style_a.png" alt="Default">
-<img src="/chordsong/scr/overlay_style_b.png" alt="Groups After">
-<img src="/chordsong/scr/overlay_style_c.png" alt="Groups First ::">
-<img src="/chordsong/scr/overlay_style_d.png" alt="Groups First ->">
+<img src="/chordsong/scr/display_style_default.png" alt="Default">
+<img src="/chordsong/scr/display_style_custom.png" alt="Custom">
 <!-- markdownlint-enable MD033 -->
 
 - **Default**: Simple count display (`a → +5 keymaps`)
-- **Groups After**: Count first, then groups (`a → +5 keymaps :: Modeling`)
-- **Groups First**: Groups first, then count (`a → Modeling → 5 keymaps`)
-- **Hybrid**: Minimal with groups and compact count (`a → Modeling :: +5`)
+- **Custom**: Custom format strings using tokens.
 
 ### Custom Format Strings
 
 When **Custom** style is selected, you can define your own format strings using a token system:
+
+<!-- markdownlint-disable MD033 -->
+<img src="/chordsong/scr/format_strings.png" alt="Custom Format Strings">
+<!-- markdownlint-enable MD033 -->
 
 **Available Tokens:**
 
@@ -84,17 +84,22 @@ When **Custom** style is selected, you can define your own format strings using 
 - `S` = Separator A (default: `→`)
 - `s` = Separator B (default: `::`)
 
-**Format Strings:**
-
 - **Folder Format**: Controls how folders (prefixes with multiple mappings) are displayed
 - **Item Format**: Controls how individual chord items are displayed
 
 **Example Custom Formats:**
 
-- Folder: `C S G s n` → `a → Modeling :: +5`
-- Folder with group icon: `C i S G s n` → `a  Modeling :: +5` (shows group icon before group name)
-- Item: `C I L` → `a  Save`
-- Item with group icon: `C i I L` → `a   Save` (shows both group icon and mapping icon)
+- Folder: `C n s g` → *Chord* *Count* *Separator_B* *First Group's Label*
+
+<!-- markdownlint-disable MD033 -->
+<img src="/chordsong/scr/custom_folder_string.png" alt="Folder Format" width="150">
+<!-- markdownlint-enable MD033 -->
+
+- Item: `C I S L T` → *Chord* *Icon* *separator_A* *Label* *Toggle*
+
+<!-- markdownlint-disable MD033 -->
+<img src="/chordsong/scr/custom_item_string.png" alt="Item Format" width="250">
+<!-- markdownlint-enable MD033 -->
 
 ### Theme Management
 
@@ -110,28 +115,6 @@ The **Match Current Blender Theme** button automatically extracts colors from yo
 
 - **Export**: Save your current overlay theme colors to a JSON file for backup or sharing
 - **Import**: Load theme colors from a previously exported JSON file
-
-Theme files include all color settings:
-
-- Chord, Label, Icon, Group, Counter colors
-- Toggle states (ON/OFF)
-- Header, Footer, Recents key colors
-- Separators and background colors
-
-### Colors & Opacity
-
-Full control over per-element colors and opacity:
-
-- **Chord Color**: Color of the chord sequence text
-- **Label Color**: Color of the action description
-- **Icon Color**: Color of Nerd Font icons
-- **Group Color**: Color of group names in overlay
-- **Counter Color**: Color of item count text
-- **Toggle ON/OFF**: Colors for toggle state indicators
-- **Header Text**: Color of overlay header text
-- **Recents Key**: Color of recent actions hotkey indicator
-- **Separators**: Color and opacity of separator lines
-- **Backgrounds**: Colors for list, header, and footer backgrounds (with opacity control)
 
 ## Testing
 
