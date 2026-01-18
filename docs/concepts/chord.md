@@ -72,6 +72,25 @@ Numpad keys are prefixed with `n` to distinguish them from the main row numbers.
 | `n+` | Numpad + | `n.` | Numpad . |
 | `nenter` | Numpad Enter | | |
 
+### Mouse Buttons and Wheel
+
+Mouse buttons and wheel scrolling can be used as chord tokens.
+
+| Token | Input | Token | Input |
+| :--- | :--- | :--- | :--- |
+| `m1` | Left Mouse Button | `m2` | Right Mouse Button |
+| `m3` | Middle Mouse Button | `m4` | Mouse Button 4 |
+| `m5` | Mouse Button 5 | `mwu` | Mouse Wheel Up |
+| `mwd` | Mouse Wheel Down | | |
+
+**Examples:**
+
+| Chord | Combination | Description |
+| :--- | :--- | :--- |
+| `m1` | Left click | Single mouse button as chord token. |
+| `^m1` | Ctrl + Left click | Mouse button with modifier. |
+| `m3 f` | Middle click, then F | Mouse button followed by key. |
+
 !!! note "Token Matching"
     **Order Independent Modifiers**: `^!a` is the same as `!^a`.
 

@@ -65,13 +65,21 @@ def normalize_token(event_type: str, shift: bool = False, ctrl: bool = False, al
             "PAGE_UP": "pageup", "PAGE_DOWN": "pagedown",
             "HOME": "home", "END": "end",
             "INSERT": "insert", "DEL": "delete",
-            # Function keys
+            # Function keys F1 - F24
             "F1": "f1", "F2": "f2", "F3": "f3", "F4": "f4", "F5": "f5", "F6": "f6",
             "F7": "f7", "F8": "f8", "F9": "f9", "F10": "f10", "F11": "f11", "F12": "f12",
+            "F13": "f13", "F14": "f14", "F15": "f15", "F16": "f16", "F17": "f17", "F18": "f18",
+            "F19": "f19", "F20": "f20", "F21": "f21", "F22": "f22", "F23": "f23", "F24": "f24",
             # Numpad Operators
             "NUMPAD_SLASH": "n/", "NUMPAD_ASTERISK": "n*",
             "NUMPAD_MINUS": "n-", "NUMPAD_PLUS": "n+",
             "NUMPAD_ENTER": "nenter", "NUMPAD_PERIOD": "n.",
+            # Mouse buttons 1-7
+            "LEFTMOUSE": "m1", "RIGHTMOUSE": "m2", "MIDDLEMOUSE": "m3",
+            "BUTTON4MOUSE": "m4", "BUTTON5MOUSE": "m5", "BUTTON6MOUSE": "m6",
+            "BUTTON7MOUSE": "m7",
+            # Mouse wheel
+            "WHEELUPMOUSE": "mwu", "WHEELDOWNMOUSE": "mwd",
         }
         base = named.get(event_type, None)
 
