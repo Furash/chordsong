@@ -255,20 +255,44 @@ def register():
             if user_config_path:
                 prefs.config_path = user_config_path
 
-            # Initialize defaults only on first install (no config path, no mappings)
-            if not user_config_path and not has_existing_mappings:
-                if hasattr(prefs, "ensure_defaults"):
-                    prefs.ensure_defaults()
-
-            # Auto-load user's config on addon enable
-            # (mappings collection is cleared on disable, but config_path.txt persists)
-            if not has_existing_mappings and user_config_exists:
+            # Auto-load user's config on startup if config path is set and file exists
+            # This ensures the config file is the source of truth
+            if user_config_exists:
                 try:
                     with open(user_config_path, "r", encoding="utf-8") as f:
                         data = loads_json(f.read())
                     apply_config(prefs, data)
                 except Exception:
                     pass
+            # Load bundled default config only on first install (no user config exists)
+            elif not user_config_exists and not has_existing_mappings:
+                default_path = default_config_path()
+                config_file_exists = default_path and os.path.exists(default_path)
+
+                # Load from default location if it exists
+                if config_file_exists:
+                    try:
+                        with open(default_path, "r", encoding="utf-8") as f:
+                            data = loads_json(f.read())
+                        apply_config(prefs, data)
+                    except Exception:
+                        pass
+                # Otherwise load bundled defaults as fallback
+                else:
+                    try:
+                        from .operators.config.load_default import _get_default_config_path
+                        bundled_config_path = _get_default_config_path()
+
+                        if os.path.exists(bundled_config_path):
+                            with open(bundled_config_path, "r", encoding="utf-8") as f:
+                                data = loads_json(f.read())
+                            apply_config(prefs, data)
+                    except Exception:
+                        pass
+            # Initialize defaults only if no config and no mappings
+            elif not user_config_path and not has_existing_mappings:
+                if hasattr(prefs, "ensure_defaults"):
+                    prefs.ensure_defaults()
             
             # Normalize order indices (for existing blend files with old data)
             # This ensures no gaps in the sequence even if loading old configs
@@ -278,22 +302,6 @@ def register():
                 # Schedule an autosave to persist the normalized indices
                 from .operators.common import schedule_autosave_safe
                 schedule_autosave_safe(prefs, delay_s=2.0)
-
-            # Load bundled default config only on first install (no saved config found)
-            default_path = default_config_path()
-            config_file_exists = default_path and os.path.exists(default_path)
-
-            if not has_existing_mappings and not user_config_exists and not config_file_exists:
-                try:
-                    from .operators.config.load_default import _get_default_config_path
-                    bundled_config_path = _get_default_config_path()
-
-                    if os.path.exists(bundled_config_path):
-                        with open(bundled_config_path, "r", encoding="utf-8") as f:
-                            data = loads_json(f.read())
-                        apply_config(prefs, data)
-                except Exception:
-                    pass
         finally:
             # Re-enable callbacks now that initialization is complete
             prefs_module._SUSPEND_CALLBACKS = False
