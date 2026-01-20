@@ -67,8 +67,23 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         history = get_history()
         entries = history.get_all()
 
+        # Use the stored context from DrawHandlerManager if available
+        # This prevents crashes when context.region is None or invalid
+        context = bpy.context
+        if self._draw_manager and self._draw_manager.region:
+            # Create a temporary context wrapper that uses our stored region
+            class ContextWithRegion:
+                def __init__(self, original_ctx, region, area):
+                    self._ctx = original_ctx
+                    self.region = region
+                    self.area = area
+                def __getattr__(self, name):
+                    return getattr(self._ctx, name)
+            
+            context = ContextWithRegion(bpy.context, self._draw_manager.region, self._draw_manager.area)
+
         # Draw the recents overlay
-        self._draw_recents_overlay(bpy.context, p, entries, self._buffer or [])
+        self._draw_recents_overlay(context, p, entries, self._buffer or [])
 
     def _draw_recents_overlay(self, context, p, entries, buffer_digits):
         """Draw the recents overlay showing numbered list."""
@@ -85,9 +100,14 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         except Exception:
             return
 
-        # Basic metrics
-        region_w = context.region.width if context.region else 600
-        region_h = context.region.height if context.region else 400
+        # Basic metrics - handle cases where region might be None or invalid
+        try:
+            region_w = context.region.width if context.region else 600
+            region_h = context.region.height if context.region else 400
+        except (AttributeError, ReferenceError, RuntimeError):
+            # Region is invalid or has been destroyed
+            region_w = 600
+            region_h = 400
 
         # Calculate scale factor
         scale_factor = calculate_scale_factor(context)

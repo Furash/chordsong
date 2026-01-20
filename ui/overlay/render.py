@@ -657,9 +657,14 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
     if filtered_mappings is None:
         filtered_mappings = p.mappings
 
-    # Basic metrics
-    region_w = context.region.width if context.region else 600
-    region_h = context.region.height if context.region else 400
+    # Basic metrics - handle cases where region might be None or invalid
+    try:
+        region_w = context.region.width if context.region else 600
+        region_h = context.region.height if context.region else 400
+    except (AttributeError, ReferenceError, RuntimeError):
+        # Region is invalid or has been destroyed
+        region_w = 600
+        region_h = 400
 
     # Generate signature for mappings to prevent cache collision (e.g. between Test and Leader)
     mappings_sig = (len(filtered_mappings), getattr(filtered_mappings[0], 'chord', '') if filtered_mappings else None)
@@ -984,9 +989,14 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
     # Fade out: alpha goes from 1.0 to 0.0
     fade_alpha = max(0.0, 1.0 - (elapsed / fade_duration))
 
-    # Basic metrics
-    region_w = context.region.width if context.region else 600
-    region_h = context.region.height if context.region else 400
+    # Basic metrics - handle cases where region might be None or invalid
+    try:
+        region_w = context.region.width if context.region else 600
+        region_h = context.region.height if context.region else 400
+    except (AttributeError, ReferenceError, RuntimeError):
+        # Region is invalid or has been destroyed
+        region_w = 600
+        region_h = 400
 
     scale_factor = calculate_scale_factor(context)
 

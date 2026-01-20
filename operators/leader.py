@@ -360,8 +360,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Store area pointer for comparison during draw
         # as_pointer() gives us a stable memory address for the area
         self._invoke_area_ptr = context.area.as_pointer() if context.area else None
-        self._area = None
-        self._region = None
+        self._area = context.area
+        self._region = context.region
 
         # Register handlers for all major space types to ensure visibility across split views
         self._draw_handles = {}
@@ -435,12 +435,24 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             except Exception:
                 pass  # If we can't get pointer, just draw
 
-        # Normal case: use context directly
+        # Use the stored region from invoke if available to prevent crashes when
+        # context.region is None or invalid (e.g., in new files, custom scripts, overlays)
+        if self._region:
+            # Create a temporary context wrapper that uses our stored region
+            class ContextWithRegion:
+                def __init__(self, original_ctx, region, area):
+                    self._ctx = original_ctx
+                    self.region = region
+                    self.area = area
+                def __getattr__(self, name):
+                    return getattr(self._ctx, name)
+            
+            context = ContextWithRegion(bpy.context, self._region, self._area)
+
         # Filter mappings by context for overlay display
         filtered_mappings = filter_mappings_by_context(p.mappings, self._context_type)
 
         # Use the buffer tokens for overlay rendering with filtered mappings
-        # draw_overlay handles context.region being None gracefully (uses defaults: 600x400)
         buffer_tokens = self._buffer or []
 
         draw_overlay(context, p, buffer_tokens, filtered_mappings)

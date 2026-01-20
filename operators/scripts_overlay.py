@@ -32,6 +32,8 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             return
 
         self._invoke_area_ptr = context.area.as_pointer() if context.area else None
+        self._area = context.area
+        self._region = context.region
 
         # Register handlers for all major space types
         self._draw_handles = {}
@@ -119,6 +121,20 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                     return
             except Exception:
                 pass
+
+        # Use the stored region from invoke if available to prevent crashes when
+        # context.region is None or invalid (e.g., in new files, custom scripts, overlays)
+        if hasattr(self, '_region') and self._region:
+            # Create a temporary context wrapper that uses our stored region
+            class ContextWithRegion:
+                def __init__(self, original_ctx, region, area):
+                    self._ctx = original_ctx
+                    self.region = region
+                    self.area = area
+                def __getattr__(self, name):
+                    return getattr(self._ctx, name)
+            
+            context = ContextWithRegion(bpy.context, self._region, self._area)
 
         # Filter scripts based on text buffer
         self._filter_scripts()
