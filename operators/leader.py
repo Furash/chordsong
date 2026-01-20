@@ -633,21 +633,11 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         global _panel_states_global
         p = prefs(context)
 
-        # Cancel keys
-        if event.type in {"ESC", "RIGHTMOUSE"} and event.value == "PRESS":
+        # Cancel key (ESC only - removed RIGHTMOUSE to allow m2 as chord token)
+        if event.type == "ESC" and event.value == "PRESS":
             self._finish(context)
             return {"CANCELLED"}
 
-        # Mouse wheel scrolling
-        if event.type == "WHEELUPMOUSE":
-            self._scroll_offset = max(0, self._scroll_offset - 1)
-            self._tag_redraw()
-            return {"RUNNING_MODAL"}
-
-        if event.type == "WHEELDOWNMOUSE":
-            self._scroll_offset += 1
-            self._tag_redraw()
-            return {"RUNNING_MODAL"}
 
         # Backspace to go up one level
         if event.type == "BACK_SPACE" and event.value == "PRESS":
@@ -695,8 +685,23 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 self._last_mod_type = event.type
                 return {"RUNNING_MODAL"}
 
-        if event.value != "PRESS":
-            return {"RUNNING_MODAL"}
+        # Mouse buttons should trigger on RELEASE to avoid conflicts with Blender's default actions
+        # (e.g., M3 triggering rotate view on PRESS, getting stuck if we consume the event)
+        is_mouse_button = event.type in {
+            "LEFTMOUSE", "RIGHTMOUSE", "MIDDLEMOUSE", 
+            "BUTTON4MOUSE", "BUTTON5MOUSE", "BUTTON6MOUSE", "BUTTON7MOUSE"
+        }
+        
+        # Wheel events should trigger on PRESS (they don't have default drag actions)
+        is_wheel = event.type in {"WHEELUPMOUSE", "WHEELDOWNMOUSE"}
+        
+        # For mouse buttons, wait for RELEASE; for everything else (including wheel), wait for PRESS
+        if is_mouse_button:
+            if event.value != "RELEASE":
+                return {"RUNNING_MODAL"}
+        else:
+            if event.value != "PRESS":
+                return {"RUNNING_MODAL"}
 
         # Modifier keys are already handled above, no need to track them here
 

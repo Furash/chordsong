@@ -57,7 +57,7 @@ For special keys that aren't letters or numbers, use these aliases:
 | `up`, `down`, `left`, `right` | Arrow keys |
 | `home`, `end`, `insert`, `delete` | Navigation keys |
 | `pageup`, `pagedown` | Page scrolling keys |
-| `f1` - `f12` | Function keys |
+| `f1` - `f24` | Function keys (F1-F24) |
 
 Punctuation keys like `,`, `.`, `/`, `;`, `'`, `[`, `]`, `\`, `-`, `=` are used directly as tokens.
 
@@ -80,7 +80,8 @@ Mouse buttons and wheel scrolling can be used as chord tokens.
 | :--- | :--- | :--- | :--- |
 | `m1` | Left Mouse Button | `m2` | Right Mouse Button |
 | `m3` | Middle Mouse Button | `m4` | Mouse Button 4 |
-| `m5` | Mouse Button 5 | `mwu` | Mouse Wheel Up |
+| `m5` | Mouse Button 5 | `m6` | Mouse Button 6 |
+| `m7` | Mouse Button 7 | `mwu` | Mouse Wheel Up |
 | `mwd` | Mouse Wheel Down | | |
 
 **Examples:**
@@ -90,6 +91,11 @@ Mouse buttons and wheel scrolling can be used as chord tokens.
 | `m1` | Left click | Single mouse button as chord token. |
 | `^m1` | Ctrl + Left click | Mouse button with modifier. |
 | `m3 f` | Middle click, then F | Mouse button followed by key. |
+| `mwu` | Wheel up | Wheel scroll as token. |
+| `^mwd` | Ctrl + Wheel down | Wheel with modifier. |
+
+!!! note "Mouse Button Behavior"
+    **Mouse buttons trigger on RELEASE** instead of PRESS to avoid conflicts with Blender's default mouse actions. For example, when using `m3` (middle mouse), you can click and release without getting stuck in Blender's rotate view mode.
 
 !!! note "Token Matching"
     **Order Independent Modifiers**: `^!a` is the same as `!^a`.
