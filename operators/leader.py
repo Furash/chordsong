@@ -445,7 +445,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         draw_overlay(context, p, buffer_tokens, filtered_mappings)
 
-    def invoke(self, context: bpy.types.Context, _event: bpy.types.Event):
+    def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
         """Start chord capture modal operation."""
         # Clean up any active test overlays
         disable_test_overlays()
@@ -457,6 +457,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self._ctrl_held = False
         self._alt_held = False
         self._shift_held = False
+        
+        # Store the leader key to ignore its first RELEASE if it's a mouse button
+        # This prevents double-triggering when mouse buttons are used as leader key
+        self._leader_key_type = get_leader_key_type()
+        self._ignore_leader_release = event.type in {
+            "LEFTMOUSE", "RIGHTMOUSE", "MIDDLEMOUSE",
+            "BUTTON4MOUSE", "BUTTON5MOUSE", "BUTTON6MOUSE", "BUTTON7MOUSE"
+        } and event.type == self._leader_key_type
 
         # Detect the current editor context
         self._context_type = self._detect_context(context)
@@ -734,6 +742,13 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Check for <leader><leader>
         # If buffer is empty and user presses the leader key again, show recents
         leader_key = get_leader_key_type()
+        
+        # Ignore the first RELEASE of a mouse button leader key to prevent double-trigger
+        if hasattr(self, '_ignore_leader_release') and self._ignore_leader_release:
+            if event.type == self._leader_key_type and event.value == "RELEASE":
+                self._ignore_leader_release = False
+                return {"RUNNING_MODAL"}
+        
         if not self._buffer and event.type == leader_key:
             # Open recents instead of repeat
             # Don't restore panels here - Recents will handle them
