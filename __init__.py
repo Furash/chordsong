@@ -17,9 +17,11 @@ from .ui import (
     CHORDSONG_PG_Group,
     CHORDSONG_PG_Mapping,
     CHORDSONG_PG_NerdIcon,
+    CHORDSONG_PG_StatsItem,
     CHORDSONG_PG_SubItem,
     CHORDSONG_PG_SubOperator,
     CHORDSONG_PG_ScriptParam,
+    CHORDSONG_UL_Stats,
 )
 from .operators import (
     CHORDSONG_OT_Append_Config,
@@ -74,6 +76,11 @@ from .operators import (
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
     CHORDSONG_OT_ScriptsOverlay,
+    CHORDSONG_OT_Stats_Blacklist,
+    CHORDSONG_OT_Stats_Clear,
+    CHORDSONG_OT_Stats_Convert_To_Chord,
+    CHORDSONG_OT_Stats_Export,
+    CHORDSONG_OT_Stats_Refresh,
     CHORDSONG_OT_SubItem_Add,
     CHORDSONG_OT_SubItem_Remove,
     CHORDSONG_OT_TestFadingOverlay,
@@ -86,6 +93,7 @@ from .operators import (
 
 _classes = (
     CHORDSONG_PG_NerdIcon,
+    CHORDSONG_PG_StatsItem,
     CHORDSONG_PG_SubItem,
     CHORDSONG_PG_SubOperator,
     CHORDSONG_PG_ScriptParam,
@@ -93,6 +101,7 @@ _classes = (
     CHORDSONG_PG_Mapping,
     CHORDSONG_PG_GroupSelection,
     CHORDSONG_Preferences,
+    CHORDSONG_UL_Stats,
     CHORDSONG_OT_Append_Config,
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_Clear_Search,
@@ -145,6 +154,11 @@ _classes = (
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
     CHORDSONG_OT_ScriptsOverlay,
+    CHORDSONG_OT_Stats_Blacklist,
+    CHORDSONG_OT_Stats_Clear,
+    CHORDSONG_OT_Stats_Convert_To_Chord,
+    CHORDSONG_OT_Stats_Export,
+    CHORDSONG_OT_Stats_Refresh,
     CHORDSONG_OT_SubItem_Add,
     CHORDSONG_OT_SubItem_Remove,
     CHORDSONG_OT_TestFadingOverlay,
@@ -152,6 +166,48 @@ _classes = (
 )
 
 addon_keymaps = []
+
+# Track which operators we've already recorded to avoid duplicates
+_stats_tracked_operators = set()
+
+def stats_operator_timer():
+    """Timer-based handler to track operator usage for statistics."""
+    try:
+        package_name = addon_root_package(__package__)
+        prefs = bpy.context.preferences.addons[package_name].preferences
+        
+        # Only track if statistics are enabled
+        if not prefs.enable_stats:
+            return 0.1  # Check every 0.1 seconds
+        
+        from .core.stats_manager import CS_StatsManager
+        
+        # Check window_manager.operators for new operators
+        wm = bpy.context.window_manager
+        if wm and hasattr(wm, 'operators') and wm.operators:
+            for op in wm.operators:
+                if op and hasattr(op, 'bl_idname'):
+                    op_idname = op.bl_idname
+                    # Use operator object as key to track which ones we've seen
+                    op_key = id(op)
+                    
+                    if op_key not in _stats_tracked_operators:
+                        _stats_tracked_operators.add(op_key)
+                        CS_StatsManager.record("operators", op_idname)
+        
+        # Clean up old operator references (operators are removed from list when done)
+        # Keep only operators that still exist in the list
+        if wm and hasattr(wm, 'operators') and wm.operators:
+            current_op_ids = {id(op) for op in wm.operators if op}
+            _stats_tracked_operators.intersection_update(current_op_ids)
+        else:
+            # If no operators, clear the set
+            _stats_tracked_operators.clear()
+        
+    except Exception:
+        pass
+    
+    return 0.1  # Check every 0.1 seconds
 
 def _safe_register_class(cls):
     """Register a class, recovering from partial/failed previous registrations."""
@@ -245,6 +301,14 @@ def register():
                         saved_path = f.read().strip()
                         if saved_path and os.path.exists(saved_path):
                             user_config_path = saved_path
+                
+                # Also restore stats export path
+                stats_path_file = os.path.join(extension_dir, "stats_export_path.txt")
+                if os.path.exists(stats_path_file):
+                    with open(stats_path_file, "r", encoding="utf-8") as f:
+                        saved_stats_path = f.read().strip()
+                        if saved_stats_path:
+                            prefs.stats_export_path = saved_stats_path
         except Exception:
             pass
 
@@ -308,6 +372,43 @@ def register():
             prefs._chordsong_suspend_autosave = False
     except Exception:
         pass
+    
+    # Register statistics handlers
+    try:
+        from .core.stats_manager import CS_StatsManager
+        
+        # Register the periodic save timer
+        # Use a short initial interval so it can read the user's preference quickly
+        if not bpy.app.timers.is_registered(CS_StatsManager.save_to_disk):
+            # Start with a short interval to read user preference, then it will use the configured interval
+            try:
+                pkg = addon_root_package(__package__)
+                if pkg and pkg in bpy.context.preferences.addons:
+                    prefs = bpy.context.preferences.addons[pkg].preferences
+                    initial_interval = float(getattr(prefs, 'stats_auto_export_interval', 180))
+                    if initial_interval <= 0:
+                        initial_interval = 60.0  # Check every 60 seconds if disabled
+                else:
+                    initial_interval = 180.0
+            except Exception:
+                initial_interval = 180.0
+            bpy.app.timers.register(CS_StatsManager.save_to_disk, first_interval=initial_interval)
+        
+        # Register the operator tracking timer
+        if not bpy.app.timers.is_registered(stats_operator_timer):
+            bpy.app.timers.register(stats_operator_timer, first_interval=0.1)
+        
+        # Register INFO panel property tracking only if enabled in preferences
+        try:
+            pkg = addon_root_package(__package__)
+            if pkg and pkg in bpy.context.preferences.addons:
+                prefs = bpy.context.preferences.addons[pkg].preferences
+                if getattr(prefs, 'enable_stats', False) and getattr(prefs, 'stats_track_properties', False):
+                    CS_StatsManager.register_info_panel_tracking()
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 def unregister():
     """Unregister addon classes and keymaps."""
@@ -323,6 +424,27 @@ def unregister():
         import bpy
         if bpy.app.timers.is_registered(_timer_cb):
             bpy.app.timers.unregister(_timer_cb)
+    except Exception:
+        pass
+    
+    # Unregister statistics handlers
+    try:
+        from .core.stats_manager import CS_StatsManager
+        
+        # Unregister the periodic save timer
+        if bpy.app.timers.is_registered(CS_StatsManager.save_to_disk):
+            bpy.app.timers.unregister(CS_StatsManager.save_to_disk)
+        
+        # Unregister the operator tracking timer
+        if bpy.app.timers.is_registered(stats_operator_timer):
+            bpy.app.timers.unregister(stats_operator_timer)
+        
+        # Unregister INFO panel property tracking
+        CS_StatsManager.unregister_info_panel_tracking()
+        
+        # Clear tracked operators set
+        global _stats_tracked_operators
+        _stats_tracked_operators.clear()
     except Exception:
         pass
 

@@ -8,10 +8,12 @@ from .prefs import (
     CHORDSONG_PG_Group,
     CHORDSONG_PG_Mapping,
     CHORDSONG_PG_NerdIcon,
+    CHORDSONG_PG_StatsItem,
     CHORDSONG_PG_SubItem,
     CHORDSONG_PG_SubOperator,
     CHORDSONG_PG_ScriptParam,
 )
+from .stats_list import CHORDSONG_UL_Stats
 
 __all__ = [
     "draw_addon_preferences",
@@ -22,4 +24,6 @@ __all__ = [
     "CHORDSONG_PG_SubItem",
     "CHORDSONG_PG_SubOperator",
     "CHORDSONG_PG_ScriptParam",
+    "CHORDSONG_PG_StatsItem",
+    "CHORDSONG_UL_Stats",
 ]

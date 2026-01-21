@@ -1,9 +1,12 @@
+# pylint: disable=undefined-variable
+# ruff: noqa: F821
+
 import bpy
 
 def main():
     # Logging to help us confirm things are working
     print("\n" + "="*40)
-    print(f"CHORD SONG: Executing Generic Node Adder")
+    print("CHORD SONG: Executing Generic Node Adder")
     print(f"Combined Params: {args}")
 
     # 1. Get the Node ID and options

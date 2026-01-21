@@ -136,6 +136,19 @@ def _on_mapping_changed(_self, context):
     except Exception:
         pass
 
+def _on_stats_track_properties_changed(self, _context):
+    """Called when stats_track_properties toggle changes."""
+    try:
+        # Skip callbacks during bulk operations
+        if _SUSPEND_CALLBACKS:
+            return
+        
+        # Update property tracking registration
+        from ..core.stats_manager import CS_StatsManager
+        CS_StatsManager._update_property_tracking(self)
+    except Exception:
+        pass
+
 def _on_group_changed(_self, context):
     # Called when a group item changes; fetch prefs via context.
     try:
@@ -281,6 +294,35 @@ class CHORDSONG_PG_NerdIcon(PropertyGroup):
     icon: StringProperty(
         name="Icon Character",
         description="The actual Nerd Font icon character",
+        default="",
+    )
+
+class CHORDSONG_PG_StatsItem(PropertyGroup):
+    """Property group for a single statistics item."""
+    name: StringProperty(
+        name="Name",
+        description="Operator/chord/property identifier",
+        default="",
+    )
+    count: IntProperty(
+        name="Count",
+        description="Usage count",
+        default=0,
+        min=0,
+    )
+    category: StringProperty(
+        name="Type",
+        description="Category: operator, chord, or property",
+        default="",
+    )
+    group: StringProperty(
+        name="Group",
+        description="Group name (for chords only)",
+        default="",
+    )
+    label: StringProperty(
+        name="Label",
+        description="Label name (for chords only)",
         default="",
     )
 
@@ -504,6 +546,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         items=(
             ("MAPPINGS", "Mappings", "Chord mappings"),
             ("UI", "UI", "Overlay/UI customization"),
+            ("STATS", "Statistics", "Usage statistics"),
         ),
         default="MAPPINGS",
     )
@@ -1002,12 +1045,90 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
+    # Statistics properties
+    enable_stats: BoolProperty(
+        name="Enable Statistics",
+        description="Track operator, chord, and property usage. Data is stored locally and never shared.",
+        default=False,
+        update=_on_prefs_changed,
+    )
+    
+    stats_collection: CollectionProperty(type=CHORDSONG_PG_StatsItem)
+    
+    stats_collection_index: IntProperty(
+        name="Stats Collection Index",
+        description="Active index in statistics collection",
+        default=0,
+        min=0,
+    )
+    
+    stats_sort_by_usage: BoolProperty(
+        name="Sort by Usage",
+        description="Sort statistics by usage count (descending). If disabled, sorts alphabetically.",
+        default=True,
+        update=_on_prefs_changed,
+    )
+    
+    stats_export_path: StringProperty(
+        name="Export Path",
+        description="Path to export statistics JSON file",
+        subtype="FILE_PATH",
+        default="",
+    )
+    
+    stats_realtime_refresh: BoolProperty(
+        name="Realtime Refresh",
+        description="Automatically refresh statistics table as you use Blender (updates within 0.5s)",
+        default=True,
+    )
+    
+    stats_track_properties: BoolProperty(
+        name="Track Properties",
+        description="Track property changes from INFO panel (requires INFO panel to be open). May interfere with UI if enabled.",
+        default=False,
+        update=_on_stats_track_properties_changed,
+    )
+    
+    stats_auto_export_interval: IntProperty(
+        name="Auto Export Interval",
+        description="Interval in seconds for automatically saving statistics to disk (0 = disabled)",
+        default=180,
+        min=0,
+        soft_max=3600,
+    )
+    
+    stats_blacklist: StringProperty(
+        name="Statistics Blacklist",
+        description="JSON array of blacklisted items in format: [\"category:name\", ...]",
+        default="[]",
+    )
+
     def ensure_defaults(self):
         """Ensure default config path and nerd icons are initialized."""
         # Only set config_path if it's truly empty (first time setup)
         # Blender persists this value automatically, so we shouldn't overwrite it
         if not (self.config_path or "").strip():
             self.config_path = default_config_path()
+        
+        # Auto-assign stats export path if empty (same directory as config)
+        if not (self.stats_export_path or "").strip():
+            config_path = self.config_path or default_config_path()
+            if config_path:
+                config_dir = os.path.dirname(config_path)
+                self.stats_export_path = os.path.join(config_dir, "chordsong_stats.json")
+                # Persist the path like we do with config_path
+                try:
+                    import bpy
+                    pkg = _addon_root_pkg()
+                    if hasattr(bpy.utils, 'extension_path_user'):
+                        extension_dir = bpy.utils.extension_path_user(pkg, path="", create=True)
+                        if extension_dir:
+                            stats_path_file = os.path.join(extension_dir, "stats_export_path.txt")
+                            os.makedirs(extension_dir, exist_ok=True)
+                            with open(stats_path_file, "w", encoding="utf-8") as f:
+                                f.write(self.stats_export_path)
+                except Exception:
+                    pass
 
         # Ensure custom scripts are disabled by default (security safeguard)
         if not hasattr(self, "allow_custom_user_scripts") or self.allow_custom_user_scripts is None:

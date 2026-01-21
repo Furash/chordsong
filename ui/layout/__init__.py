@@ -5,6 +5,7 @@ Addon Preferences UI layout entry point.
 from .config import draw_config_section
 from .ui_tab import draw_ui_tab
 from .mappings_tab import draw_mappings_tab
+from .stats_tab import draw_statistics_tab
 
 def draw_addon_preferences(prefs, context, layout):
     """Main dispatcher for addon preferences UI."""
@@ -22,5 +23,7 @@ def draw_addon_preferences(prefs, context, layout):
     # Dispatch to specific tab
     if prefs.prefs_tab == "UI":
         draw_ui_tab(prefs, col)
+    elif prefs.prefs_tab == "STATS":
+        draw_statistics_tab(prefs, context, col)
     else:
         draw_mappings_tab(prefs, context, col)
