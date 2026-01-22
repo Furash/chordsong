@@ -114,6 +114,40 @@ def _on_prefs_changed(self, _context):
     except Exception:
         pass
 
+def _on_stats_interval_changed(self, _context):
+    # Called when stats auto-export interval changes - restart the timer.
+    try:
+        # Skip callbacks during bulk operations (config loading, etc.)
+        if _SUSPEND_CALLBACKS:
+            return
+        
+        # Restart the stats auto-export timer with new interval
+        from ..core.stats_manager import ChordSong_StatsManager
+        
+        # Signal existing timer(s) to stop on next run
+        ChordSong_StatsManager.timer_should_stop = True
+        
+        # Unregister existing timer(s) - may not catch all if already scheduled
+        try:
+            while bpy.app.timers.is_registered(ChordSong_StatsManager.save_to_disk):
+                bpy.app.timers.unregister(ChordSong_StatsManager.save_to_disk)
+        except (ValueError, RuntimeError):
+            pass
+        
+        # Re-register with new interval
+        new_interval = float(self.stats_auto_export_interval)
+        if new_interval <= 0:
+            new_interval = 60.0  # Check every 60 seconds if disabled
+        
+        # Reset the stop flag before registering new timer
+        ChordSong_StatsManager.timer_should_stop = False
+        bpy.app.timers.register(ChordSong_StatsManager.save_to_disk, first_interval=new_interval)
+        
+        # Also call standard prefs changed
+        _on_prefs_changed(self, _context)
+    except Exception:
+        pass
+
 def _on_mapping_changed(_self, context):
     try:
         # Skip callbacks during bulk operations (config loading, etc.)
@@ -136,18 +170,6 @@ def _on_mapping_changed(_self, context):
     except Exception:
         pass
 
-def _on_stats_track_properties_changed(self, _context):
-    """Called when stats_track_properties toggle changes."""
-    try:
-        # Skip callbacks during bulk operations
-        if _SUSPEND_CALLBACKS:
-            return
-        
-        # Update property tracking registration
-        from ..core.stats_manager import CS_StatsManager
-        CS_StatsManager._update_property_tracking(self)
-    except Exception:
-        pass
 
 def _on_group_changed(_self, context):
     # Called when a group item changes; fetch prefs via context.
@@ -301,7 +323,7 @@ class CHORDSONG_PG_StatsItem(PropertyGroup):
     """Property group for a single statistics item."""
     name: StringProperty(
         name="Name",
-        description="Operator/chord/property identifier",
+        description="Operator/chord identifier",
         default="",
     )
     count: IntProperty(
@@ -312,7 +334,7 @@ class CHORDSONG_PG_StatsItem(PropertyGroup):
     )
     category: StringProperty(
         name="Type",
-        description="Category: operator, chord, or property",
+        description="Category: operator or chord",
         default="",
     )
     group: StringProperty(
@@ -1048,7 +1070,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     # Statistics properties
     enable_stats: BoolProperty(
         name="Enable Statistics",
-        description="Track operator, chord, and property usage. Data is stored locally and never shared.",
+        description="Track operator and chord usage. Data is stored locally and never shared.",
         default=False,
         update=_on_prefs_changed,
     )
@@ -1082,19 +1104,13 @@ class CHORDSONG_Preferences(AddonPreferences):
         default=True,
     )
     
-    stats_track_properties: BoolProperty(
-        name="Track Properties",
-        description="Track property changes from INFO panel (requires INFO panel to be open). May interfere with UI if enabled.",
-        default=False,
-        update=_on_stats_track_properties_changed,
-    )
-    
     stats_auto_export_interval: IntProperty(
         name="Auto Export Interval",
         description="Interval in seconds for automatically saving statistics to disk (0 = disabled)",
         default=180,
         min=0,
         soft_max=3600,
+        update=_on_stats_interval_changed,
     )
     
     stats_blacklist: StringProperty(

@@ -871,9 +871,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 pkg = addon_root_package(__package__)
                 prefs_obj = context.preferences.addons[pkg].preferences
                 if getattr(prefs_obj, 'enable_stats', False):
-                    from ..core.stats_manager import CS_StatsManager
+                    from ..core.stats_manager import ChordSong_StatsManager
                     chord_str = " ".join(chord_tokens)
-                    CS_StatsManager.record("chords", chord_str)
+                    ChordSong_StatsManager.record("chords", chord_str)
             except Exception:
                 pass
 
@@ -1042,17 +1042,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             set_val = not current_value
                             setattr(obj, prop_name, set_val)
                             
-                            # Record property change for statistics (if enabled)
-                            try:
-                                from ..utils.addon_package import addon_root_package
-                                pkg = addon_root_package(__package__)
-                                prefs_obj = context.preferences.addons[pkg].preferences
-                                if getattr(prefs_obj, 'enable_stats', False):
-                                    from ..core.stats_manager import CS_StatsManager
-                                    CS_StatsManager.record("properties", path)
-                            except Exception:
-                                pass
-                            
                             return set_val
 
                         def do_set_path(path, value):
@@ -1067,17 +1056,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             if not hasattr(obj, prop_name):
                                 return None
                             setattr(obj, prop_name, value)
-                            
-                            # Record property change for statistics (if enabled)
-                            try:
-                                from ..utils.addon_package import addon_root_package
-                                pkg = addon_root_package(__package__)
-                                prefs_obj = context.preferences.addons[pkg].preferences
-                                if getattr(prefs_obj, 'enable_stats', False):
-                                    from ..core.stats_manager import CS_StatsManager
-                                    CS_StatsManager.record("properties", path)
-                            except Exception:
-                                pass
                             
                             return value
 
@@ -1242,17 +1220,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                 return False
 
                             setattr(obj, prop_name, val_to_set)
-                            
-                            # Record property change for statistics (if enabled)
-                            try:
-                                from ..utils.addon_package import addon_root_package
-                                pkg = addon_root_package(__package__)
-                                prefs_obj = context.preferences.addons[pkg].preferences
-                                if getattr(prefs_obj, 'enable_stats', False):
-                                    from ..core.stats_manager import CS_StatsManager
-                                    CS_StatsManager.record("properties", path)
-                            except Exception:
-                                pass
                             
                             return True
 

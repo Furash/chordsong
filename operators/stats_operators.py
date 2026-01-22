@@ -51,8 +51,8 @@ class CHORDSONG_OT_Stats_Clear(Operator):
     def execute(self, context):
         """Clear all statistics."""
         try:
-            from ..core.stats_manager import CS_StatsManager
-            CS_StatsManager.clear_all()
+            from ..core.stats_manager import ChordSong_StatsManager
+            ChordSong_StatsManager.clear_all()
 
             # Clear the UI list as well
             prefs = context.preferences.addons[addon_root_package(__package__)].preferences
@@ -78,7 +78,7 @@ def _refresh_stats_ui(prefs, export_to_file=False):
         True if successful, False otherwise
     """
     try:
-        from ..core.stats_manager import CS_StatsManager
+        from ..core.stats_manager import ChordSong_StatsManager
 
         # Clear the collection
         prefs.stats_collection.clear()
@@ -88,8 +88,8 @@ def _refresh_stats_ui(prefs, export_to_file=False):
 
         # Collect all statistics from all categories (excluding blacklisted)
         all_stats = []
-        for category in ['operators', 'chords', 'properties']:
-            stats = CS_StatsManager.get_stats(category)
+        for category in ['operators', 'chords']:
+            stats = ChordSong_StatsManager.get_stats(category)
             for name, count in stats.items():
                 # Skip if blacklisted
                 blacklist_key = _make_blacklist_key(category, name)
@@ -130,11 +130,9 @@ def _refresh_stats_ui(prefs, export_to_file=False):
                         export_path += '.json'
                         prefs.stats_export_path = export_path
 
-                    # Collect all statistics
                     export_data = {
-                        "operators": CS_StatsManager.get_stats("operators"),
-                        "chords": CS_StatsManager.get_stats("chords"),
-                        "properties": CS_StatsManager.get_stats("properties")
+                        "operators": ChordSong_StatsManager.get_stats("operators"),
+                        "chords": ChordSong_StatsManager.get_stats("chords")
                     }
 
                     # Write to file
@@ -185,7 +183,7 @@ class CHORDSONG_OT_Stats_Export(Operator):
     def execute(self, context):
         """Export statistics to file."""
         try:
-            from ..core.stats_manager import CS_StatsManager
+            from ..core.stats_manager import ChordSong_StatsManager
 
             prefs = context.preferences.addons[addon_root_package(__package__)].preferences
 
@@ -205,9 +203,8 @@ class CHORDSONG_OT_Stats_Export(Operator):
 
             # Collect all statistics
             export_data = {
-                "operators": CS_StatsManager.get_stats("operators"),
-                "chords": CS_StatsManager.get_stats("chords"),
-                "properties": CS_StatsManager.get_stats("properties")
+                "operators": ChordSong_StatsManager.get_stats("operators"),
+                "chords": ChordSong_StatsManager.get_stats("chords")
             }
 
             # Write to file
@@ -248,7 +245,7 @@ class CHORDSONG_OT_Stats_Blacklist(Operator):
 
     category: bpy.props.StringProperty(
         name="Category",
-        description="Item category (operator, chord, property)",
+        description="Item category (operator, chord)",
         default="",
     )
 
@@ -354,8 +351,7 @@ class CHORDSONG_OT_Stats_Blacklist(Operator):
                 # Type icon
                 type_icon = {
                     'operator': 'SETTINGS',
-                    'chord': 'EVENT_SPACE',
-                    'property': 'PROPERTIES'
+                    'chord': 'EVENT_SPACE'
                 }.get(category, 'DOT')
                 row.label(text=category.capitalize(), icon=type_icon)
                 row.separator()
@@ -383,14 +379,13 @@ class CHORDSONG_OT_Stats_Blacklist(Operator):
 
 
 class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
-    """Convert operator or property to a chord mapping"""
+    """Convert operator to a chord mapping"""
     bl_idname = "chordsong.stats_convert_to_chord"
     bl_label = "Convert to Chord"
-    bl_description = "Create a new chord mapping for this operator or property"
+    bl_description = "Create a new chord mapping for this operator"
     bl_options = {'INTERNAL'}
 
-    # Statistics-specific properties
-    category: bpy.props.StringProperty()
+    category: bpy.props.StringProperty()  # Category from statistics ('operators' or 'chords')
     stats_name: bpy.props.StringProperty()  # Name from statistics (to avoid conflict with 'name' property)
 
     # Properties from context_menu (copied for compatibility)
@@ -562,7 +557,7 @@ class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
                 self.report({'WARNING'}, "No operator/property name provided")
                 return self._invoke_dialog(context)
 
-            # Extract from operator/property name (instead of button context)
+            # Extract from operator name (instead of button context)
             # Note: category is 'operators' (plural) from stats, not 'operator' (singular)
             if self.category == 'operators':
                 # Construct full operator path (e.g., "bpy.ops.transform.translate")
@@ -638,30 +633,6 @@ class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
 
                 return self._invoke_dialog(context)
 
-            elif self.category == 'properties':
-                # For properties, set the context_path
-                if not self.stats_name.startswith("bpy.context.") and not self.stats_name.startswith("context."):
-                    self.context_path = f"bpy.context.{self.stats_name}"
-                else:
-                    self.context_path = self.stats_name
-
-                # Normalize bpy.data paths if present
-                self.context_path = normalize_bpy_data_path(self.context_path)
-
-                # Guess if it's a toggle (we don't have the value, so default to property)
-                self.mapping_type = "CONTEXT_PROPERTY"
-
-                # Format label/group
-                self.name = self.context_path.split(".")[-1].replace("_", " ").title()
-                self.group = "Property"
-
-                # Detect editor context
-                self.editor_context = detect_editor_context(context, kwargs=self.kwargs)
-
-                # Suggest chord
-                self.chord = suggest_chord(self.group, self.name)
-
-                return self._invoke_dialog(context)
 
             # Fallback: Show dialog for manual entry
             print(f"[DEBUG] invoke: Unknown category '{self.category}', showing dialog for manual entry")
@@ -696,7 +667,7 @@ class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
                     pass
 
             # Use appropriate icon based on mapping type
-            path_icon = "CHECKBOX_HLT" if self.mapping_type == "CONTEXT_TOGGLE" else "PROPERTIES"
+            path_icon = "PROPERTIES"
 
             if sub_count > 0:
                 col.label(text=f"Multiple {self.mapping_type.split('_')[-1].title()}s: {self.context_path} + {sub_count} more", icon=path_icon)

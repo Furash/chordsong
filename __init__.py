@@ -178,9 +178,9 @@ def stats_operator_timer():
         
         # Only track if statistics are enabled
         if not prefs.enable_stats:
-            return 0.1  # Check every 0.1 seconds
+            return 0.5  # Check every 0.5 seconds
         
-        from .core.stats_manager import CS_StatsManager
+        from .core.stats_manager import ChordSong_StatsManager
         
         # Check window_manager.operators for new operators
         wm = bpy.context.window_manager
@@ -193,7 +193,7 @@ def stats_operator_timer():
                     
                     if op_key not in _stats_tracked_operators:
                         _stats_tracked_operators.add(op_key)
-                        CS_StatsManager.record("operators", op_idname)
+                        ChordSong_StatsManager.record("operators", op_idname)
         
         # Clean up old operator references (operators are removed from list when done)
         # Keep only operators that still exist in the list
@@ -207,7 +207,7 @@ def stats_operator_timer():
     except Exception:
         pass
     
-    return 0.1  # Check every 0.1 seconds
+    return 0.5  # Check every 0.5 seconds
 
 def _safe_register_class(cls):
     """Register a class, recovering from partial/failed previous registrations."""
@@ -375,11 +375,11 @@ def register():
     
     # Register statistics handlers
     try:
-        from .core.stats_manager import CS_StatsManager
+        from .core.stats_manager import ChordSong_StatsManager
         
         # Register the periodic save timer
         # Use a short initial interval so it can read the user's preference quickly
-        if not bpy.app.timers.is_registered(CS_StatsManager.save_to_disk):
+        if not bpy.app.timers.is_registered(ChordSong_StatsManager.save_to_disk):
             # Start with a short interval to read user preference, then it will use the configured interval
             try:
                 pkg = addon_root_package(__package__)
@@ -392,21 +392,13 @@ def register():
                     initial_interval = 180.0
             except Exception:
                 initial_interval = 180.0
-            bpy.app.timers.register(CS_StatsManager.save_to_disk, first_interval=initial_interval)
+            
+            bpy.app.timers.register(ChordSong_StatsManager.save_to_disk, first_interval=initial_interval)
         
         # Register the operator tracking timer
         if not bpy.app.timers.is_registered(stats_operator_timer):
-            bpy.app.timers.register(stats_operator_timer, first_interval=0.1)
+            bpy.app.timers.register(stats_operator_timer, first_interval=0.5)
         
-        # Register INFO panel property tracking only if enabled in preferences
-        try:
-            pkg = addon_root_package(__package__)
-            if pkg and pkg in bpy.context.preferences.addons:
-                prefs = bpy.context.preferences.addons[pkg].preferences
-                if getattr(prefs, 'enable_stats', False) and getattr(prefs, 'stats_track_properties', False):
-                    CS_StatsManager.register_info_panel_tracking()
-        except Exception:
-            pass
     except Exception:
         pass
 
@@ -429,18 +421,16 @@ def unregister():
     
     # Unregister statistics handlers
     try:
-        from .core.stats_manager import CS_StatsManager
+        from .core.stats_manager import ChordSong_StatsManager
         
         # Unregister the periodic save timer
-        if bpy.app.timers.is_registered(CS_StatsManager.save_to_disk):
-            bpy.app.timers.unregister(CS_StatsManager.save_to_disk)
+        if bpy.app.timers.is_registered(ChordSong_StatsManager.save_to_disk):
+            bpy.app.timers.unregister(ChordSong_StatsManager.save_to_disk)
         
         # Unregister the operator tracking timer
         if bpy.app.timers.is_registered(stats_operator_timer):
             bpy.app.timers.unregister(stats_operator_timer)
         
-        # Unregister INFO panel property tracking
-        CS_StatsManager.unregister_info_panel_tracking()
         
         # Clear tracked operators set
         global _stats_tracked_operators
