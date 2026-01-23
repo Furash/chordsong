@@ -19,13 +19,13 @@ def _get_preset_formats(style):
     Token types:
     - C: Chord, I: Icon, i: Group Icon, G: Groups (all), g: Group (first only)
     - L: Label, N: Count (verbose), n: Count (compact)
-    - S: Separator A (→), s: Separator B (::)
+    - S: Separator A (>), s: Separator B (::)
     - T: Toggle icon
     
     Returns: (folder_format, item_format, separator_a, separator_b)
     """
     presets = {
-        "DEFAULT": ("C S N", "C I L T", "→", "::"),
+        "DEFAULT": ("C s n g L", "C I S L T", ">", "::"),
         "CUSTOM": None,  # Use user-defined formats
     }
     return presets.get(style, presets["DEFAULT"])
