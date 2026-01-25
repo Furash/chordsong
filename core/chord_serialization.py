@@ -63,10 +63,28 @@ def _serialize_mapping(m) -> dict:
         chord_dict["operator"] = get_str_attr(m, "operator")
         chord_dict["call_context"] = getattr(m, "call_context", "EXEC_DEFAULT")
         
-        # Add parameters if present
-        kwargs_json = get_str_attr(m, "kwargs_json")
-        if kwargs_json and kwargs_json.strip():
-            chord_dict["kwargs_json"] = kwargs_json
+        # Store operator parameters as kwargs dict (supports multi-row via underscore prefixes)
+        from .engine import parse_kwargs
+        params = [get_str_attr(m, "kwargs_json")]
+        for op_p in getattr(m, "operator_params", []):
+            params.append(get_str_attr(op_p, "value"))
+
+        merged_kwargs = {}
+        for row_idx, param_str in enumerate(params):
+            if not (param_str or "").strip():
+                continue
+            row_kwargs = parse_kwargs(param_str)
+            is_first_key_in_row = True
+            for key, value in row_kwargs.items():
+                if row_idx > 0 and is_first_key_in_row:
+                    merged_kwargs[f"_{key}"] = value
+                    is_first_key_in_row = False
+                else:
+                    merged_kwargs[key] = value
+                    is_first_key_in_row = False
+
+        if merged_kwargs:
+            chord_dict["kwargs"] = merged_kwargs
         
         # Add sub-operators if present
         sub_operators = getattr(m, "sub_operators", [])
@@ -77,9 +95,26 @@ def _serialize_mapping(m) -> dict:
                     "operator": get_str_attr(sub_op, "operator"),
                     "call_context": getattr(sub_op, "call_context", "EXEC_DEFAULT"),
                 }
-                kwargs = get_str_attr(sub_op, "kwargs_json")
-                if kwargs and kwargs.strip():
-                    sub_op_dict["kwargs_json"] = kwargs
+                params = [get_str_attr(sub_op, "kwargs_json")]
+                for op_p in getattr(sub_op, "operator_params", []):
+                    params.append(get_str_attr(op_p, "value"))
+
+                merged_kwargs = {}
+                for row_idx, param_str in enumerate(params):
+                    if not (param_str or "").strip():
+                        continue
+                    row_kwargs = parse_kwargs(param_str)
+                    is_first_key_in_row = True
+                    for key, value in row_kwargs.items():
+                        if row_idx > 0 and is_first_key_in_row:
+                            merged_kwargs[f"_{key}"] = value
+                            is_first_key_in_row = False
+                        else:
+                            merged_kwargs[key] = value
+                            is_first_key_in_row = False
+
+                if merged_kwargs:
+                    sub_op_dict["kwargs"] = merged_kwargs
                 sub_ops_data.append(sub_op_dict)
             chord_dict["sub_operators"] = sub_ops_data
     

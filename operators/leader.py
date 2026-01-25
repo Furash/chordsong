@@ -1312,11 +1312,23 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             # Handle operator execution
             operators_to_run = []
 
+            def _combined_operator_kwargs_str(ptr) -> str:
+                """Combine primary kwargs_json with any additional operator_params rows."""
+                all_kwargs_str = getattr(ptr, "kwargs_json", "") or ""
+                for p_row in getattr(ptr, "operator_params", []):
+                    v = (getattr(p_row, "value", "") or "").strip()
+                    if not v:
+                        continue
+                    if all_kwargs_str and not all_kwargs_str.strip().endswith(","):
+                        all_kwargs_str += ", "
+                    all_kwargs_str += v
+                return all_kwargs_str
+
             primary_op = (m.operator or "").strip()
             if primary_op:
                 operators_to_run.append({
                     "op": primary_op,
-                    "kwargs": parse_kwargs(getattr(m, "kwargs_json", "{}")),
+                    "kwargs": parse_kwargs(_combined_operator_kwargs_str(m)),
                     "call_ctx": (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
                 })
 
@@ -1325,7 +1337,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 if sub_op:
                     operators_to_run.append({
                         "op": sub_op,
-                        "kwargs": parse_kwargs(getattr(sub, "kwargs_json", "{}")),
+                        "kwargs": parse_kwargs(_combined_operator_kwargs_str(sub)),
                         "call_ctx": (getattr(sub, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
                     })
 

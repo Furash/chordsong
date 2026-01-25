@@ -386,6 +386,14 @@ def _are_mappings_identical(m1, m2):
             return False
         if get_str_attr(m1, "kwargs_json") != get_str_attr(m2, "kwargs_json"):
             return False
+        # Check additional operator parameter rows
+        op_params1 = getattr(m1, "operator_params", [])
+        op_params2 = getattr(m2, "operator_params", [])
+        if len(op_params1) != len(op_params2):
+            return False
+        for p1, p2 in zip(op_params1, op_params2):
+            if get_str_attr(p1, "value") != get_str_attr(p2, "value"):
+                return False
 
         # Check sub_operators
         sub1 = getattr(m1, "sub_operators", [])
@@ -399,6 +407,13 @@ def _are_mappings_identical(m1, m2):
                 return False
             if get_str_attr(s1, "kwargs_json") != get_str_attr(s2, "kwargs_json"):
                 return False
+            op_params1 = getattr(s1, "operator_params", [])
+            op_params2 = getattr(s2, "operator_params", [])
+            if len(op_params1) != len(op_params2):
+                return False
+            for p1, p2 in zip(op_params1, op_params2):
+                if get_str_attr(p1, "value") != get_str_attr(p2, "value"):
+                    return False
 
     elif mapping_type == "PYTHON_FILE":
         if get_str_attr(m1, "python_file") != get_str_attr(m2, "python_file"):

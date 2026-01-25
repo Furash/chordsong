@@ -43,6 +43,7 @@ from .mapping.mapping_select import (
     CHORDSONG_OT_Mapping_Deselect_All,
 )
 from .mapping.property_convert import CHORDSONG_OT_Property_Mapping_Convert
+from .mapping.operator_param_ops import CHORDSONG_OT_OperatorParam_Add, CHORDSONG_OT_OperatorParam_Remove
 from .mapping.subitem_ops import CHORDSONG_OT_SubItem_Add, CHORDSONG_OT_SubItem_Remove
 from .config.open_keymap import CHORDSONG_OT_Open_Keymap
 from .config.open_prefs import CHORDSONG_OT_Open_Prefs
@@ -107,6 +108,8 @@ __all__ = [
     "CHORDSONG_OT_Mapping_Sort_Group",
     "CHORDSONG_OT_Mapping_Toggle_Select",
     "CHORDSONG_OT_Mapping_Unfold_All",
+    "CHORDSONG_OT_OperatorParam_Add",
+    "CHORDSONG_OT_OperatorParam_Remove",
     "CHORDSONG_OT_Property_Mapping_Convert",
     "CHORDSONG_OT_SubItem_Add",
     "CHORDSONG_OT_SubItem_Remove",

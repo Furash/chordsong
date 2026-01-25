@@ -390,6 +390,15 @@ class CHORDSONG_PG_SubItem(PropertyGroup):
         update=_on_mapping_changed,
     )
 
+class CHORDSONG_PG_OperatorParam(PropertyGroup):
+    """Additional parameter row for operator mappings."""
+    value: StringProperty(
+        name="Value",
+        description="Python-like parameter string: mode='ADD', factor=1.0",
+        default="",
+        update=_on_mapping_changed,
+    )
+
 class CHORDSONG_PG_SubOperator(PropertyGroup):
     """Sub-operator for consecutive operator calls."""
     operator: StringProperty(
@@ -418,6 +427,8 @@ class CHORDSONG_PG_SubOperator(PropertyGroup):
         default="",
         update=_on_mapping_changed,
     )
+    # Additional parameter rows for this operator call
+    operator_params: CollectionProperty(type=CHORDSONG_PG_OperatorParam)
 
 class CHORDSONG_PG_ScriptParam(PropertyGroup):
     """Parameter row for Python script mappings."""
@@ -539,6 +550,8 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     sub_operators: CollectionProperty(type=CHORDSONG_PG_SubOperator)
     # Collection for multiple script parameters
     script_params: CollectionProperty(type=CHORDSONG_PG_ScriptParam)
+    # Collection for multiple operator parameter rows (in addition to kwargs_json)
+    operator_params: CollectionProperty(type=CHORDSONG_PG_OperatorParam)
     sync_toggles: BoolProperty(
         name="Sync Toggles",
         description="If enabled, all sub-item toggles will match the state of the primary toggle",

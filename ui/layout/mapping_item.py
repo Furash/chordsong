@@ -355,53 +355,88 @@ def _draw_operator_mapping(layout, m, idx):
     """Draw rows for an operator mapping."""
     op_area = layout.box()
 
-    def draw_op_row(layout, m_ptr, op_prop, ctx_prop, kwargs_prop, is_primary, sub_idx=-1):
-        op_block = layout.column(align=True)
-        master_split = op_block.split(factor=0.7, align=True)
+    master_f = 0.7
+    gutter_f = 0.2
+    ctx_f = 0.4
+
+    def draw_row(container, label, ptr, prop, controls_cb=None):
+        block = container.column(align=True)
+        master_split = block.split(factor=master_f, align=True)
 
         inputs_col = master_split.column(align=True)
-        gutter_f = 0.2
+        row = inputs_col.row(align=True)
+        split = row.split(factor=gutter_f, align=True)
+        split.alignment = 'RIGHT'
+        split.label(text=label)
+        split.prop(ptr, prop, text="")
 
+        controls = master_split.row(align=True)
+        ctx = controls.split(factor=ctx_f, align=True)
+        if controls_cb:
+            controls_cb(ctx)
+        else:
+            ctx.label(text="")
+
+        block.separator(factor=0.2)
+
+    def draw_operator_block(container, op_ptr, is_primary, operator_index, sub_idx=-1):
+        # Operator row (includes call context + add/remove operator + convert)
+        def operator_controls(ctx):
+            ctx.prop(op_ptr, "call_context", text="")
+            btns = ctx.split(factor=0.5, align=True)
+            if is_primary:
+                op_add = btns.operator("chordsong.subitem_add", text="Add", icon="ADD")
+                op_add.mapping_index = idx
+            else:
+                rem = btns.operator("chordsong.subitem_remove", text="Del", icon="TRASH")
+                rem.mapping_index = idx
+                rem.item_index = sub_idx
+
+            conv = btns.operator("chordsong.mapping_convert", text="Convert")
+            conv.index = idx
+            conv.sub_index = sub_idx
+
+        # Custom operator field row: keep refresh button next to the text field
+        op_block = container.column(align=True)
+        master_split = op_block.split(factor=master_f, align=True)
+        inputs_col = master_split.column(align=True)
         id_row = inputs_col.row(align=True)
         id_split = id_row.split(factor=gutter_f, align=True)
         id_split.alignment = 'RIGHT'
         id_split.label(text="Operator:")
-        # Split the operator field area to add a refresh button
         op_field_split = id_split.split(factor=0.92, align=True)
-        op_field_split.prop(m_ptr, op_prop, text="")
-        # Add refresh button to clear operator cache (useful after installing new addons)
-        op_field_split.operator(
-            "chordsong.clear_operator_cache",
-            text="",
-            icon="DOT",
-            emboss=False
-        )
+        op_field_split.prop(op_ptr, "operator", text="")
+        op_field_split.operator("chordsong.clear_operator_cache", text="", icon="DOT", emboss=False)
 
-        p_row = inputs_col.row(align=True)
-        p_split = p_row.split(factor=gutter_f, align=True)
-        p_split.alignment = 'RIGHT'
-        p_split.label(text="Parameters:")
-        p_split.prop(m_ptr, kwargs_prop, text="")
+        controls = master_split.row(align=True)
+        ctx = controls.split(factor=ctx_f, align=True)
+        operator_controls(ctx)
+        op_block.separator(factor=0.2)
 
-        controls_row = master_split.row(align=True)
-        ctx_split = controls_row.split(factor=0.4, align=True)
-        ctx_split.prop(m_ptr, ctx_prop, text="")
-
-        btns_split = ctx_split.split(factor=0.5, align=True)
-        if is_primary:
-            op_add = btns_split.operator("chordsong.subitem_add", text="Add", icon="ADD")
+        # Parameters main row (kwargs_json) + "+" to add parameter rows
+        def params_controls(ctx):
+            ctx.label(text="")  # Placeholder to align with call context above
+            btns = ctx.split(factor=0.5, align=True)
+            op_add = btns.operator("chordsong.operator_param_add", text="", icon="ADD")
             op_add.mapping_index = idx
-        else:
-            rem = btns_split.operator("chordsong.subitem_remove", text="Del", icon="TRASH")
-            rem.mapping_index = idx
-            rem.item_index = sub_idx
+            op_add.operator_index = operator_index
+            btns.label(text="")  # Placeholder for Convert column
 
-        conv = btns_split.operator("chordsong.mapping_convert", text="Convert")
-        conv.index = idx
-        conv.sub_index = sub_idx
+        draw_row(container, "Parameters:", op_ptr, "kwargs_json", params_controls)
 
-        layout.separator(factor=0.4)
+        # Additional operator parameter rows
+        for p_i, p in enumerate(getattr(op_ptr, "operator_params", [])):
+            def param_row_controls(ctx, _p_i=p_i):
+                ctx.label(text="")  # Placeholder
+                btns = ctx.split(factor=0.5, align=True)
+                rem = btns.operator("chordsong.operator_param_remove", text="", icon="TRASH")
+                rem.mapping_index = idx
+                rem.operator_index = operator_index
+                rem.param_index = _p_i
+                btns.label(text="")  # Placeholder
 
-    draw_op_row(op_area, m, "operator", "call_context", "kwargs_json", True)
+            draw_row(container, "", p, "value", param_row_controls)
+
+    draw_operator_block(op_area, m, True, operator_index=0, sub_idx=-1)
     for i, sub_op in enumerate(m.sub_operators):
-        draw_op_row(op_area, sub_op, "operator", "call_context", "kwargs_json", False, i)
+        draw_operator_block(op_area, sub_op, False, operator_index=i + 1, sub_idx=i)

@@ -84,19 +84,56 @@ def dump_prefs(prefs) -> dict:
             # 1. Primary operator
             primary_op = get_str_attr(m, "operator")
             if primary_op:
+                # Merge operator params (preserve row structure with underscore prefix)
+                params = [get_str_attr(m, "kwargs_json")]
+                for op_p in getattr(m, "operator_params", []):
+                    params.append(getattr(op_p, "value", "") or "")
+
+                merged_kwargs = {}
+                for row_idx, param_str in enumerate(params):
+                    if not (param_str or "").strip():
+                        continue
+                    row_kwargs = parse_kwargs(param_str)
+                    is_first_key_in_row = True
+                    for key, value in row_kwargs.items():
+                        if row_idx > 0 and is_first_key_in_row:
+                            merged_kwargs[f"_{key}"] = value
+                            is_first_key_in_row = False
+                        else:
+                            merged_kwargs[key] = value
+                            is_first_key_in_row = False
+
                 operators_list.append({
                     "operator": primary_op,
                     "call_context": getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT",
-                    "kwargs": parse_kwargs(get_str_attr(m, "kwargs_json")),
+                    "kwargs": merged_kwargs,
                 })
             
             # 2. Sub-operators
             for sub in getattr(m, "sub_operators", []):
                 if sub.operator.strip():
+                    params = [get_str_attr(sub, "kwargs_json")]
+                    for op_p in getattr(sub, "operator_params", []):
+                        params.append(getattr(op_p, "value", "") or "")
+
+                    merged_kwargs = {}
+                    for row_idx, param_str in enumerate(params):
+                        if not (param_str or "").strip():
+                            continue
+                        row_kwargs = parse_kwargs(param_str)
+                        is_first_key_in_row = True
+                        for key, value in row_kwargs.items():
+                            if row_idx > 0 and is_first_key_in_row:
+                                merged_kwargs[f"_{key}"] = value
+                                is_first_key_in_row = False
+                            else:
+                                merged_kwargs[key] = value
+                                is_first_key_in_row = False
+
                     operators_list.append({
                         "operator": sub.operator.strip(),
                         "call_context": sub.call_context,
-                        "kwargs": parse_kwargs(sub.kwargs_json),
+                        "kwargs": merged_kwargs,
                     })
             
             mapping_dict["operators"] = operators_list
@@ -337,18 +374,54 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
                 
                 primary_op = get_str_attr(m, "operator")
                 if primary_op:
+                    params = [get_str_attr(m, "kwargs_json")]
+                    for op_p in getattr(m, "operator_params", []):
+                        params.append(getattr(op_p, "value", "") or "")
+
+                    merged_kwargs = {}
+                    for row_idx, param_str in enumerate(params):
+                        if not (param_str or "").strip():
+                            continue
+                        row_kwargs = parse_kwargs(param_str)
+                        is_first_key_in_row = True
+                        for key, value in row_kwargs.items():
+                            if row_idx > 0 and is_first_key_in_row:
+                                merged_kwargs[f"_{key}"] = value
+                                is_first_key_in_row = False
+                            else:
+                                merged_kwargs[key] = value
+                                is_first_key_in_row = False
+
                     operators_list.append({
                         "operator": primary_op,
                         "call_context": getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT",
-                        "kwargs": parse_kwargs(get_str_attr(m, "kwargs_json")),
+                        "kwargs": merged_kwargs,
                     })
                 
                 for sub in getattr(m, "sub_operators", []):
                     if sub.operator.strip():
+                        params = [get_str_attr(sub, "kwargs_json")]
+                        for op_p in getattr(sub, "operator_params", []):
+                            params.append(getattr(op_p, "value", "") or "")
+
+                        merged_kwargs = {}
+                        for row_idx, param_str in enumerate(params):
+                            if not (param_str or "").strip():
+                                continue
+                            row_kwargs = parse_kwargs(param_str)
+                            is_first_key_in_row = True
+                            for key, value in row_kwargs.items():
+                                if row_idx > 0 and is_first_key_in_row:
+                                    merged_kwargs[f"_{key}"] = value
+                                    is_first_key_in_row = False
+                                else:
+                                    merged_kwargs[key] = value
+                                    is_first_key_in_row = False
+
                         operators_list.append({
                             "operator": sub.operator.strip(),
                             "call_context": sub.call_context,
-                            "kwargs": parse_kwargs(sub.kwargs_json),
+                            "kwargs": merged_kwargs,
                         })
                 
                 mapping_dict["operators"] = operators_list
@@ -638,33 +711,87 @@ def _add_mapping_from_dict(prefs, item: dict, order_index: int = 0):
         m.property_value = (item.get("property_value", "") or "").strip()
     else:
         # Check for version 2 format (consolidated list)
+        def _apply_operator_kwargs_rows(ptr, kwargs_dict: dict, fallback_kwargs_json: str = ""):
+            """Restore ptr.kwargs_json + ptr.operator_params from a kwargs dict.
+
+            Uses underscore-prefixed keys to mark new rows (same encoding as scripts).
+            """
+            # Clear param rows (safe even if empty)
+            try:
+                ptr.operator_params.clear()
+            except Exception:
+                pass
+
+            if isinstance(kwargs_dict, dict) and kwargs_dict:
+                current_row = {}
+                rows = []
+
+                for key, value in kwargs_dict.items():
+                    if isinstance(key, str) and key.startswith("_"):
+                        if current_row:
+                            rows.append(current_row)
+                        current_row = {key[1:]: value}
+                    else:
+                        current_row[key] = value
+
+                if current_row:
+                    rows.append(current_row)
+
+                if rows:
+                    ptr.kwargs_json = _kwargs_dict_to_str(rows[0])
+                    for row in rows[1:]:
+                        try:
+                            pr = ptr.operator_params.add()
+                            pr.value = _kwargs_dict_to_str(row)
+                        except Exception:
+                            pass
+                    return
+
+            # Fallback to kwargs_json string if provided
+            ptr.kwargs_json = (fallback_kwargs_json or "").strip()
+
         operators = item.get("operators", [])
         if isinstance(operators, list) and operators:
             for idx, op_data in enumerate(operators):
                 if not isinstance(op_data, dict): continue
                 op_id = (op_data.get("operator", "") or "").strip()
                 op_ctx = (op_data.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
-                op_kwargs = _kwargs_dict_to_str(op_data.get("kwargs", {}))
                 if idx == 0:
                     m.operator = op_id
                     m.call_context = op_ctx
-                    m.kwargs_json = op_kwargs
+                    _apply_operator_kwargs_rows(
+                        m,
+                        op_data.get("kwargs", {}) or {},
+                        fallback_kwargs_json=(op_data.get("kwargs_json", "") or ""),
+                    )
                 else:
                     sub = m.sub_operators.add()
                     sub.operator = op_id
                     sub.call_context = op_ctx
-                    sub.kwargs_json = op_kwargs
+                    _apply_operator_kwargs_rows(
+                        sub,
+                        op_data.get("kwargs", {}) or {},
+                        fallback_kwargs_json=(op_data.get("kwargs_json", "") or ""),
+                    )
         else:
             # Backward compatibility (Version 1)
             m.operator = (item.get("operator", "") or "").strip()
             m.call_context = (item.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
-            m.kwargs_json = _kwargs_dict_to_str(item.get("kwargs", {}))
+            _apply_operator_kwargs_rows(
+                m,
+                item.get("kwargs", {}) or {},
+                fallback_kwargs_json=(item.get("kwargs_json", "") or ""),
+            )
             for sub_data in item.get("sub_operators", []):
                 if isinstance(sub_data, dict):
                     sub = m.sub_operators.add()
                     sub.operator = (sub_data.get("operator", "") or "").strip()
                     sub.call_context = (sub_data.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
-                    sub.kwargs_json = _kwargs_dict_to_str(sub_data.get("kwargs", {}))
+                    _apply_operator_kwargs_rows(
+                        sub,
+                        sub_data.get("kwargs", {}) or {},
+                        fallback_kwargs_json=(sub_data.get("kwargs_json", "") or ""),
+                    )
 
     for sub_data in item.get("sub_items", []):
         if isinstance(sub_data, dict):
