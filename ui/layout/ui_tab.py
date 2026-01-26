@@ -103,8 +103,12 @@ def draw_ui_tab(prefs, layout):
     box = layout.box()
     header = box.row()
     header.label(text="Appearance", icon='BRUSH_DATA')
+
+    r = box.row(align=False)
+    r.label(text="Overlay Sorting:")
+    r.prop(prefs, "overlay_sort_mode", text="")
     
-    r = box.row(align=True)
+    r = box.row(align=False)
     r.label(text="Item Display Style:")
     r.prop(prefs, "overlay_item_format", text="")
     

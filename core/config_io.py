@@ -19,6 +19,39 @@ def _normalize_order_indices(mappings):
     for idx, m in enumerate(mappings):
         m.order_index = idx
 
+def _normalize_group_indices(groups):
+    """
+    Normalize group display_order values to match collection positions (0, 1, 2, ...).
+    
+    Some configs (and older defaults) may contain gaps in display_order. While the UI
+    primarily uses collection ordering, keeping display_order normalized ensures
+    move/cleanup operations don't accumulate stale indices.
+    """
+    # Fast-path: already normalized → no-op
+    needs_fix = False
+    for idx, grp in enumerate(groups):
+        try:
+            if int(getattr(grp, "display_order", -1)) != idx:
+                needs_fix = True
+                break
+        except Exception:
+            needs_fix = True
+            break
+
+    if not needs_fix:
+        return False
+
+    changed = False
+    for idx, grp in enumerate(groups):
+        try:
+            if int(getattr(grp, "display_order", -1)) != idx:
+                grp.display_order = idx
+                changed = True
+        except Exception:
+            # Best-effort only; don't break cleanup/move because of one bad item
+            pass
+    return changed
+
 def _ensure_json_serializable(obj):
     """Recursively convert sets to lists to ensure JSON serializability."""
     if isinstance(obj, dict):
@@ -203,6 +236,7 @@ def dump_prefs(prefs) -> dict:
             "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
             "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
             "style": getattr(prefs, "overlay_item_format", "GROUPS_FIRST"),
+            "sort_mode": getattr(prefs, "overlay_sort_mode", "GROUP_AND_INDEX"),
             "format_folder": getattr(prefs, "overlay_format_folder", "C G S N"),
             "format_item": getattr(prefs, "overlay_format_item", "C I L"),
             "separator_a": getattr(prefs, "overlay_separator_a", "→"),
@@ -286,6 +320,7 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
             "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
             "style": getattr(prefs, "overlay_item_format", "GROUPS_FIRST"),
+            "sort_mode": getattr(prefs, "overlay_sort_mode", "GROUP_AND_INDEX"),
             "format_folder": getattr(prefs, "overlay_format_folder", "C G S N"),
             "format_item": getattr(prefs, "overlay_format_item", "C I L"),
             "separator_a": getattr(prefs, "overlay_separator_a", "→"),
@@ -571,6 +606,10 @@ def apply_config(prefs, data: dict) -> list[str]:
         style = overlay.get("style", "GROUPS_FIRST")
         if style in _enum_items_as_set(prefs, "overlay_item_format"):
             prefs.overlay_item_format = style
+
+        sort_mode = overlay.get("sort_mode", None)
+        if sort_mode in _enum_items_as_set(prefs, "overlay_sort_mode"):
+            prefs.overlay_sort_mode = sort_mode
         
         # Load format strings and separators
         string_props = {
@@ -721,6 +760,20 @@ def _add_mapping_from_dict(prefs, item: dict, order_index: int = 0):
                 ptr.operator_params.clear()
             except Exception:
                 pass
+
+            # Compatibility: some shared snippets put underscore-marked keys into the
+            # string form (kwargs_json). If so, decode it like a kwargs dict so
+            # "_pos" becomes "pos" (and starts a new row).
+            if (not kwargs_dict) and (fallback_kwargs_json or "").strip():
+                try:
+                    parsed = parse_kwargs(fallback_kwargs_json)
+                    if isinstance(parsed, dict) and any(
+                        isinstance(k, str) and k.startswith("_") for k in parsed.keys()
+                    ):
+                        kwargs_dict = parsed
+                        fallback_kwargs_json = ""
+                except Exception:
+                    pass
 
             if isinstance(kwargs_dict, dict) and kwargs_dict:
                 current_row = {}

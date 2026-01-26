@@ -268,7 +268,7 @@ def _draw_toggle_mapping(layout, m, idx):
         row = inputs_col.row(align=True)
         split = row.split(factor=gutter_f, align=True)
         split.alignment = 'RIGHT'
-        split.label(text="Property:")
+        split.label(text="Property:" if is_primary else "")
         split.prop(ptr, prop, text="")
 
         # Right side
@@ -281,14 +281,14 @@ def _draw_toggle_mapping(layout, m, idx):
 
         btns_split = ctx_split.split(factor=0.5, align=True)
         if is_primary:
-            op = btns_split.operator("chordsong.subitem_add", text="Add", icon="ADD")
+            op = btns_split.operator("chordsong.subitem_add", text="", icon="ADD")
             op.mapping_index = idx
         else:
-            op = btns_split.operator("chordsong.subitem_remove", text="Del", icon="TRASH")
+            op = btns_split.operator("chordsong.subitem_remove", text="", icon="TRASH")
             op.mapping_index = idx
             op.item_index = sub_idx
 
-        conv = btns_split.operator("chordsong.property_mapping_convert", text="Convert")
+        conv = btns_split.operator("chordsong.property_mapping_convert", text="", icon="FILE_REFRESH")
         conv.index = idx
         conv.sub_index = sub_idx
 
@@ -315,14 +315,14 @@ def _draw_property_mapping(layout, m, idx):
         row1 = inputs_col.row(align=True)
         split1 = row1.split(factor=gutter_f, align=True)
         split1.alignment = 'RIGHT'
-        split1.label(text="Property:")
+        split1.label(text="Property:" if is_primary else "")
         split1.prop(path_ptr, path_prop, text="")
 
         # Value
         row2 = inputs_col.row(align=True)
         split2 = row2.split(factor=gutter_f, align=True)
         split2.alignment = 'RIGHT'
-        split2.label(text="Value:")
+        split2.label(text="Value:" if is_primary else "")
         split2.prop(val_ptr, val_prop, text="")
 
         # Right side
@@ -332,14 +332,14 @@ def _draw_property_mapping(layout, m, idx):
 
         btns_split = ctx_split.split(factor=0.5, align=True)
         if is_primary:
-            op = btns_split.operator("chordsong.subitem_add", text="Add", icon="ADD")
+            op = btns_split.operator("chordsong.subitem_add", text="", icon="ADD")
             op.mapping_index = idx
         else:
-            op = btns_split.operator("chordsong.subitem_remove", text="Del", icon="TRASH")
+            op = btns_split.operator("chordsong.subitem_remove", text="", icon="TRASH")
             op.mapping_index = idx
             op.item_index = sub_idx
 
-        conv = btns_split.operator("chordsong.property_mapping_convert", text="Convert")
+        conv = btns_split.operator("chordsong.property_mapping_convert", text="", icon="FILE_REFRESH")
         conv.index = idx
         conv.sub_index = sub_idx
 
@@ -385,14 +385,14 @@ def _draw_operator_mapping(layout, m, idx):
             ctx.prop(op_ptr, "call_context", text="")
             btns = ctx.split(factor=0.5, align=True)
             if is_primary:
-                op_add = btns.operator("chordsong.subitem_add", text="Add", icon="ADD")
+                op_add = btns.operator("chordsong.subitem_add", text="", icon="ADD")
                 op_add.mapping_index = idx
             else:
-                rem = btns.operator("chordsong.subitem_remove", text="Del", icon="TRASH")
+                rem = btns.operator("chordsong.subitem_remove", text="", icon="TRASH")
                 rem.mapping_index = idx
                 rem.item_index = sub_idx
 
-            conv = btns.operator("chordsong.mapping_convert", text="Convert")
+            conv = btns.operator("chordsong.mapping_convert", text="", icon="FILE_REFRESH")
             conv.index = idx
             conv.sub_index = sub_idx
 

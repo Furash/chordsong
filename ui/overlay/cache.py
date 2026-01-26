@@ -35,11 +35,20 @@ def get_prefs_hash(p, region_w, region_h):
         p.overlay_footer_token_gap,
         p.overlay_footer_label_gap,
         p.overlay_item_format,
+        getattr(p, "overlay_sort_mode", "GROUP_AND_INDEX"),
         # Format string settings (for CUSTOM style)
         getattr(p, "overlay_format_item", "C I L"),
         getattr(p, "overlay_format_folder", "C G S N"),
         getattr(p, "overlay_separator_a", "→"),
         getattr(p, "overlay_separator_b", "::"),
+        # Group order + icons affect both formatting and ordering
+        tuple(
+            (
+                (getattr(grp, "name", "") or "").strip(),
+                (getattr(grp, "icon", "") or "").strip(),
+            )
+            for grp in getattr(p, "groups", [])
+        ),
         p.overlay_list_background,
         p.overlay_header_background,
         p.overlay_footer_background,

@@ -95,21 +95,30 @@ def normalize_token(event_type: str, shift: bool = False, ctrl: bool = False, al
 
     # Ctrl
     if ctrl:
-        if mod_side == "LEFT": mods += "<^"
-        elif mod_side == "RIGHT": mods += ">^"
-        else: mods += "^"
+        if mod_side == "LEFT":
+            mods += "<^"
+        elif mod_side == "RIGHT":
+            mods += ">^"
+        else:
+            mods += "^"
 
     # Alt
     if alt:
-        if mod_side == "LEFT": mods += "<!"
-        elif mod_side == "RIGHT": mods += ">!"
-        else: mods += "!"
+        if mod_side == "LEFT":
+            mods += "<!"
+        elif mod_side == "RIGHT":
+            mods += ">!"
+        else:
+            mods += "!"
 
     # Shift
     if shift:
-        if mod_side == "LEFT": mods += "<+"
-        elif mod_side == "RIGHT": mods += ">+"
-        else: mods += "+"
+        if mod_side == "LEFT":
+            mods += "<+"
+        elif mod_side == "RIGHT":
+            mods += ">+"
+        else:
+            mods += "+"
 
     return mods + base
 
@@ -166,6 +175,37 @@ def _get_token_parts(token: str) -> tuple[set[str], str]:
             break
 
     base = res[i:]
+    # Accept common aliases for the Grave/Tilde key so users can type either form:
+    # - ` / backtick  == grave
+    # - ~ / tilde     == +grave
+    if base in ("`", "backtick"):
+        base = "grave"
+    elif base in ("~", "tilde"):
+        found_mods.add('+')
+        base = "grave"
+    # Accept common shifted punctuation aliases (users may type the literal character
+    # instead of the canonical "+<base>" form):
+    # - <  == +,
+    # - >  == +.
+    # - :  == +;
+    # - "  == +'
+    # - {  == +[
+    # - }  == +]
+    # - ?  == +/
+    # - |  == +\
+    _shifted_punct_aliases = {
+        "<": ",",
+        ">": ".",
+        ":": ";",
+        '"': "'",
+        "{": "[",
+        "}": "]",
+        "?": "/",
+        "|": "\\",
+    }
+    if base in _shifted_punct_aliases:
+        found_mods.add('+')
+        base = _shifted_punct_aliases[base]
     # If base is a single uppercase letter, it implies a shift modifier
     if len(base) == 1 and base.isupper():
         found_mods.add('+')

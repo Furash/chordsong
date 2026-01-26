@@ -2,7 +2,7 @@
 
 # pyright: reportMissingImports=false
 # pyright: reportMissingModuleSource=false
-# pylint: disable=import-error,broad-exception-caught,invalid-name,import-outside-toplevel
+# pylint: disable=import-error,broad-exception-caught,invalid-name,import-outside-toplevel,relative-beyond-top-level
 
 import bpy
 
@@ -46,9 +46,10 @@ class CHORDSONG_OT_Group_Cleanup(bpy.types.Operator):
             
             seen_names.add(name)
 
-        # 3. Normalize order indices for all mappings
-        from ...core.config_io import _normalize_order_indices
+        # 3. Normalize order indices for all mappings + group indices
+        from ...core.config_io import _normalize_order_indices, _normalize_group_indices
         _normalize_order_indices(p.mappings)
+        _normalize_group_indices(p.groups)
 
         # 4. Trigger the actual sync via a delayed timer for stability
         p.sync_groups_delayed(remove_unused=True)

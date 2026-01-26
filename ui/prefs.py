@@ -723,6 +723,18 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
+    overlay_sort_mode: EnumProperty(
+        name="Overlay Sorting",
+        description="How to prioritize chords in the overlay list",
+        items=(
+            ("GROUP_AND_INDEX", "Group + Order", "Use group order (Mappings tab) and manual chord order within each group"),
+            ("LABEL", "Label", "Sort alphabetically by label (natural sorting)"),
+            ("CHORD", "Chord", "Sort by chord token (natural sorting: 2 before 10)"),
+        ),
+        default="GROUP_AND_INDEX",
+        update=_on_prefs_changed,
+    )
+
     overlay_font_size_header: IntProperty(
         name="Header font size",
         default=16,

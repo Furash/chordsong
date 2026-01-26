@@ -1,12 +1,78 @@
 """Rendering functions for the overlay."""
 import os
 import time
+import re
 import gpu  # type: ignore
 from gpu_extras.batch import batch_for_shader  # type: ignore
 from ...utils.render import calculate_scale_factor, calculate_overlay_position
-from ...core.engine import candidates_for_prefix, get_leader_key_token
+from ...core.engine import candidates_for_prefix, get_leader_key_token, get_str_attr
 from .cache import _overlay_cache, get_prefs_hash
 from .layout import build_overlay_rows, wrap_into_columns, calculate_column_widths
+
+_NATURAL_SPLIT_RE = re.compile(r"(\d+)")
+
+def _natural_sort_key(text: str):
+    """Natural sort key: '2' < '10', case-insensitive."""
+    s = (text or "").strip()
+    if not s:
+        return ()
+    parts = _NATURAL_SPLIT_RE.split(s)
+    key = []
+    for part in parts:
+        if not part:
+            continue
+        if part.isdigit():
+            # Numbers sort after text chunks at same position
+            key.append((1, int(part)))
+        else:
+            key.append((0, part.lower()))
+    return tuple(key)
+
+def _label_sort_text(label: str) -> str:
+    """Strip extra info/icons so label sorting feels intuitive."""
+    s = (label or "").strip()
+    if not s:
+        return ""
+    # Drop extra property value info (label:: value)
+    s = s.split("::", 1)[0].strip()
+    # Drop toggle icons appended to label
+    for toggle_icon in ("󰨚", "󰨙"):
+        s = s.replace(toggle_icon, "")
+    # Normalize whitespace
+    return " ".join(s.split())
+
+def _order_mappings_by_group_and_index(prefs, mappings):
+    """Order mappings to match Mappings tab group order + per-group mapping order."""
+    # Preserve original order within each group
+    grouped = {}
+    seen = set()
+
+    for m in list(mappings):
+        group_name = (get_str_attr(m, "group") or "").strip()
+        normalized = group_name if group_name else "Ungrouped"
+        if normalized not in grouped:
+            grouped[normalized] = []
+        grouped[normalized].append(m)
+        if normalized not in seen:
+            seen.add(normalized)
+
+    # User-defined group order (as shown in UI)
+    user_order = []
+    for grp in getattr(prefs, "groups", []):
+        name = (getattr(grp, "name", "") or "").strip()
+        if name and name in grouped:
+            user_order.append(name)
+
+    remaining = [g for g in grouped.keys() if g not in user_order]
+    # "Ungrouped" first, then alphabetically (matches mappings tab behavior)
+    remaining.sort(key=lambda s: (s != "Ungrouped", s.lower()))
+
+    group_order = remaining + user_order
+
+    out = []
+    for g in group_order:
+        out.extend(grouped.get(g, []))
+    return out
 
 def linear_to_srgb(color):
     """Convert a linear color (stored) to sRGB color space (displayed).
@@ -719,7 +785,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
             # Directly convert mappings to candidates for scripts overlay or toggle multi-execution mode
             # For scripts overlay, all items are already filtered and should be displayed
             # For toggle multi-execution mode with empty buffer, show all toggle mappings as final items
-            from ...core.engine import Candidate, split_chord, get_str_attr, tokens_match
+            from ...core.engine import Candidate, split_chord, tokens_match
             cands = []
             for m in filtered_mappings:
                 chord = get_str_attr(m, "chord", "")
@@ -802,8 +868,37 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
             max_items_limit = getattr(p, "scripts_overlay_max_items", p.overlay_max_items)
             cands = cands[:max_items_limit]
         else:
-            cands = candidates_for_prefix(filtered_mappings, buffer_tokens, context=context)
-            # Don't sort - preserve the order from prefs.mappings (manual ordering)
+            sort_mode = getattr(p, "overlay_sort_mode", "GROUP_AND_INDEX")
+
+            mappings_for_candidates = filtered_mappings
+            if sort_mode == "GROUP_AND_INDEX":
+                # Reorder mappings so candidates respect group order + per-group order
+                mappings_for_candidates = _order_mappings_by_group_and_index(p, filtered_mappings)
+
+            cands = candidates_for_prefix(mappings_for_candidates, buffer_tokens, context=context)
+
+            # Apply explicit candidate sorting modes
+            if sort_mode == "LABEL":
+                cands = sorted(
+                    cands,
+                    key=lambda c: (
+                        _label_sort_text(c.label) == "",
+                        _natural_sort_key(_label_sort_text(c.label)),
+                        c.next_token == "",
+                        _natural_sort_key(c.next_token),
+                    ),
+                )
+            elif sort_mode == "CHORD":
+                cands = sorted(
+                    cands,
+                    key=lambda c: (
+                        c.next_token == "",
+                        _natural_sort_key(c.next_token),
+                        _natural_sort_key(_label_sort_text(c.label)),
+                    ),
+                )
+
+            # Apply max items limit
             cands = cands[: p.overlay_max_items]
 
         # Display buffer with + separator instead of spaces
