@@ -405,6 +405,12 @@ def register():
         if not bpy.app.timers.is_registered(stats_operator_timer):
             bpy.app.timers.register(stats_operator_timer, first_interval=0.5)
         
+        # Load blacklist from statistics file on startup
+        try:
+            ChordSong_StatsManager.load_blacklist_from_file()
+        except Exception:
+            pass
+        
     except Exception:
         pass
 

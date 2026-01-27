@@ -100,6 +100,11 @@ class ChordSong_StatsManager:
         cls._schedule_ui_refresh()
     
     @classmethod
+    def mark_dirty(cls) -> None:
+        """Mark statistics as dirty to trigger a save on next timer cycle."""
+        cls._dirty = True
+    
+    @classmethod
     def _schedule_ui_refresh(cls) -> None:
         """Schedule a debounced UI refresh if conditions are met."""
         prefs = cls._get_preferences()
@@ -145,13 +150,25 @@ class ChordSong_StatsManager:
         
         try:
             with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                # Ensure metadata structure exists
+                if "_metadata" not in data:
+                    data["_metadata"] = {}
+                if "last_saved" not in data["_metadata"]:
+                    data["_metadata"]["last_saved"] = 0.0
+                if "blacklist" not in data["_metadata"]:
+                    data["_metadata"]["blacklist"] = []
+                return data
         except (json.JSONDecodeError, IOError):
-            return {}
+            return {"_metadata": {"last_saved": 0.0, "blacklist": []}}
     
     @classmethod
     def _merge_buffer_into_data(cls, data: Dict, buffer: Dict) -> None:
         """Merge buffer counts into data dictionary (in-place)."""
+        # Ensure metadata exists
+        if "_metadata" not in data:
+            data["_metadata"] = {}
+        
         for category, items in buffer.items():
             if category not in data:
                 data[category] = {}
@@ -164,7 +181,7 @@ class ChordSong_StatsManager:
     @classmethod
     def _write_json_file(cls, path: str, data: Dict, sort_keys: bool = False) -> bool:
         """
-        Write data to JSON file.
+        Write data to JSON file with timestamp and blacklist.
         
         Returns:
             True if successful, False otherwise.
@@ -173,6 +190,24 @@ class ChordSong_StatsManager:
             parent_dir = os.path.dirname(path)
             if parent_dir:
                 os.makedirs(parent_dir, exist_ok=True)
+            
+            # Ensure metadata exists and update timestamp
+            if "_metadata" not in data:
+                data["_metadata"] = {}
+            import time
+            data["_metadata"]["last_saved"] = time.time()
+            
+            # Sync blacklist from preferences to metadata
+            prefs = cls._get_preferences()
+            if prefs:
+                try:
+                    blacklist_json = getattr(prefs, 'stats_blacklist', '[]')
+                    blacklist_list = json.loads(blacklist_json)
+                    data["_metadata"]["blacklist"] = blacklist_list
+                except Exception:
+                    # If blacklist can't be read, keep existing or use empty list
+                    if "blacklist" not in data["_metadata"]:
+                        data["_metadata"]["blacklist"] = []
             
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4, sort_keys=sort_keys)
@@ -235,18 +270,34 @@ class ChordSong_StatsManager:
         cls._buffer = {"operators": {}, "chords": {}}
         cls._dirty = False
         
-        # Load and merge data
-        data = cls._load_data_from_file(internal_path)
-        cls._merge_buffer_into_data(data, current_buffer)
+        # Load and merge data for internal file
+        internal_data = cls._load_data_from_file(internal_path)
+        cls._merge_buffer_into_data(internal_data, current_buffer)
         
         # Save to internal file
-        internal_success = cls._write_json_file(internal_path, data)
+        internal_success = cls._write_json_file(internal_path, internal_data)
         
         # Save to export path if configured
+        # IMPORTANT: Load existing export file data and merge with internal data to avoid data loss
         export_success = False
         export_path = cls._get_export_path()
         if export_path:
-            export_success = cls._write_json_file(export_path, data, sort_keys=True)
+            # Load existing export file data (if it exists)
+            export_data = cls._load_data_from_file(export_path)
+            export_last_saved = export_data.get("_metadata", {}).get("last_saved", 0.0)
+            internal_last_saved = internal_data.get("_metadata", {}).get("last_saved", 0.0)
+            
+            # Only merge if internal file is newer than export file
+            # This prevents double-counting when export file already contains previously exported data
+            if internal_last_saved > export_last_saved:
+                # Internal file has newer data, merge it into export
+                cls._merge_buffer_into_data(export_data, internal_data)
+            else:
+                # Export file is newer or same, merge only the new buffer data
+                # This handles the case where export file was manually edited or has external data
+                cls._merge_buffer_into_data(export_data, current_buffer)
+            
+            export_success = cls._write_json_file(export_path, export_data, sort_keys=True)
         
         # Handle failures
         if not internal_success and not export_success:
@@ -284,7 +335,8 @@ class ChordSong_StatsManager:
         path = cls.get_internal_file_path()
         if path:
             data = cls._load_data_from_file(path)
-            if category in data:
+            # Skip metadata when processing categories
+            if category in data and category != "_metadata":
                 for identifier, value in data[category].items():
                     result[identifier] = cls._normalize_count(value)
         
@@ -295,3 +347,37 @@ class ChordSong_StatsManager:
                 result[identifier] = result.get(identifier, 0) + count
         
         return result
+    
+    @classmethod
+    def load_blacklist_from_file(cls) -> None:
+        """
+        Load blacklist from internal statistics file and sync to preferences.
+        Called on addon registration to restore blacklist between sessions.
+        """
+        prefs = cls._get_preferences()
+        if not prefs:
+            return
+        
+        path = cls.get_internal_file_path()
+        if not path:
+            return
+        
+        try:
+            data = cls._load_data_from_file(path)
+            blacklist = data.get("_metadata", {}).get("blacklist", [])
+            
+            # Sync to preferences if blacklist exists in file
+            if blacklist:
+                try:
+                    # Only update if preferences blacklist is empty (first load)
+                    # or if file blacklist is newer (has more items)
+                    current_blacklist_json = getattr(prefs, 'stats_blacklist', '[]')
+                    current_blacklist = json.loads(current_blacklist_json) if current_blacklist_json else []
+                    
+                    # Merge: prefer file blacklist if it has more items, otherwise keep current
+                    if len(blacklist) >= len(current_blacklist):
+                        prefs.stats_blacklist = json.dumps(sorted(blacklist))
+                except Exception:
+                    pass
+        except Exception:
+            pass

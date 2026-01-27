@@ -289,6 +289,14 @@ class CHORDSONG_OT_Stats_Blacklist(Operator):
                     action_msg = "added to"
 
                 _save_blacklist(prefs, blacklist)
+                # Save blacklist to statistics file immediately
+                try:
+                    from ..core.stats_manager import ChordSong_StatsManager
+                    # Trigger a save to update the blacklist in the JSON file
+                    # Mark as dirty so the next auto-save will include the updated blacklist
+                    ChordSong_StatsManager.mark_dirty()
+                except Exception:
+                    pass
                 # Light refresh - just update UI, no file export needed
                 _refresh_stats_ui(prefs, export_to_file=False)
                 self.report({'INFO'}, f"Item {action_msg} blacklist")
@@ -304,6 +312,12 @@ class CHORDSONG_OT_Stats_Blacklist(Operator):
                 if blacklist_key in blacklist:
                     blacklist.remove(blacklist_key)
                     _save_blacklist(prefs, blacklist)
+                    # Save blacklist to statistics file
+                    try:
+                        from ..core.stats_manager import ChordSong_StatsManager
+                        ChordSong_StatsManager.mark_dirty()
+                    except Exception:
+                        pass
                     # Light refresh - just update UI, no file export needed
                     _refresh_stats_ui(prefs, export_to_file=False)
                     # Reopen editor dialog
@@ -312,6 +326,12 @@ class CHORDSONG_OT_Stats_Blacklist(Operator):
             elif self.action == 'CLEAR':
                 # Clear all blacklisted items
                 _save_blacklist(prefs, set())
+                # Save blacklist to statistics file
+                try:
+                    from ..core.stats_manager import ChordSong_StatsManager
+                    ChordSong_StatsManager.mark_dirty()
+                except Exception:
+                    pass
                 # Light refresh - just update UI, no file export needed
                 _refresh_stats_ui(prefs, export_to_file=False)
                 self.report({'INFO'}, "Blacklist cleared")
