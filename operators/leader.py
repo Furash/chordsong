@@ -9,8 +9,8 @@ import bpy  # type: ignore
 
 from ..core.engine import (
     candidates_for_prefix,
+    chord_to_display_form,
     find_exact_mapping,
-    humanize_chord,
     normalize_token,
     parse_kwargs,
     filter_mappings_by_context,
@@ -55,7 +55,7 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
 
     # Set up new fading overlay
     state["active"] = True
-    state["chord_text"] = humanize_chord(chord_tokens)
+    state["chord_text"] = chord_to_display_form(" ".join(chord_tokens))
     state["label"] = label
     state["icon"] = icon
     state["show_chord"] = show_chord
@@ -872,7 +872,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 prefs_obj = context.preferences.addons[pkg].preferences
                 if getattr(prefs_obj, 'enable_stats', False):
                     from ..core.stats_manager import ChordSong_StatsManager
-                    chord_str = " ".join(chord_tokens)
+                    chord_str = chord_to_display_form(" ".join(chord_tokens))
                     ChordSong_StatsManager.record("chords", chord_str)
             except Exception:
                 pass
@@ -1469,7 +1469,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             return {"RUNNING_MODAL"}
 
         # No match - remove only the last token and keep modal running so user can try again
-        chord_str = humanize_chord(self._buffer)
+        chord_str = chord_to_display_form(" ".join(self._buffer))
         self.report({"WARNING"}, f'Unknown chord: "{chord_str}"')
         if self._buffer:
             self._buffer.pop()  # Remove only the last token

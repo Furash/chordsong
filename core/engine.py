@@ -213,6 +213,23 @@ def _get_token_parts(token: str) -> tuple[set[str], str]:
 
     return found_mods, base
 
+def token_for_display(token: str) -> str:
+    """Convert grave/tilde aliases to display characters for UI and stats.
+    Returns ` for grave, ~ for +grave, otherwise the token unchanged.
+    """
+    if not token:
+        return token
+    if token == "grave":
+        return "`"
+    if token == "+grave":
+        return "~"
+    return token
+
+def chord_to_display_form(chord_str: str) -> str:
+    """Convert a chord string to display form (grave -> `, +grave -> ~)."""
+    tokens = split_chord(chord_str)
+    return " ".join(token_for_display(t) for t in tokens)
+
 def tokens_match(mapping_token: str, pressed_token: str) -> bool:
     """Check if a mapping token matches a pressed token, handling AHK modifiers and order."""
     if mapping_token == pressed_token:

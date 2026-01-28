@@ -11,6 +11,7 @@ from ..core.engine import (
     normalize_token,
     get_leader_key_type,
     get_leader_key_token,
+    token_for_display,
 )
 from ..utils.render import (
     DrawHandlerManager,
@@ -146,7 +147,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 return extra[extra_idx] if extra_idx < len(extra) else "?"
             else:  # 74-87 (14 items)
                 # ` ~ , . < > : ; ' " [ ] { }
-                punctuation = ["grave", "+grave", ",", ".", "+,", "+.", "+;", ";", "'", "+'", "[", "]", "+[", "+]"]
+                punctuation = ["`", "~", ",", ".", "+,", "+.", "+;", ";", "'", "+'", "[", "]", "+[", "+]"]
                 punct_idx = idx - 74
                 return punctuation[punct_idx] if punct_idx < len(punctuation) else "?"
 
@@ -210,7 +211,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 max_icon_w = max(max_icon_w, iw)
 
             # Chord width
-            chord_text = "+".join(entry.chord_tokens)
+            chord_text = "+".join(token_for_display(t) for t in entry.chord_tokens)
             cw, _ = blf.dimensions(0, chord_text)
             max_chord_w = max(max_chord_w, cw)
 
@@ -242,7 +243,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         footer_bg_top = footer_y + chord_size # Default if no footer
 
         if p.overlay_show_footer:
-            leader_token = get_leader_key_token()
+            leader_token = token_for_display(get_leader_key_token())
             footer_items = [
                 {"token": "ESC", "label": "Close", "icon": ""},
                 {"token": leader_token, "label": "Repeat Most Recent", "icon": ""}
@@ -330,7 +331,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                         pass
 
                 # Draw chord (50% alpha)
-                chord_text = "+".join(entry.chord_tokens)
+                chord_text = "+".join(token_for_display(t) for t in entry.chord_tokens)
                 blf.size(0, chord_size)
                 blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * 0.25)
                 blf.position(0, chord_col_x, current_y, 0)
@@ -596,12 +597,11 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 self._finish(context)
                 return {"CANCELLED"}
 
-        # Handle punctuation keys (grave, +grave ... for items 75-88)
+        # Handle punctuation keys (` ~ , . ... for items 75-88); accept both display and alias
         punct_map = {
-            "grave": 74, "+grave": 75, ",": 76, ".": 77,
-            "+,": 78, "+.": 79, "+;": 80, ";": 81,
-            "'": 82, "+'": 83, "[": 84, "]": 85,
-            "+[": 86, "+]": 87
+            "grave": 74, "`": 74, "+grave": 75, "~": 75,
+            ",": 76, ".": 77, "+,": 78, "+.": 79, "+;": 80, ";": 81,
+            "'": 82, "+'": 83, "[": 84, "]": 85, "+[": 86, "+]": 87
         }
         if tok in punct_map:
             index = punct_map[tok]

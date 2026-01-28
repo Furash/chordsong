@@ -5,7 +5,7 @@ import re
 import gpu  # type: ignore
 from gpu_extras.batch import batch_for_shader  # type: ignore
 from ...utils.render import calculate_scale_factor, calculate_overlay_position
-from ...core.engine import candidates_for_prefix, get_leader_key_token, get_str_attr
+from ...core.engine import candidates_for_prefix, get_leader_key_token, get_str_attr, token_for_display
 from .cache import _overlay_cache, get_prefs_hash
 from .layout import build_overlay_rows, wrap_into_columns, calculate_column_widths
 
@@ -289,7 +289,7 @@ def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_si
 
         # Token for "Recent Commands"
         if label_txt == "Recent Commands" and "+" in token_txt:
-            leader_token = get_leader_key_token()
+            leader_token = token_for_display(get_leader_key_token())
             token_txt = f"{leader_token}+{leader_token}"
 
         # Measure token
@@ -756,7 +756,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
     if cache_valid:
         # Use cached layout data
         layout = _overlay_cache["layout_data"]
-        prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
+        prefix = "+".join(token_for_display(t) for t in buffer_tokens) if buffer_tokens else "> ..."
         if custom_header is not None:
             header_left = custom_header
         else:
@@ -902,7 +902,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
             cands = cands[: p.overlay_max_items]
 
         # Display buffer with + separator instead of spaces
-        prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
+        prefix = "+".join(token_for_display(t) for t in buffer_tokens) if buffer_tokens else "> ..."
         
         # Use custom header if provided, otherwise use blend file name
         if custom_header is not None:

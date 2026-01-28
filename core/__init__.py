@@ -9,6 +9,7 @@ Core logic for the addon (no Blender UI drawing).
 from .config_io import apply_config, dump_prefs, loads_json
 from .engine import (
     candidates_for_prefix,
+    chord_to_display_form,
     filter_mappings_by_context,
     find_exact_mapping,
     get_leader_key_token,
@@ -17,11 +18,13 @@ from .engine import (
     normalize_token,
     parse_kwargs,
     set_leader_key_in_keymap,
+    token_for_display,
 )
 
 __all__ = [
     "apply_config",
     "candidates_for_prefix",
+    "chord_to_display_form",
     "dump_prefs",
     "filter_mappings_by_context",
     "find_exact_mapping",
@@ -32,4 +35,5 @@ __all__ = [
     "normalize_token",
     "parse_kwargs",
     "set_leader_key_in_keymap",
+    "token_for_display",
 ]

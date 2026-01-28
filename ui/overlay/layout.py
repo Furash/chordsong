@@ -1,5 +1,5 @@
 """Layout calculation functions for overlay."""
-from ...core.engine import get_leader_key_token
+from ...core.engine import get_leader_key_token, token_for_display
 from .tokenizer import (
     parse_format_string,
     generate_tokens_for_folder,
@@ -74,6 +74,7 @@ def build_overlay_rows(cands, has_buffer, p=None, preserve_order=False):
     
     for c in sorted_cands:
         token = c.next_token
+        display_token = token_for_display(token)
         icon = c.icon if c.icon else ""
         
         if c.count > 1 or not c.is_final:
@@ -81,7 +82,7 @@ def build_overlay_rows(cands, has_buffer, p=None, preserve_order=False):
             token_types = parse_format_string(format_folder)
             tokens = generate_tokens_for_folder(
                 token_types=token_types,
-                chord=token,
+                chord=display_token,
                 icon=icon,
                 groups=c.groups if c.groups else [],
                 count=c.count,
@@ -93,7 +94,7 @@ def build_overlay_rows(cands, has_buffer, p=None, preserve_order=False):
             # Store tokens in the row for rendering
             rows.append({
                 "kind": "item",
-                "token": token,
+                "token": display_token,
                 "label": "",
                 "label_extra": "",
                 "icon": "",
@@ -115,7 +116,7 @@ def build_overlay_rows(cands, has_buffer, p=None, preserve_order=False):
             token_types = parse_format_string(format_item)
             tokens = generate_tokens_for_item(
                 token_types=token_types,
-                chord=token,
+                chord=display_token,
                 icon=icon,
                 groups=c.groups if c.groups else [],
                 label=label,
@@ -127,7 +128,7 @@ def build_overlay_rows(cands, has_buffer, p=None, preserve_order=False):
             
             rows.append({
                 "kind": "item",
-                "token": token,
+                "token": display_token,
                 "label": "",
                 "label_extra": label_extra if label_extra else "",
                 "icon": "",
@@ -143,7 +144,7 @@ def build_overlay_rows(cands, has_buffer, p=None, preserve_order=False):
 
     if not has_buffer:
         # Only show recents at root level (no buffer)
-        leader_token = get_leader_key_token()
+        leader_token = token_for_display(get_leader_key_token())
         footer.append({"kind": "item", "token": f"{leader_token}+{leader_token}", "label": "Recent Commands", "icon": ""})
 
     footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})

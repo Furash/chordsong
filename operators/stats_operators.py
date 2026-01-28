@@ -9,6 +9,7 @@ import os
 import bpy
 from bpy.types import Operator
 
+from ..core.engine import chord_to_display_form
 from ..utils.addon_package import addon_root_package
 from .common import prefs, schedule_autosave_safe
 from .context_menu.extractors import detect_editor_context, normalize_bpy_data_path
@@ -111,9 +112,9 @@ def _refresh_stats_ui(prefs, export_to_file=False):
 
             # For chords, find the mapping to get group and label
             if category == 'chords':
-                # Find mapping by chord string
+                # Find mapping by chord string (normalize so grave/` and +grave/~ match)
                 for mapping in prefs.mappings:
-                    if mapping.chord == name:
+                    if chord_to_display_form((mapping.chord or "").strip()) == name:
                         item.group = mapping.group or ""
                         item.label = mapping.label or ""
                         break
