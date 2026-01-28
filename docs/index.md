@@ -39,7 +39,7 @@ Chord Song uses **Nerd Font** icons to provide visual cues in the overlay. Witho
 3. In Blender, navigate to **Edit > Preferences > Interface > Text Rendering**.
 4. Set the **Interface Font** to your installed Nerd Font.
 
-![Text Rendering](/chordsong/scr/text_rendering.png){ width="640" }
+![Text Rendering](/chordsong/scr/overlay_example.png)
 
 ### 2. Download the Add-on
 
