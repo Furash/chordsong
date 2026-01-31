@@ -778,7 +778,7 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
         """Draw the conflict report in a dialog."""
         layout = self.layout
 
-        # Capture popup region for later refresh (Blender 4.2+)
+        # Capture popup region for later refresh
         region_popup = getattr(context, "region_popup", None)
         if region_popup:
             CHORDSONG_OT_CheckConflicts._popup_region = region_popup

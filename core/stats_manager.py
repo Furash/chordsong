@@ -5,6 +5,7 @@
 
 import json
 import os
+from datetime import datetime, timezone
 from typing import Dict, Optional
 import bpy
 
@@ -12,16 +13,18 @@ import bpy
 class ChordSong_StatsManager:
     """
     Singleton-style statistics manager that tracks operator and chord usage.
-    Uses an in-memory buffer and periodic writes to disk to ensure zero performance impact.
+    Uses an in-memory buffer and periodic writes to disk to avoid blocking the main thread.
     """
     
     # Constants
     DEFAULT_INTERVAL = 180.0
     DISABLED_CHECK_INTERVAL = 60.0
     STATS_FILENAME = "chordsong_stats.json"
-    
+    _CATEGORIES = ("operators", "chords")
+
     # Class state
     _buffer: Dict[str, Dict[str, int]] = {"operators": {}, "chords": {}}
+    _file_cache: Optional[Dict[str, Dict[str, int]]] = None  # loaded at startup, refreshed after save
     _dirty: bool = False
     _cached_internal_path: Optional[str] = None
     timer_should_stop: bool = False  # Public flag for preference callback coordination
@@ -53,17 +56,14 @@ class ChordSong_StatsManager:
         """
         if cls._cached_internal_path:
             return cls._cached_internal_path
-        
-        if hasattr(bpy.utils, 'extension_path_user'):
-            try:
-                pkg = cls._get_addon_package()
-                extension_dir = bpy.utils.extension_path_user(pkg, path="", create=True)
-                if extension_dir:
-                    cls._cached_internal_path = os.path.join(extension_dir, cls.STATS_FILENAME)
-                    return cls._cached_internal_path
-            except Exception:
-                pass
-        
+        try:
+            pkg = cls._get_addon_package()
+            extension_dir = bpy.utils.extension_path_user(pkg, path="", create=True)
+            if extension_dir:
+                cls._cached_internal_path = os.path.join(extension_dir, cls.STATS_FILENAME)
+                return cls._cached_internal_path
+        except Exception:
+            pass
         return ""
     
     @classmethod
@@ -82,6 +82,17 @@ class ChordSong_StatsManager:
             export_path += '.json'
         
         return export_path
+
+    @classmethod
+    def get_stats_file_path(cls) -> str:
+        """
+        Get the canonical stats file path: export path if set, else internal path.
+        Used for load at startup, Export, auto-save, and Reload so one file is the source of truth.
+        """
+        export_path = cls._get_export_path()
+        if export_path:
+            return export_path
+        return cls.get_internal_file_path() or ""
     
     @classmethod
     def record(cls, category: str, identifier: str) -> None:
@@ -97,51 +108,44 @@ class ChordSong_StatsManager:
         
         cls._buffer[category][identifier] = cls._buffer[category].get(identifier, 0) + 1
         cls._dirty = True
-        cls._schedule_ui_refresh()
+        # Do not schedule UI refresh from here: modifying prefs.stats_collection from a timer
+        # can cause Blender crashes. User can click Refresh or re-open the Stats tab to update.
     
     @classmethod
     def mark_dirty(cls) -> None:
         """Mark statistics as dirty to trigger a save on next timer cycle."""
         cls._dirty = True
     
-    @classmethod
-    def _schedule_ui_refresh(cls) -> None:
-        """Schedule a debounced UI refresh if conditions are met."""
-        prefs = cls._get_preferences()
-        if not prefs:
-            return
-        
-        should_refresh = (
-            getattr(prefs, 'prefs_tab', None) == "STATS" and
-            getattr(prefs, 'stats_realtime_refresh', False)
-        )
-        
-        if should_refresh:
-            try:
-                bpy.app.timers.unregister(cls._debounced_refresh)
-            except ValueError:
-                pass
-            bpy.app.timers.register(cls._debounced_refresh, first_interval=0.5)
-    
-    @classmethod
-    def _debounced_refresh(cls):
-        """Debounced refresh function called by timer."""
-        prefs = cls._get_preferences()
-        if prefs and getattr(prefs, 'prefs_tab', None) == "STATS":
-            try:
-                from ..operators.stats_operators import _refresh_stats_ui
-                _refresh_stats_ui(prefs, export_to_file=False)
-            except Exception:
-                pass
-        return None
     
     @classmethod
     def _normalize_count(cls, value) -> int:
-        """Normalize count value (handles legacy dict format)."""
+        """Return count as int; supports legacy dict format {"count": n}."""
         if isinstance(value, dict):
             return value.get("count", 0)
         return int(value) if isinstance(value, (int, float)) else 0
-    
+
+    @classmethod
+    def _ensure_json_path(cls, path: str) -> str:
+        """Strip path and append .json if missing. Caller should check path non-empty and file exists if needed."""
+        path = (path or "").strip()
+        if path and not path.lower().endswith(".json"):
+            path = path + ".json"
+        return path
+
+    @classmethod
+    def _data_to_cache(cls, data: Dict) -> Dict[str, Dict[str, int]]:
+        """Build {operators: {...}, chords: {...}} from loaded JSON data, with normalized counts."""
+        cache = {}
+        for category in cls._CATEGORIES:
+            if category in data and isinstance(data[category], dict):
+                cache[category] = {
+                    k: cls._normalize_count(v)
+                    for k, v in data[category].items()
+                }
+            else:
+                cache[category] = {}
+        return cache
+
     @classmethod
     def _load_data_from_file(cls, path: str) -> Dict:
         """Load statistics data from JSON file."""
@@ -155,29 +159,72 @@ class ChordSong_StatsManager:
                 if "_metadata" not in data:
                     data["_metadata"] = {}
                 if "last_saved" not in data["_metadata"]:
-                    data["_metadata"]["last_saved"] = 0.0
+                    data["_metadata"]["last_saved"] = ""
                 if "blacklist" not in data["_metadata"]:
                     data["_metadata"]["blacklist"] = []
                 return data
         except (json.JSONDecodeError, IOError):
-            return {"_metadata": {"last_saved": 0.0, "blacklist": []}}
-    
+            return {"_metadata": {"last_saved": "", "blacklist": []}}
+
     @classmethod
-    def _merge_buffer_into_data(cls, data: Dict, buffer: Dict) -> None:
-        """Merge buffer counts into data dictionary (in-place)."""
-        # Ensure metadata exists
-        if "_metadata" not in data:
+    def load_from_file(cls) -> None:
+        """
+        Load statistics from the stats file into the in-memory cache.
+        Called at addon startup; uses export path if set, else internal path.
+        Replaces current Blender data with file content.
+        """
+        path = cls.get_stats_file_path()
+        if not path or not os.path.exists(path):
+            return
+        try:
+            data = cls._load_data_from_file(path)
+            cls._file_cache = cls._data_to_cache(data)
+            cls._buffer = {"operators": {}, "chords": {}}
+            cls._dirty = False
+        except Exception:
+            cls._file_cache = None
+
+    @classmethod
+    def reload_from_path(cls, path: str) -> bool:
+        """
+        Reload statistics from a JSON file path (canonical stats file or any path).
+        Replaces in-memory cache and buffer with file contents.
+        Returns True if file was loaded, False if path empty, file missing, or error.
+        """
+        path = cls._ensure_json_path(path)
+        if not path or not os.path.exists(path):
+            return False
+        try:
+            data = cls._load_data_from_file(path)
+            cls._file_cache = cls._data_to_cache(data)
+            cls._buffer = {"operators": {}, "chords": {}}
+            cls._dirty = False
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def write_current_to_file(cls, path: str) -> bool:
+        """
+        Overwrite the stats file with current UI state (file cache + buffer).
+        On success, clears the buffer so in-memory state matches the file.
+        Returns True on success, False otherwise.
+        """
+        path = cls._ensure_json_path(path)
+        if not path:
+            return False
+        try:
+            data = {cat: dict(cls.get_stats(cat)) for cat in cls._CATEGORIES}
             data["_metadata"] = {}
-        
-        for category, items in buffer.items():
-            if category not in data:
-                data[category] = {}
-            
-            for identifier, buffer_count in items.items():
-                buffer_count = cls._normalize_count(buffer_count)
-                existing_count = cls._normalize_count(data[category].get(identifier, 0))
-                data[category][identifier] = existing_count + buffer_count
-    
+            success = cls._write_json_file(path, data, sort_keys=True)
+            if success:
+                cls._file_cache = {cat: dict(data[cat]) for cat in cls._CATEGORIES}
+                cls._buffer = {"operators": {}, "chords": {}}
+                cls._dirty = False
+            return success
+        except Exception:
+            return False
+
     @classmethod
     def _write_json_file(cls, path: str, data: Dict, sort_keys: bool = False) -> bool:
         """
@@ -191,11 +238,10 @@ class ChordSong_StatsManager:
             if parent_dir:
                 os.makedirs(parent_dir, exist_ok=True)
             
-            # Ensure metadata exists and update timestamp
+            # Ensure metadata exists and update timestamp (human-readable ISO 8601)
             if "_metadata" not in data:
                 data["_metadata"] = {}
-            import time
-            data["_metadata"]["last_saved"] = time.time()
+            data["_metadata"]["last_saved"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
             
             # Sync blacklist from preferences to metadata
             prefs = cls._get_preferences()
@@ -217,101 +263,35 @@ class ChordSong_StatsManager:
             return False
     
     @classmethod
-    def _restore_buffer(cls, failed_buffer: Dict) -> None:
-        """Restore failed buffer back into active buffer."""
-        for category, items in failed_buffer.items():
-            if category not in cls._buffer:
-                cls._buffer[category] = {}
-            
-            for identifier, count in items.items():
-                count = cls._normalize_count(count)
-                cls._buffer[category][identifier] = cls._buffer[category].get(identifier, 0) + count
-        
-        cls._dirty = True
-    
-    @classmethod
     def save_to_disk(cls) -> Optional[float]:
         """
-        Periodic task to merge buffer into JSON files.
-        
-        This is registered as a Blender persistent timer. Returning a float
-        causes Blender to automatically re-schedule the timer for that many seconds.
-        Returning None stops the timer.
-        
-        Returns:
-            Interval in seconds until next save, or None to stop timer.
+        Periodic task: overwrite the stats file with current UI state (what get_stats() returns).
+        Uses the same file as Export and load (get_stats_file_path()).
         """
-        # Check if timer should stop (set by preference change callback)
-        # This prevents duplicate timer registration during interval changes
         if cls.timer_should_stop:
             cls.timer_should_stop = False
-            return None  # Stop this timer instance, new one will be registered
-        
-        # Get configured interval
+            return None
         prefs = cls._get_preferences()
         interval = cls.DEFAULT_INTERVAL
-        
         if prefs:
-            interval = float(getattr(prefs, 'stats_auto_export_interval', cls.DEFAULT_INTERVAL))
+            interval = float(getattr(prefs, "stats_auto_export_interval", cls.DEFAULT_INTERVAL))
             if interval <= 0:
                 return cls.DISABLED_CHECK_INTERVAL
-        
-        # Skip if no new data
         if not cls._dirty:
             return interval
-        
-        # Get internal file path
-        internal_path = cls.get_internal_file_path()
-        if not internal_path:
+        path = cls.get_stats_file_path()
+        if not path:
             return interval
-        
-        # Atomically swap buffer
-        current_buffer = cls._buffer
-        cls._buffer = {"operators": {}, "chords": {}}
-        cls._dirty = False
-        
-        # Load and merge data for internal file
-        internal_data = cls._load_data_from_file(internal_path)
-        cls._merge_buffer_into_data(internal_data, current_buffer)
-        
-        # Save to internal file
-        internal_success = cls._write_json_file(internal_path, internal_data)
-        
-        # Save to export path if configured
-        # IMPORTANT: Load existing export file data and merge with internal data to avoid data loss
-        export_success = False
-        export_path = cls._get_export_path()
-        if export_path:
-            # Load existing export file data (if it exists)
-            export_data = cls._load_data_from_file(export_path)
-            export_last_saved = export_data.get("_metadata", {}).get("last_saved", 0.0)
-            internal_last_saved = internal_data.get("_metadata", {}).get("last_saved", 0.0)
-            
-            # Only merge if internal file is newer than export file
-            # This prevents double-counting when export file already contains previously exported data
-            if internal_last_saved > export_last_saved:
-                # Internal file has newer data, merge it into export
-                cls._merge_buffer_into_data(export_data, internal_data)
-            else:
-                # Export file is newer or same, merge only the new buffer data
-                # This handles the case where export file was manually edited or has external data
-                cls._merge_buffer_into_data(export_data, current_buffer)
-            
-            export_success = cls._write_json_file(export_path, export_data, sort_keys=True)
-        
-        # Handle failures
-        if not internal_success and not export_success:
-            cls._restore_buffer(current_buffer)
-        
+        cls.write_current_to_file(path)
         return interval
     
     @classmethod
     def clear_all(cls) -> None:
-        """Reset all statistics (buffer and internal file)."""
+        """Reset all statistics (buffer, file cache, and stats file)."""
         cls._buffer = {"operators": {}, "chords": {}}
+        cls._file_cache = {"operators": {}, "chords": {}}
         cls._dirty = False
-        
-        path = cls.get_internal_file_path()
+        path = cls.get_stats_file_path()
         if path and os.path.exists(path):
             try:
                 os.remove(path)
@@ -321,60 +301,55 @@ class ChordSong_StatsManager:
     @classmethod
     def get_stats(cls, category: str) -> Dict[str, int]:
         """
-        Get all statistics for a given category.
-        
-        Args:
-            category: Category to retrieve ('operators', 'chords')
-            
-        Returns:
-            Dictionary mapping identifier to count.
+        Return stats for a category: file cache + buffer (what the UI displays).
+        category: 'operators' or 'chords'. Returns dict of identifier -> count.
         """
         result = {}
-        
-        # Load from internal file
-        path = cls.get_internal_file_path()
-        if path:
-            data = cls._load_data_from_file(path)
-            # Skip metadata when processing categories
-            if category in data and category != "_metadata":
-                for identifier, value in data[category].items():
-                    result[identifier] = cls._normalize_count(value)
-        
-        # Merge with buffer
+        if cls._file_cache is not None and category in cls._file_cache:
+            result = dict(cls._file_cache[category])
+        else:
+            path = cls.get_stats_file_path()
+            if path:
+                data = cls._load_data_from_file(path)
+                if category in data and category != "_metadata":
+                    for identifier, value in data[category].items():
+                        result[identifier] = cls._normalize_count(value)
+        # Add unsaved buffer so UI never shows less than file
         if category in cls._buffer:
             for identifier, value in cls._buffer[category].items():
                 count = cls._normalize_count(value)
-                result[identifier] = result.get(identifier, 0) + count
+                existing = cls._normalize_count(result.get(identifier, 0))
+                result[identifier] = existing + count
         
         return result
     
     @classmethod
     def load_blacklist_from_file(cls) -> None:
         """
-        Load blacklist from internal statistics file and sync to preferences.
-        Called on addon registration to restore blacklist between sessions.
+        Load blacklist from the stats file and sync to preferences.
+        Called on addon registration; uses same file as load_from_file (get_stats_file_path).
+        """
+        cls.load_blacklist_from_path(cls.get_stats_file_path())
+
+    @classmethod
+    def load_blacklist_from_path(cls, path: str) -> None:
+        """
+        Load blacklist from a statistics JSON file and sync to preferences.
+        Used after reload_from_path so the UI filter matches the loaded file.
         """
         prefs = cls._get_preferences()
         if not prefs:
             return
-        
-        path = cls.get_internal_file_path()
-        if not path:
+        path = cls._ensure_json_path(path or "")
+        if not path or not os.path.exists(path):
             return
-        
         try:
             data = cls._load_data_from_file(path)
             blacklist = data.get("_metadata", {}).get("blacklist", [])
-            
-            # Sync to preferences if blacklist exists in file
             if blacklist:
                 try:
-                    # Only update if preferences blacklist is empty (first load)
-                    # or if file blacklist is newer (has more items)
-                    current_blacklist_json = getattr(prefs, 'stats_blacklist', '[]')
-                    current_blacklist = json.loads(current_blacklist_json) if current_blacklist_json else []
-                    
-                    # Merge: prefer file blacklist if it has more items, otherwise keep current
+                    current_blacklist_json = getattr(prefs, "stats_blacklist", "[]") or "[]"
+                    current_blacklist = json.loads(current_blacklist_json)
                     if len(blacklist) >= len(current_blacklist):
                         prefs.stats_blacklist = json.dumps(sorted(blacklist))
                 except Exception:

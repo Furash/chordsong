@@ -59,7 +59,7 @@ from .script_select import CHORDSONG_OT_Script_Select, CHORDSONG_OT_Script_Selec
 from .scripts_overlay import CHORDSONG_OT_ScriptsOverlay
 from .stats_operators import (
     CHORDSONG_OT_Stats_Blacklist,
-    CHORDSONG_OT_Stats_Clear,
+    CHORDSONG_OT_Stats_Reload,
     CHORDSONG_OT_Stats_Convert_To_Chord,
     CHORDSONG_OT_Stats_Export,
     CHORDSONG_OT_Stats_Refresh,
@@ -121,7 +121,7 @@ __all__ = [
     "CHORDSONG_OT_Script_Select_Apply",
     "CHORDSONG_OT_ScriptsOverlay",
     "CHORDSONG_OT_Stats_Blacklist",
-    "CHORDSONG_OT_Stats_Clear",
+    "CHORDSONG_OT_Stats_Reload",
     "CHORDSONG_OT_Stats_Convert_To_Chord",
     "CHORDSONG_OT_Stats_Export",
     "CHORDSONG_OT_Stats_Refresh",

@@ -198,6 +198,7 @@ def dump_prefs(prefs) -> dict:
         "version": CHORDSONG_CONFIG_VERSION,
         "scripts_folder": get_str_attr(prefs, "scripts_folder"),
         "allow_custom_user_scripts": bool(getattr(prefs, "allow_custom_user_scripts", False)),
+        "enable_stats": bool(getattr(prefs, "enable_stats", False)),
         "overlay": {
             "enabled": bool(getattr(prefs, "overlay_enabled", True)),
             "fading_enabled": bool(getattr(prefs, "overlay_fading_enabled", True)),
@@ -275,7 +276,8 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
     
     # Always include version
     result["version"] = CHORDSONG_CONFIG_VERSION
-    
+    result["enable_stats"] = bool(getattr(prefs, "enable_stats", False))
+
     # Scripts folder
     if filter_options.get("scripts_folder", True):
         result["scripts_folder"] = get_str_attr(prefs, "scripts_folder")
@@ -529,6 +531,12 @@ def apply_config(prefs, data: dict) -> list[str]:
     else:
         # Explicitly set to False if not in config (for backward compatibility and security)
         prefs.allow_custom_user_scripts = False
+
+    # Statistics tracking (saved with user config so it survives Load/Save Config)
+    if "enable_stats" in data:
+        v = data.get("enable_stats", False)
+        if isinstance(v, bool):
+            prefs.enable_stats = v
 
     overlay = data.get("overlay", {})
     if isinstance(overlay, dict):

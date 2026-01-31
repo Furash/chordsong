@@ -301,9 +301,50 @@ def _cleanup_fading_overlay():
 
 
 def cleanup_all_handlers():
-    """Clean up all draw handlers and timers. Called on addon unregister."""
+    """Clean up all draw handlers and timers. Called on addon unregister.
+    Must remove all draw handlers before Python/GPU teardown to avoid
+    EXCEPTION_ACCESS_VIOLATION in pygpu_shader__tp_dealloc (Vulkan shutdown).
+    """
     _cleanup_fading_overlay()
     disable_test_overlays()
+    # Remove Leader overlay draw handlers (class-level)
+    try:
+        for st, handle in list(CHORDSONG_OT_Leader._draw_handles.items()):
+            try:
+                st.draw_handler_remove(handle, "WINDOW")
+            except Exception:
+                pass
+        CHORDSONG_OT_Leader._draw_handles.clear()
+    except Exception:
+        pass
+    # Remove Scripts overlay draw handlers (class-level)
+    try:
+        from .scripts_overlay import CHORDSONG_OT_Scripts_Overlay
+        for st, handle in list(CHORDSONG_OT_Scripts_Overlay._draw_handles.items()):
+            try:
+                st.draw_handler_remove(handle, "WINDOW")
+            except Exception:
+                pass
+        CHORDSONG_OT_Scripts_Overlay._draw_handles.clear()
+    except Exception:
+        pass
+    # Remove Recents overlay draw handlers (instance-level, registered in class list)
+    try:
+        from .recents import CHORDSONG_OT_Recents
+        for dm in list(getattr(CHORDSONG_OT_Recents, "_active_draw_managers", [])):
+            try:
+                dm.remove_handler()
+            except Exception:
+                pass
+        CHORDSONG_OT_Recents._active_draw_managers.clear()
+    except Exception:
+        pass
+    # Clear overlay cache so no stale refs to layout/GPU-related data
+    try:
+        from ..ui.overlay.cache import clear_overlay_cache
+        clear_overlay_cache()
+    except Exception:
+        pass
 
 class CHORDSONG_OT_Leader(bpy.types.Operator):
     """Start chord capture (leader)"""

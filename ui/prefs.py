@@ -39,24 +39,15 @@ def default_config_path() -> str:
     Default config path: Uses extension-specific user directory.
     This directory persists between extension upgrades.
     """
-    # Check if extension_path_user is available (Blender 4.2+)
-    if hasattr(bpy.utils, 'extension_path_user'):
-        try:
-            # Use extension_path_user for extension-specific user directory
-            # This ensures the directory persists between upgrades
-            # Try with root package name (first 3 parts: bl_ext.repo.addon_id)
-            # as extensions use this format for their namespace
-            root_pkg = _addon_root_pkg()
-            extension_dir = bpy.utils.extension_path_user(root_pkg, path="", create=True)
-            if extension_dir:
-                return os.path.join(extension_dir, "chordsong.json")
-        except Exception:
-            # Silently fallback if extension_path_user fails
-            pass
-    
-    # Fallback to user_resource if extension_path_user is not available
-    # (for backward compatibility with older Blender versions)
-    # Note: This respects BLENDER_USER_RESOURCES and BLENDER_USER_SCRIPTS env vars
+    # Use extension_path_user for extension-specific user directory (persists between upgrades)
+    try:
+        root_pkg = _addon_root_pkg()
+        extension_dir = bpy.utils.extension_path_user(root_pkg, path="", create=True)
+        if extension_dir:
+            return os.path.join(extension_dir, "chordsong.json")
+    except Exception:
+        pass
+    # Fallback to user_resource (respects BLENDER_USER_RESOURCES / BLENDER_USER_SCRIPTS)
     try:
         presets_dir = bpy.utils.user_resource("SCRIPTS", path="presets", create=True)
         if presets_dir:
@@ -1121,12 +1112,6 @@ class CHORDSONG_Preferences(AddonPreferences):
         description="Path to export statistics JSON file",
         subtype="FILE_PATH",
         default="",
-    )
-    
-    stats_realtime_refresh: BoolProperty(
-        name="Realtime Refresh",
-        description="Automatically refresh statistics table as you use Blender (updates within 0.5s)",
-        default=True,
     )
     
     stats_auto_export_interval: IntProperty(

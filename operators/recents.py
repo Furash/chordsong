@@ -46,6 +46,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
     _buffer = None  # Buffer for capturing digits
     _draw_manager = None  # DrawHandlerManager instance
+    _active_draw_managers = []  # Class-level: for cleanup on addon unregister
 
     def _draw_callback(self):
         """Draw callback for the recents overlay."""
@@ -364,7 +365,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         self._buffer = []
         self._draw_manager = DrawHandlerManager()
         self._draw_manager.ensure_handler(context, self._draw_callback, p)
-
+        try:
+            CHORDSONG_OT_Recents._active_draw_managers.append(self._draw_manager)
+        except Exception:
+            pass
         context.window_manager.modal_handler_add(self)
         self._draw_manager.tag_redraw()
         return {"RUNNING_MODAL"}
@@ -374,6 +378,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         if hasattr(self, '_panel_states') and self._panel_states:
             self._restore_panels(context)
         if self._draw_manager:
+            try:
+                CHORDSONG_OT_Recents._active_draw_managers.remove(self._draw_manager)
+            except (ValueError, AttributeError):
+                pass
             self._draw_manager.remove_handler()
             self._draw_manager.tag_redraw()
             self._draw_manager = None

@@ -3,12 +3,20 @@
 # pyright: reportMissingImports=false
 # pylint: disable=import-error,broad-exception-caught
 
+STATS_LIST_ROWS = 12
+
 
 def draw_statistics_tab(prefs, _context, layout):
     """Draw the statistics tab."""
-    # Note: Initial refresh removed - realtime refresh handles updates
-    # Manual refresh available via "Export to JSON" button
-    
+    # Populate the list from current in-memory stats whenever the tab is drawn,
+    # so the UI always shows what is being tracked (including after Export).
+    if prefs.enable_stats:
+        try:
+            from ...operators.stats_operators import _refresh_stats_ui
+            _refresh_stats_ui(prefs, export_to_file=False)
+        except Exception:
+            pass
+
     # Enable/disable statistics tracking
     box = layout.box()
     row = box.row()
@@ -40,12 +48,11 @@ def draw_statistics_tab(prefs, _context, layout):
     row.prop(prefs, "stats_export_path", text="Export Path")
     row = box.row()
     row.prop(prefs, "stats_sort_by_usage", text="Sort by Usage", toggle=True)
-    row.prop(prefs, "stats_realtime_refresh", text="Realtime Refresh", toggle=True, icon='FILE_REFRESH')
-    row.operator("chordsong.stats_clear", text="Clear All", icon='TRASH')
+    row.operator("chordsong.stats_reload", text="Reload from JSON", icon='FILE_REFRESH')
     
     row = box.row()
     row.scale_y = 1.3
-    row.operator("chordsong.stats_export", text="Export to JSON", icon='EXPORT')
+    row.operator("chordsong.stats_export", text="Export Stats", icon='EXPORT')
 
     # Blacklist editor button
     op = row.operator("chordsong.stats_blacklist", text="Edit Blacklist", icon='PREFERENCES')
@@ -67,16 +74,26 @@ def draw_statistics_tab(prefs, _context, layout):
         "stats_collection",
         prefs,
         "stats_collection_index",
-        rows=12,
+        rows=STATS_LIST_ROWS,
     )
-    
-    
-    # Display count
+
+    # Display count and blacklist hint
     row = box.row()
     total_items = len(prefs.stats_collection)
     if total_items > 0:
         total_count = sum(item.count for item in prefs.stats_collection)
         row.label(text=f"Total: {total_items} items, {total_count} uses")
+        # Show how many are hidden by blacklist so user knows why list can be shorter than JSON
+        try:
+            from ...core.stats_manager import ChordSong_StatsManager
+            ops_count = len(ChordSong_StatsManager.get_stats("operators"))
+            chords_count = len(ChordSong_StatsManager.get_stats("chords"))
+            total_in_data = ops_count + chords_count
+            if total_in_data > total_items:
+                row = box.row()
+                row.label(text=f"({total_in_data - total_items} hidden by blacklist)", icon='FILTER')
+        except Exception:
+            pass
     else:
         row.label(text="No statistics data yet. Use Blender to start tracking!")
 

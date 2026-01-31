@@ -4,7 +4,6 @@
 # pylint: disable=import-error,broad-exception-caught
 
 import json
-import os
 
 import bpy
 from bpy.types import Operator
@@ -38,45 +37,47 @@ def _make_blacklist_key(category, name):
     return f"{category}:{name}"
 
 
-class CHORDSONG_OT_Stats_Clear(Operator):
-    """Clear all statistics data"""
-    bl_idname = "chordsong.stats_clear"
-    bl_label = "Clear Statistics"
-    bl_description = "Clear all usage statistics (cannot be undone)"
+def _write_stats_to_file(prefs):
+    """
+    Overwrite the stats file with current UI state (what is displayed).
+    Uses the canonical stats path (export path if set, else internal).
+    Returns True on success, False otherwise.
+    """
+    from ..core.stats_manager import ChordSong_StatsManager
+    path = ChordSong_StatsManager.get_stats_file_path()
+    return path and ChordSong_StatsManager.write_current_to_file(path)
+
+
+class CHORDSONG_OT_Stats_Reload(Operator):
+    """Reload statistics from the stats file (same file as Export/load)"""
+    bl_idname = "chordsong.stats_reload"
+    bl_label = "Reload from JSON"
+    bl_description = "Reload statistics from the stats file; replaces in-memory data with file content"
     bl_options = {'INTERNAL'}
 
-    def invoke(self, context, event):
-        """Show confirmation dialog before clearing."""
-        return context.window_manager.invoke_confirm(self, event)
-
     def execute(self, context):
-        """Clear all statistics."""
+        """Reload from the stats file (same file as Export/load) and refresh UI."""
         try:
             from ..core.stats_manager import ChordSong_StatsManager
-            ChordSong_StatsManager.clear_all()
-
-            # Clear the UI list as well
             prefs = context.preferences.addons[addon_root_package(__package__)].preferences
-            prefs.stats_collection.clear()
-
-            self.report({'INFO'}, "Statistics cleared")
+            path = ChordSong_StatsManager.get_stats_file_path()
+            if ChordSong_StatsManager.reload_from_path(path):
+                ChordSong_StatsManager.load_blacklist_from_path(path)
+                _refresh_stats_ui(prefs, export_to_file=False)
+                self.report({'INFO'}, "Statistics reloaded from JSON")
+            else:
+                self.report({'WARNING'}, "No stats file found or could not load")
         except Exception as e:
-            self.report({'ERROR'}, f"Failed to clear statistics: {str(e)}")
+            self.report({'ERROR'}, f"Failed to reload: {str(e)}")
             return {'CANCELLED'}
-
         return {'FINISHED'}
 
 
 def _refresh_stats_ui(prefs, export_to_file=False):
     """
-    Refresh the statistics UI collection.
-
-    Args:
-        prefs: Addon preferences object
-        export_to_file: If True, also export statistics to JSON file (more expensive)
-
-    Returns:
-        True if successful, False otherwise
+    Rebuild the stats UI list from get_stats() (optionally save to file after).
+    prefs: addon preferences. export_to_file: if True, also write current state to stats file (e.g. Refresh button).
+    Returns True on success, False on error.
     """
     try:
         from ..core.stats_manager import ChordSong_StatsManager
@@ -87,9 +88,9 @@ def _refresh_stats_ui(prefs, export_to_file=False):
         # Get blacklist
         blacklist = _get_blacklist(prefs)
 
-        # Collect all statistics from all categories (excluding blacklisted)
+        # Collect from both categories, excluding blacklisted
         all_stats = []
-        for category in ['operators', 'chords']:
+        for category in ("operators", "chords"):
             stats = ChordSong_StatsManager.get_stats(category)
             for name, count in stats.items():
                 # Skip if blacklisted
@@ -119,32 +120,12 @@ def _refresh_stats_ui(prefs, export_to_file=False):
                         item.label = mapping.label or ""
                         break
 
-        # Optionally export to file (only if requested, as it's expensive)
+        # Optionally overwrite stats file with current state (e.g. when Refresh is clicked)
         if export_to_file:
             try:
-                prefs.ensure_defaults()
-                export_path = prefs.stats_export_path.strip()
-
-                if export_path:
-                    # Ensure .json extension
-                    if not export_path.lower().endswith('.json'):
-                        export_path += '.json'
-                        prefs.stats_export_path = export_path
-
-                    export_data = {
-                        "operators": ChordSong_StatsManager.get_stats("operators"),
-                        "chords": ChordSong_StatsManager.get_stats("chords")
-                    }
-
-                    # Write to file
-                    parent_dir = os.path.dirname(export_path)
-                    if parent_dir:
-                        os.makedirs(parent_dir, exist_ok=True)
-
-                    with open(export_path, 'w', encoding='utf-8') as f:
-                        json.dump(export_data, f, indent=4, sort_keys=True)
+                _write_stats_to_file(prefs)
             except Exception:
-                pass  # Silently fail export, refresh still succeeds
+                pass  # Silently fail, refresh still succeeds
 
         return True
     except Exception:
@@ -175,53 +156,29 @@ class CHORDSONG_OT_Stats_Refresh(Operator):
 
 
 class CHORDSONG_OT_Stats_Export(Operator):
-    """Export statistics to JSON file"""
+    """Overwrite the stats JSON file with what is currently displayed in the UI"""
     bl_idname = "chordsong.stats_export"
     bl_label = "Export Statistics"
-    bl_description = "Export all statistics to a JSON file"
+    bl_description = "Overwrite the stats file with current UI state (export path if set, else internal file)"
     bl_options = {'INTERNAL'}
 
     def execute(self, context):
-        """Export statistics to file."""
+        """Overwrite the stats file with current UI state."""
         try:
             from ..core.stats_manager import ChordSong_StatsManager
-
             prefs = context.preferences.addons[addon_root_package(__package__)].preferences
-
-            # Ensure defaults are set (will auto-assign path if empty)
-            prefs.ensure_defaults()
-
-            export_path = prefs.stats_export_path.strip()
-
-            if not export_path:
-                self.report({'ERROR'}, "Cannot determine export path. Please check preferences.")
+            path = ChordSong_StatsManager.get_stats_file_path()
+            if not path:
+                self.report({'ERROR'}, "Cannot determine stats file path.")
                 return {'CANCELLED'}
-
-            # Ensure .json extension
-            if not export_path.lower().endswith('.json'):
-                export_path += '.json'
-                prefs.stats_export_path = export_path
-
-            # Collect all statistics
-            export_data = {
-                "operators": ChordSong_StatsManager.get_stats("operators"),
-                "chords": ChordSong_StatsManager.get_stats("chords")
-            }
-
-            # Write to file
-            parent_dir = os.path.dirname(export_path)
-            if parent_dir:
-                os.makedirs(parent_dir, exist_ok=True)
-
-            with open(export_path, 'w', encoding='utf-8') as f:
-                json.dump(export_data, f, indent=4, sort_keys=True)
-
-            self.report({'INFO'}, f"Statistics exported to {export_path}")
-
+            if _write_stats_to_file(prefs):
+                self.report({'INFO'}, f"Statistics saved to {path}")
+            else:
+                self.report({'ERROR'}, "Failed to write statistics to file.")
+                return {'CANCELLED'}
         except Exception as e:
             self.report({'ERROR'}, f"Failed to export statistics: {str(e)}")
             return {'CANCELLED'}
-
         return {'FINISHED'}
 
 

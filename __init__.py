@@ -80,7 +80,7 @@ from .operators import (
     CHORDSONG_OT_Script_Select_Apply,
     CHORDSONG_OT_ScriptsOverlay,
     CHORDSONG_OT_Stats_Blacklist,
-    CHORDSONG_OT_Stats_Clear,
+    CHORDSONG_OT_Stats_Reload,
     CHORDSONG_OT_Stats_Convert_To_Chord,
     CHORDSONG_OT_Stats_Export,
     CHORDSONG_OT_Stats_Refresh,
@@ -161,7 +161,7 @@ _classes = (
     CHORDSONG_OT_Script_Select_Apply,
     CHORDSONG_OT_ScriptsOverlay,
     CHORDSONG_OT_Stats_Blacklist,
-    CHORDSONG_OT_Stats_Clear,
+    CHORDSONG_OT_Stats_Reload,
     CHORDSONG_OT_Stats_Convert_To_Chord,
     CHORDSONG_OT_Stats_Export,
     CHORDSONG_OT_Stats_Refresh,
@@ -173,47 +173,117 @@ _classes = (
 
 addon_keymaps = []
 
-# Track which operators we've already recorded to avoid duplicates
+# Track which operators we've already recorded to avoid duplicates (modal + last-op)
 _stats_tracked_operators = set()
+_stats_last_op_id = None
 
 def stats_operator_timer():
-    """Timer-based handler to track operator usage for statistics."""
+    """Timer-based handler to track operator usage for statistics.
+    - window.modal_operators: currently running modal instances (one count per invocation).
+    - wm.operators[-1]: last executed operator (catches non-modal/EXEC ops once per run).
+    """
+    global _stats_last_op_id
     try:
         package_name = addon_root_package(__package__)
-        prefs = bpy.context.preferences.addons[package_name].preferences
-        
-        # Only track if statistics are enabled
-        if not prefs.enable_stats:
-            return 0.5  # Check every 0.5 seconds
-        
+        try:
+            prefs_obj = bpy.context.preferences.addons[package_name].preferences
+        except (KeyError, AttributeError, TypeError):
+            return 0.5
+        if not getattr(prefs_obj, "enable_stats", False):
+            return 0.5
         from .core.stats_manager import ChordSong_StatsManager
-        
-        # Check window_manager.operators for new operators
-        wm = bpy.context.window_manager
-        if wm and hasattr(wm, 'operators') and wm.operators:
-            for op in wm.operators:
-                if op and hasattr(op, 'bl_idname'):
-                    op_idname = op.bl_idname
-                    # Use operator object as key to track which ones we've seen
-                    op_key = id(op)
-                    
-                    if op_key not in _stats_tracked_operators:
-                        _stats_tracked_operators.add(op_key)
-                        ChordSong_StatsManager.record("operators", op_idname)
-        
-        # Clean up old operator references (operators are removed from list when done)
-        # Keep only operators that still exist in the list
-        if wm and hasattr(wm, 'operators') and wm.operators:
-            current_op_ids = {id(op) for op in wm.operators if op}
+        wm = getattr(bpy.context, "window_manager", None)
+        if not wm:
+            return 0.5
+        current_op_ids = set()
+        checked = False
+        # 1) Modal operators (running instances) – per-invocation counts
+        # Snapshot with list() to avoid iterating a collection that may change during iteration
+        windows = getattr(wm, "windows", None)
+        if windows is not None:
+            try:
+                for win in windows:
+                    if win is None:
+                        continue
+                    modal_ops = getattr(win, "modal_operators", None)
+                    if modal_ops is None:
+                        continue
+                    checked = True
+                    try:
+                        snapshot = list(modal_ops)
+                    except (ReferenceError, RuntimeError, TypeError):
+                        snapshot = []
+                    for op in snapshot:
+                        if op is None:
+                            continue
+                        try:
+                            bl_idname = getattr(op, "bl_idname", None)
+                            if not bl_idname:
+                                continue
+                            op_key = id(op)
+                            current_op_ids.add(op_key)
+                            if op_key not in _stats_tracked_operators:
+                                _stats_tracked_operators.add(op_key)
+                                ChordSong_StatsManager.record("operators", bl_idname)
+                        except (ReferenceError, RuntimeError, AttributeError):
+                            continue
+            except (ReferenceError, RuntimeError, AttributeError):
+                pass
+        if not checked:
+            win = getattr(bpy.context, "window", None)
+            if win is not None:
+                modal_ops = getattr(win, "modal_operators", None)
+                if modal_ops is not None:
+                    try:
+                        snapshot = list(modal_ops)
+                    except (ReferenceError, RuntimeError, TypeError):
+                        snapshot = []
+                    for op in snapshot:
+                        if op is None:
+                            continue
+                        try:
+                            bl_idname = getattr(op, "bl_idname", None)
+                            if not bl_idname:
+                                continue
+                            checked = True
+                            op_key = id(op)
+                            current_op_ids.add(op_key)
+                            if op_key not in _stats_tracked_operators:
+                                _stats_tracked_operators.add(op_key)
+                                ChordSong_StatsManager.record("operators", bl_idname)
+                        except (ReferenceError, RuntimeError, AttributeError):
+                            continue
+                    if snapshot:
+                        checked = True
+        if checked:
             _stats_tracked_operators.intersection_update(current_op_ids)
-        else:
-            # If no operators, clear the set
-            _stats_tracked_operators.clear()
-        
+        # 2) Last executed operator (wm.operators) – catches non-modal/EXEC ops
+        # Access last element only; avoid len() or full iteration to reduce crash risk
+        try:
+            reg = getattr(wm, "operators", None)
+            if reg is None:
+                _stats_last_op_id = None
+            else:
+                last_op = reg[-1]
+                if last_op is None:
+                    _stats_last_op_id = None
+                else:
+                    bl_idname = getattr(last_op, "bl_idname", None)
+                    if bl_idname:
+                        op_key = id(last_op)
+                        if op_key != _stats_last_op_id and op_key not in current_op_ids:
+                            if op_key not in _stats_tracked_operators:
+                                _stats_tracked_operators.add(op_key)
+                                ChordSong_StatsManager.record("operators", bl_idname)
+                        _stats_last_op_id = op_key
+                    else:
+                        _stats_last_op_id = None
+        except Exception:
+            _stats_last_op_id = None
     except Exception:
         pass
-    
-    return 0.5  # Check every 0.5 seconds
+    return 0.5
+
 
 def _safe_register_class(cls):
     """Register a class, recovering from partial/failed previous registrations."""
@@ -401,12 +471,13 @@ def register():
             
             bpy.app.timers.register(ChordSong_StatsManager.save_to_disk, first_interval=initial_interval)
         
-        # Register the operator tracking timer
+        # Register the operator tracking timer; delay first run to avoid startup crash
         if not bpy.app.timers.is_registered(stats_operator_timer):
-            bpy.app.timers.register(stats_operator_timer, first_interval=0.5)
+            bpy.app.timers.register(stats_operator_timer, first_interval=2.0)
         
-        # Load blacklist from statistics file on startup
+        # Load statistics and blacklist from file on startup
         try:
+            ChordSong_StatsManager.load_from_file()
             ChordSong_StatsManager.load_blacklist_from_file()
         except Exception:
             pass
@@ -444,9 +515,10 @@ def unregister():
             bpy.app.timers.unregister(stats_operator_timer)
         
         
-        # Clear tracked operators set
-        global _stats_tracked_operators
+        # Clear tracked operators set and last-op cursor
+        global _stats_tracked_operators, _stats_last_op_id
         _stats_tracked_operators.clear()
+        _stats_last_op_id = None
     except Exception:
         pass
 

@@ -83,9 +83,6 @@ def linear_to_srgb(color):
     
     This conversion should make rendered colors match the color picker preview.
     
-    Uses Blender's native conversion for accuracy (Blender 3.2+) or falls back 
-    to manual conversion for older versions.
-    
     Args:
         color: tuple/list of (r, g, b, a) in linear space (0.0-1.0) - as stored
     
@@ -93,7 +90,6 @@ def linear_to_srgb(color):
         tuple of (r, g, b, a) in sRGB space (0.0-1.0) - for rendering
     """
     try:
-        # Use Blender's built-in conversion (Blender 3.2+) for exact matching
         from mathutils import Color
         linear_color = Color((
             max(0.0, min(1.0, color[0])),
@@ -101,19 +97,14 @@ def linear_to_srgb(color):
             max(0.0, min(1.0, color[2]))
         ))
         srgb_color = linear_color.from_scene_linear_to_srgb()
-        # Apply calibration to match Blender's color picker as closely as possible
-        # The picker preview may use a slightly different gamma curve or view transform
-        # Calibrated to within ±1 8-bit value (0.39% precision) which is the practical limit
-        calibration = 0.936  # Fine-tuned to compensate for observed brightness difference
+        calibration = 0.936  # Fine-tuned to match color picker preview
         return (
             max(0.0, min(1.0, srgb_color[0] * calibration)),
             max(0.0, min(1.0, srgb_color[1] * calibration)),
             max(0.0, min(1.0, srgb_color[2] * calibration)),
             color[3] if len(color) > 3 else 1.0
         )
-    except (ImportError, AttributeError) as e:
-        # Fallback for Blender < 3.2
-        print(f"[ChordSong] Using fallback color conversion (Blender < 3.2): {e}")
+    except (ImportError, AttributeError):
         def linear_to_srgb_component(c):
             c = max(0.0, min(1.0, c))  # Clamp input
             if c <= 0.0031308:
