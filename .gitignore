@@ -10,6 +10,10 @@ __pycache__/
 # C extensions
 *.so
 
+# env
+.claude
+.vscode
+
 # Distribution / packaging
 .Python
 build/
@@ -212,3 +216,4 @@ cython_debug/
 VIDEO_SCRIPT.md
 IMPLEMENTATION_NOTES.md
 CHORD_SERIALIZATION_IMPLEMENTATION.md
+COMPLIANCE_SUMMARY.md
