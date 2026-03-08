@@ -42,6 +42,18 @@ k c  → ...          g g  → ...
 a 2  → ...          k c  → ...
 ```
 
+## Overlay Sort Mode
+
+The overlay can sort chords independently from their list order. Go to **Preferences → UI → Layout & Items → Sort** to choose a sort mode.
+
+Presets: `g d c` (Group → Depth → Index), `d g c` (Depth → Group → Index), `g c` (Group → Index), `L` (Label).
+
+Select **Custom** to write your own sort string using tokens:
+
+`D` depth, `d` depth (inverted), `g` group (display order), `G` group (ABC), `C` chord (ABC), `c` index, `L` label, `n` count, `N` count (inverted).
+
+See [Overlay Configuration](../customization/overlay.md#overlay-sort-order) for full details.
+
 ## Order Preservation
 
 Your custom chord order is preserved:

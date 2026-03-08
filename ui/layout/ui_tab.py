@@ -38,6 +38,14 @@ def draw_ui_tab(prefs, layout):
     r.separator()
     r.prop(prefs, "overlay_max_label_length", text="Max Label Length (0 = no limit)")
 
+    r = box.row(align=True)
+    r.prop(prefs, "overlay_sort_mode", text="Sort")
+    if prefs.overlay_sort_mode == "CUSTOM":
+        r = box.row(align=True)
+        r.prop(prefs, "overlay_sort_string", text="Sort String")
+        r = box.row(align=True)
+        r.label(text="D=Depth  d=Depth(inv)  g=Group  G=Group(ABC)  C=Chord(ABC)  c=Index  L=Label  n=Count  N=Count(inv)")
+
     # Section: Scripts Overlay
     box = layout.box()
     header = box.row()

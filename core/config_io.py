@@ -171,6 +171,8 @@ def dump_prefs(prefs) -> dict:
             "separator_a": getattr(prefs, "overlay_separator_a", "→"),
             "separator_b": getattr(prefs, "overlay_separator_b", "::"),
             "max_label_length": int(getattr(prefs, "overlay_max_label_length", 0)),
+            "sort_mode": getattr(prefs, "overlay_sort_mode", "PRESET_GDO"),
+            "sort_string": getattr(prefs, "overlay_sort_string", "g d c"),
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
             "ungrouped_expanded": bool(getattr(prefs, "ungrouped_expanded", False)),
@@ -254,6 +256,8 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             "separator_a": getattr(prefs, "overlay_separator_a", "→"),
             "separator_b": getattr(prefs, "overlay_separator_b", "::"),
             "max_label_length": int(getattr(prefs, "overlay_max_label_length", 0)),
+            "sort_mode": getattr(prefs, "overlay_sort_mode", "PRESET_GDO"),
+            "sort_string": getattr(prefs, "overlay_sort_string", "g d c"),
             "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
             "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
             "ungrouped_expanded": bool(getattr(prefs, "ungrouped_expanded", False)),
@@ -498,7 +502,34 @@ def apply_config(prefs, data: dict) -> list[str]:
         style = overlay.get("style", "GROUPS_FIRST")
         if style in _enum_items_as_set(prefs, "overlay_item_format"):
             prefs.overlay_item_format = style
-        
+
+        sort_mode = overlay.get("sort_mode", "PRESET_GDO")
+        # Migrate old enum values to new PRESET_* names
+        _sort_migration = {
+            # Old enum names → closest remaining preset
+            "GROUP_ORDER": "PRESET_GO", "GROUP_ALPHA": "PRESET_GO",
+            "GROUP_LABEL": "PRESET_GO", "GROUP_DEPTH": "PRESET_GDO",
+            "GROUP_DEPTH_IDX": "PRESET_GDO", "DEPTH_GROUP": "PRESET_DGO",
+            "DEPTH_ALPHA": "PRESET_DGO", "DEPTH_LABEL": "PRESET_L",
+            "ALPHA": "PRESET_L", "LABEL": "PRESET_L", "ORDER_INDEX": "PRESET_GO",
+            # Removed presets → closest remaining preset
+            "PRESET_GC": "PRESET_GO", "PRESET_GL": "PRESET_GO",
+            "PRESET_GOD": "PRESET_GDO", "PRESET_DgO": "PRESET_DGO",
+            "PRESET_DL": "PRESET_L", "PRESET_C": "PRESET_L",
+            "PRESET_O": "PRESET_GO",
+        }
+        sort_mode = _sort_migration.get(sort_mode, sort_mode)
+        if sort_mode in _enum_items_as_set(prefs, "overlay_sort_mode"):
+            prefs.overlay_sort_mode = sort_mode
+
+        sort_string = overlay.get("sort_string", "")
+        if sort_string:
+            # Migrate old tokens: O→c, G↔g (swapped)
+            _tok_map = {'O': 'c', 'G': 'g', 'g': 'G'}
+            migrated = [_tok_map.get(tok, tok) for tok in str(sort_string).split()]
+            try: prefs.overlay_sort_string = " ".join(migrated)
+            except: pass
+
         # Load format strings and separators
         string_props = {
             "format_folder": "overlay_format_folder",

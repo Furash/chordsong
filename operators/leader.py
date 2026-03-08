@@ -799,9 +799,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             "BUTTON4MOUSE", "BUTTON5MOUSE", "BUTTON6MOUSE", "BUTTON7MOUSE"
         }
         
-        # Wheel events should trigger on PRESS (they don't have default drag actions)
-        is_wheel = event.type in {"WHEELUPMOUSE", "WHEELDOWNMOUSE"}
-        
         # For mouse buttons, wait for RELEASE; for everything else (including wheel), wait for PRESS
         if is_mouse_button:
             if event.value != "RELEASE":

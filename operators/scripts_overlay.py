@@ -25,15 +25,20 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
     _filtered_scripts_list = []  # Filtered scripts (max 9 for 1-9 chords)
     _invoke_area_ptr = None
     _panel_states = {}  # Store original panel visibility states: {area_ptr: {"n_panel": bool, "t_panel": bool}}
+    _cancel_requested = False  # Class-level flag to allow cancellation from re-invocation
 
     def _ensure_draw_handler(self, context: bpy.types.Context):
         p = prefs(context)
         if not p.overlay_enabled or self._draw_handles:
             return
 
-        self._invoke_area_ptr = context.area.as_pointer() if context.area else None
-        self._area = context.area
-        self._region = context.region
+        # Use override area/region if set (e.g. when invoked from Preferences)
+        area = getattr(self, '_override_area', None) or context.area
+        region = getattr(self, '_override_region', None) or context.region
+
+        self._invoke_area_ptr = area.as_pointer() if area else None
+        self._area = area
+        self._region = region
 
         # Register handlers for all major space types
         self._draw_handles = {}
@@ -225,8 +230,36 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                     custom_header=script_count_text,
                     scripts_overlay_settings=scripts_overlay_settings)
 
+    def _find_viewport_area(self, context):
+        """Find a suitable viewport area for overlay drawing.
+
+        When invoked from a non-viewport context (e.g. Preferences panel),
+        the current area can't host draw handlers. Search all windows for
+        a supported area and return (area, region) or (None, None).
+        """
+        supported = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
+        for window in context.window_manager.windows:
+            try:
+                screen = window.screen
+                if not screen:
+                    continue
+                for area in screen.areas:
+                    if area.type in supported:
+                        for region in area.regions:
+                            if region.type == 'WINDOW':
+                                return area, region
+            except Exception:
+                continue
+        return None, None
+
     def invoke(self, context: bpy.types.Context, _event: bpy.types.Event):
         """Start scripts overlay modal operation."""
+        # If already running, request cancellation (acts as toggle)
+        if CHORDSONG_OT_ScriptsOverlay._draw_handles:
+            CHORDSONG_OT_ScriptsOverlay._cancel_requested = True
+            self._tag_redraw()
+            return {'CANCELLED'}
+
         p = prefs(context)
         p.ensure_defaults()
 
@@ -241,6 +274,20 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             # Ensure any existing draw handlers are cleaned up
             self._remove_draw_handler()
             return {'CANCELLED'}
+
+        # If invoked from a non-viewport area (e.g. Preferences debug panel),
+        # find a suitable viewport area to host the overlay
+        supported = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
+        area = context.area
+        region = context.region
+        if area and area.type not in supported:
+            area, region = self._find_viewport_area(context)
+            if not area:
+                self.report({'WARNING'}, "No viewport area found for overlay")
+                return {'CANCELLED'}
+        # Store the resolved area/region for draw handler setup
+        self._override_area = area
+        self._override_region = region
 
         # If panels were hidden by Leader, keep them hidden
         # Retrieve panel state from global storage if available
@@ -288,6 +335,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         return {"RUNNING_MODAL"}
 
     def _finish(self, context: bpy.types.Context):
+        CHORDSONG_OT_ScriptsOverlay._cancel_requested = False
         # Restore T & N panels if they were hidden
         self._restore_panels(context)
         self._remove_draw_handler()
@@ -311,6 +359,12 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             return {"CANCELLED"}
 
     def _modal_inner(self, context: bpy.types.Context, event: bpy.types.Event):
+        # Check if cancellation was requested from re-invocation (toggle)
+        if CHORDSONG_OT_ScriptsOverlay._cancel_requested:
+            CHORDSONG_OT_ScriptsOverlay._cancel_requested = False
+            self._finish(context)
+            return {"CANCELLED"}
+
         # Safety check: if script execution is disabled, cancel immediately
         try:
             p = prefs(context)

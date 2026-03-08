@@ -30,6 +30,44 @@ Automatically hides Tool (T) and Properties (N) panels in the active editor (3D 
 - **Line Height**: Text line height multiplier.
 - **Horizontal Column Gap**: Column spacing.
 
+## Overlay Sort Order
+
+Controls how chords are sorted in the overlay. Choose a preset or define a custom sort string.
+
+### Presets
+
+| Preset | Sort String | Description |
+| ------ | ----------- | ----------- |
+| Group → Depth → Index | `g d c` | By group display order, then items before folders, then mapping index |
+| Depth → Group → Index | `d g c` | Items before folders, then by group, then mapping index |
+| Group → Index | `g c` | By group display order, then mapping index |
+| Label | `L` | Alphabetically by displayed label |
+
+### Custom Sort String
+
+Select **Custom** to define your own sort string. Tokens are space-separated and evaluated left to right (highest priority first).
+
+**Available tokens:**
+
+| Token | Description |
+| ----- | ----------- |
+| `D` | Depth (folders first) |
+| `d` | Depth inverted (items first) |
+| `g` | Group by display order |
+| `G` | Group alphabetical (ABC) |
+| `C` | Chord token alphabetical (ABC) |
+| `c` | Chord order index (mapping list position) |
+| `L` | Label alphabetical (for folders: group names; for items: action label) |
+| `n` | Count ascending (fewer items first) |
+| `N` | Count descending (more items first) |
+
+**Examples:**
+
+- `g d c` — Group by display order, items before folders, then by mapping index
+- `L c` — Alphabetical by label, break ties by index
+- `N g c` — Biggest folders first, then by group, then index
+- `d G c` — Items first, then groups alphabetically, then index
+
 ## Typography
 
 Enhanced typography controls with separate font sizes for all overlay elements:
