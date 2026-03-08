@@ -8,7 +8,7 @@
 
 Instead of memorizing awkward `Ctrl+Alt+Shift+F5` combinations, use intuitive sequences like `m c` for **M**esh > **C**ube. A single leader key (default: `Space`) opens up dozens of unique combinations with visual feedback.
 
-![Overlay Example](docs/scr/overlay_style_a.png)
+![Overlay Example](docs/scr/overlay_example.png)
 
 ## Features
 
