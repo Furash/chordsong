@@ -298,6 +298,19 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         self._finish(context)
 
     def modal(self, context: bpy.types.Context, event: bpy.types.Event):
+        try:
+            return self._modal_inner(context, event)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            print("Chord Song Scripts Overlay: modal crashed, cleaning up to prevent busy state.")
+            try:
+                self._finish(context)
+            except Exception:
+                self._remove_draw_handler()
+            return {"CANCELLED"}
+
+    def _modal_inner(self, context: bpy.types.Context, event: bpy.types.Event):
         # Safety check: if script execution is disabled, cancel immediately
         try:
             p = prefs(context)
