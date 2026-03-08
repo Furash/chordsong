@@ -125,6 +125,8 @@ class Candidate:
     is_final: bool = False  # True if this is the last token in the chord
     mapping_type: str = "OPERATOR"
     property_value: str = ""
+    order_index: int = 0    # Order index from the mapping (for sorting)
+    depth: int = 0          # Max remaining chord depth after this token (0 = final)
     count: int = 1          # Number of mappings reachable through this token
     groups: tuple[str, ...] = () # Unique groups reachable through this token
 
@@ -256,7 +258,7 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
     """
     bt = tuple(buffer_tokens)
     out = {}
-    for m in mappings:
+    for list_pos, m in enumerate(mappings):
         if not getattr(m, "enabled", True):
             continue
 
@@ -286,6 +288,8 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
         group = get_str_attr(m, "group")
         icon = get_str_attr(m, "icon")
         property_value = get_str_attr(m, "property_value")
+        raw_order = int(getattr(m, "order_index", 0) or 0)
+        order_index = raw_order if raw_order > 0 else list_pos
 
         # Determine dynamic toggle state if possible
         if context and mapping_type == "CONTEXT_TOGGLE":
@@ -331,22 +335,27 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
 
         # Check if this is the final token in the chord
         is_final = len(tokens) == len(bt) + 1
+        remaining_depth = len(tokens) - len(bt) - 1  # 0 = final, 1 = one more level, etc.
         # Track counts and keep first label per next token for minimal UI
         if nxt not in out:
             out[nxt] = {
-                "cand": Candidate(nxt, label, group, icon, is_final, mapping_type, property_value),
+                "cand": Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index),
                 "count": 1,
-                "groups": {group} if group else set()
+                "groups": {group} if group else set(),
+                "max_depth": remaining_depth,
+                "min_order": order_index,
             }
         else:
             out[nxt]["count"] += 1
+            out[nxt]["max_depth"] = max(out[nxt]["max_depth"], remaining_depth)
+            out[nxt]["min_order"] = min(out[nxt]["min_order"], order_index)
             if group:
                 out[nxt]["groups"].add(group)
 
             # If we already have a non-final candidate, but found a final one, update the candidate
             # but keep the accumulated count and groups
             if not out[nxt]["cand"].is_final and is_final:
-                out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final, mapping_type, property_value)
+                out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index)
 
     # Convert back to Candidate list with updated counts
     result = []
@@ -360,6 +369,8 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
             is_final=c.is_final,
             mapping_type=c.mapping_type,
             property_value=c.property_value,
+            order_index=data["min_order"],
+            depth=data["max_depth"],
             count=data["count"],
             groups=tuple(sorted(data["groups"]))
         ))

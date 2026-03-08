@@ -30,14 +30,13 @@ def _get_preset_formats(style):
     }
     return presets.get(style, presets["DEFAULT"])
 
-def build_overlay_rows(cands, has_buffer, p=None, preserve_order=False):
+def build_overlay_rows(cands, has_buffer, p=None):
     """Build display rows from candidates, footer returned separately.
-    
+
     Args:
         cands: List of Candidate objects
         has_buffer: Whether there's a buffer (affects footer display)
         p: Preferences object (optional)
-        preserve_order: If True, don't sort candidates (preserve original order)
     """
     rows = []
     
@@ -66,11 +65,69 @@ def build_overlay_rows(cands, has_buffer, p=None, preserve_order=False):
             if grp.name and grp.icon:
                 group_icons[grp.name] = grp.icon
     
-    # Sort candidates by group then token (unless preserve_order is True)
-    if preserve_order:
-        sorted_cands = cands
+    # Build group display_order lookup from preferences
+    group_order = {}
+    if p:
+        for grp in p.groups:
+            if grp.name:
+                group_order[grp.name] = grp.display_order
+
+    # Sort candidates based on overlay_sort_mode preference
+    sort_mode = getattr(p, "overlay_sort_mode", "PRESET_GDO") if p else "PRESET_GDO"
+
+    # For candidates spanning multiple groups (folders), use the group with the
+    # lowest display_order so the folder sorts with its most prominent group.
+    def _best_group(c):
+        if c.groups:
+            return min(c.groups, key=lambda g: (group_order.get(g, 999), g.lower()))
+        return c.group
+
+    # Resolve sort string from preset or custom
+    _preset_strings = {
+        "PRESET_GO": "g c", "PRESET_GC": "g C", "PRESET_GL": "g L",
+        "PRESET_GDO": "g d c", "PRESET_GOD": "g c d",
+        "PRESET_DGO": "d g c", "PRESET_DgO": "d G c", "PRESET_DL": "d L",
+        "PRESET_C": "C", "PRESET_L": "L", "PRESET_O": "c",
+    }
+    if sort_mode == "CUSTOM":
+        sort_string = getattr(p, "overlay_sort_string", "g d c") if p else "g d c"
     else:
-        sorted_cands = sorted(cands, key=lambda c: (c.group.lower(), c.next_token))
+        sort_string = _preset_strings.get(sort_mode, "g d c")
+
+    # Build sort key from sort string tokens:
+    # D=depth, d=depth(inverted), g=group(display_order), G=group(ABC), C=chord(ABC), c=chord(order_index), L=label(ABC), n=count
+    sort_tokens = sort_string.split()
+
+    def _sort_key(c):
+        key = []
+        for t in sort_tokens:
+            if t == 'D':
+                key.append(c.depth)
+            elif t == 'd':
+                key.append(-c.depth)
+            elif t == 'g':
+                g = _best_group(c)
+                key.extend((group_order.get(g, 999), g.lower()))
+            elif t == 'G':
+                key.append(_best_group(c).lower())
+            elif t == 'C':
+                key.append(c.next_token)
+            elif t == 'c':
+                key.append(c.order_index)
+            elif t == 'L':
+                # For folders, sort by displayed groups string; for items, by label
+                if c.count > 1 or not c.is_final:
+                    groups = sorted(c.groups, key=lambda g: (group_order.get(g, 999), g.lower())) if c.groups else []
+                    key.append(", ".join(groups).lower() if groups else c.label.lower())
+                else:
+                    key.append(c.label.lower())
+            elif t == 'n':
+                key.append(c.count)
+            elif t == 'N':
+                key.append(-c.count)
+        return tuple(key)
+
+    sorted_cands = sorted(cands, key=_sort_key)
     
     for c in sorted_cands:
         token = c.next_token

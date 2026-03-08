@@ -7,6 +7,7 @@
 import bpy  # type: ignore
 
 from ..common import prefs
+from ...ui.overlay.cache import clear_overlay_cache
 
 
 def _update_order_indices(mappings):
@@ -58,10 +59,12 @@ class CHORDSONG_OT_Mapping_Move_Up(bpy.types.Operator):
         
         # Update order indices to match new positions
         _update_order_indices(p.mappings)
-        
-        # Force UI redraw to show new indices
-        for area in context.screen.areas:
-            area.tag_redraw()
+        clear_overlay_cache()
+
+        # Force redraw of all areas (including viewports on other screens)
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                area.tag_redraw()
         
         return {"FINISHED"}
 
@@ -109,10 +112,12 @@ class CHORDSONG_OT_Mapping_Move_Down(bpy.types.Operator):
         
         # Update order indices to match new positions
         _update_order_indices(p.mappings)
-        
-        # Force UI redraw to show new indices
-        for area in context.screen.areas:
-            area.tag_redraw()
+        clear_overlay_cache()
+
+        # Force redraw of all areas (including viewports on other screens)
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                area.tag_redraw()
         
         return {"FINISHED"}
 
@@ -175,10 +180,12 @@ class CHORDSONG_OT_Mapping_Sort_Group(bpy.types.Operator):
         
         # Update order indices to match new positions
         _update_order_indices(p.mappings)
-        
-        # Force UI redraw to show new indices
-        for area in context.screen.areas:
-            area.tag_redraw()
+        clear_overlay_cache()
+
+        # Force redraw of all areas (including viewports on other screens)
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                area.tag_redraw()
         
         count = len(sorted_chords)
         self.report({"INFO"}, f"Sorted {count} chords in group '{self.group_name}'")

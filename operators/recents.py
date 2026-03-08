@@ -505,6 +505,19 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             bpy.app.timers.register(execute_property_delayed, first_interval=0.01)
 
     def modal(self, context: bpy.types.Context, event: bpy.types.Event):
+        try:
+            return self._modal_inner(context, event)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            print("Chord Song Recents: modal crashed, cleaning up to prevent busy state.")
+            try:
+                self._finish(context)
+            except Exception:
+                pass
+            return {"CANCELLED"}
+
+    def _modal_inner(self, context: bpy.types.Context, event: bpy.types.Event):
         history = get_history()
 
         # Cancel keys

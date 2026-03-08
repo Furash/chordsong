@@ -40,6 +40,8 @@ def get_prefs_hash(p, region_w, region_h):
         getattr(p, "overlay_format_folder", "C G S N"),
         getattr(p, "overlay_separator_a", "→"),
         getattr(p, "overlay_separator_b", "::"),
+        getattr(p, "overlay_sort_mode", "PRESET_GDO"),
+        getattr(p, "overlay_sort_string", "g d c"),
         p.overlay_list_background,
         p.overlay_header_background,
         p.overlay_footer_background,
