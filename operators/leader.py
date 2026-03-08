@@ -304,6 +304,80 @@ def cleanup_all_handlers():
     """Clean up all draw handlers and timers. Called on addon unregister."""
     _cleanup_fading_overlay()
     disable_test_overlays()
+    # Remove Leader overlay draw handlers (class-level)
+    try:
+        for st, handle in list(CHORDSONG_OT_Leader._draw_handles.items()):
+            try:
+                st.draw_handler_remove(handle, "WINDOW")
+            except Exception:
+                pass
+        CHORDSONG_OT_Leader._draw_handles.clear()
+    except Exception:
+        pass
+    # Remove Scripts overlay draw handlers (class-level)
+    try:
+        from .scripts_overlay import CHORDSONG_OT_ScriptsOverlay
+        for st, handle in list(CHORDSONG_OT_ScriptsOverlay._draw_handles.items()):
+            try:
+                st.draw_handler_remove(handle, "WINDOW")
+            except Exception:
+                pass
+        CHORDSONG_OT_ScriptsOverlay._draw_handles.clear()
+    except Exception:
+        pass
+    # Clear overlay cache so no stale refs to layout/GPU-related data
+    try:
+        from ..ui.overlay.cache import clear_overlay_cache
+        clear_overlay_cache()
+    except Exception:
+        pass
+
+
+class CHORDSONG_OT_ResetState(bpy.types.Operator):
+    """Reset Blender's busy state by cleaning up all Chord Song handlers and timers"""
+
+    bl_idname = "chordsong.reset_state"
+    bl_label = "Chord Song: Reset State"
+    bl_options = {"REGISTER"}
+
+    def execute(self, context: bpy.types.Context):
+        # 1. Clean up all draw handlers and fading overlays
+        cleanup_all_handlers()
+
+        # 2. Unregister known Chord Song app timers to stop any stuck retry loops
+        timers_removed = 0
+        known_timers = []
+        try:
+            from ..core.autosave import _timer_cb
+            known_timers.append(_timer_cb)
+        except Exception:
+            pass
+        for func in known_timers:
+            try:
+                if bpy.app.timers.is_registered(func):
+                    bpy.app.timers.unregister(func)
+                    timers_removed += 1
+            except Exception:
+                pass
+
+        # 3. Show fading overlay confirmation
+        _show_fading_overlay(context, [], "Blender's modal state reset", "󰑓", show_chord=False)
+
+        # 4. Force tag all areas for redraw to clear any stale overlays
+        try:
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    try:
+                        area.tag_redraw()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        self.report({'INFO'}, f"Chord Song: State reset. Removed {timers_removed} timer(s).")
+        print(f"Chord Song: State reset complete. Handlers cleaned, {timers_removed} timer(s) removed.")
+        return {"FINISHED"}
+
 
 class CHORDSONG_OT_Leader(bpy.types.Operator):
     """Start chord capture (leader)"""
@@ -650,6 +724,19 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self._finish(context)
 
     def modal(self, context: bpy.types.Context, event: bpy.types.Event):
+        try:
+            return self._modal_inner(context, event)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            print("Chord Song Leader: modal crashed, cleaning up to prevent busy state.")
+            try:
+                self._finish(context)
+            except Exception:
+                self._remove_draw_handler()
+            return {"CANCELLED"}
+
+    def _modal_inner(self, context: bpy.types.Context, event: bpy.types.Event):
         global _panel_states_global
         p = prefs(context)
 
@@ -711,9 +798,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             "LEFTMOUSE", "RIGHTMOUSE", "MIDDLEMOUSE", 
             "BUTTON4MOUSE", "BUTTON5MOUSE", "BUTTON6MOUSE", "BUTTON7MOUSE"
         }
-        
-        # Wheel events should trigger on PRESS (they don't have default drag actions)
-        is_wheel = event.type in {"WHEELUPMOUSE", "WHEELDOWNMOUSE"}
         
         # For mouse buttons, wait for RELEASE; for everything else (including wheel), wait for PRESS
         if is_mouse_button:

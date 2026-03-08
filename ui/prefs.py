@@ -984,6 +984,38 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
+    overlay_sort_mode: EnumProperty(
+        name="Overlay Sort Mode",
+        description="How chords are sorted in the overlay",
+        items=(
+            ("PRESET_GDO", "g d c  Group → Depth → Index", "Sort by group (display order), then depth, then order index"),
+            ("PRESET_DGO", "d g c  Depth → Group → Index", "Sort by depth, then group (display order), then order index"),
+            ("PRESET_GO", "g c  Group → Index", "Sort by group (display order), then order index"),
+            ("PRESET_L", "L  Label", "Sort alphabetically by label"),
+            ("CUSTOM", "Custom", "Use custom sort string"),
+        ),
+        default="PRESET_GDO",
+        update=_on_prefs_changed,
+    )
+
+    overlay_sort_string: StringProperty(
+        name="Sort String",
+        description=(
+            "Custom sort order using tokens (space-separated):\n"
+            "D = Depth (folders first)\n"
+            "d = Depth (items first)\n"
+            "g = Group (by display order)\n"
+            "G = Group (alphabetical)\n"
+            "C = Chord token (alphabetical)\n"
+            "c = Chord order index\n"
+            "L = Label (alphabetical)\n"
+            "n = Count (ascending)\n"
+            "N = Count (descending)"
+        ),
+        default="g d c",
+        update=_on_prefs_changed,
+    )
+
     mappings: CollectionProperty(type=CHORDSONG_PG_Mapping)
     groups: CollectionProperty(type=CHORDSONG_PG_Group)
     nerd_icons: CollectionProperty(type=CHORDSONG_PG_NerdIcon)

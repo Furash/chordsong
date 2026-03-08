@@ -666,8 +666,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         region_w = 600
         region_h = 400
 
-    # Generate signature for mappings to prevent cache collision (e.g. between Test and Leader)
-    mappings_sig = (len(filtered_mappings), getattr(filtered_mappings[0], 'chord', '') if filtered_mappings else None)
+    # Generate signature for mappings to detect reordering, additions, removals
+    mappings_sig = tuple((getattr(m, 'chord', ''), getattr(m, 'enabled', True)) for m in filtered_mappings)
 
     # Get blend file path for cache validation (to detect when file is saved with different name)
     import bpy  # type: ignore
@@ -850,10 +850,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         # Always use global line height
         line_h = int(body_size * p.overlay_line_height)
 
-        # Build rows and footer
-        # Preserve order to respect manual ordering from prefs.mappings
-        preserve_order = True
-        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, preserve_order=preserve_order)
+        # Build rows and footer (sorted by group display_order, then chord order_index)
+        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p)
         max_rows = max(int(max_rows_setting), 1)
         columns = wrap_into_columns(rows, max_rows)
 

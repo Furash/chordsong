@@ -13,7 +13,7 @@ from .group.group_remove import CHORDSONG_OT_Group_Remove
 from .group.group_rename import CHORDSONG_OT_Group_Rename
 from .group.group_select import CHORDSONG_OT_Group_Select
 from .icon_select import CHORDSONG_OT_Icon_Select, CHORDSONG_OT_Icon_Select_Apply
-from .leader import CHORDSONG_OT_Leader, cleanup_all_handlers
+from .leader import CHORDSONG_OT_Leader, CHORDSONG_OT_ResetState, cleanup_all_handlers
 from .config.append_config import CHORDSONG_OT_Append_Config
 from .config.clear_search import CHORDSONG_OT_Clear_Search
 from .config.clear_operator_cache import CHORDSONG_OT_Clear_Operator_Cache
@@ -82,6 +82,7 @@ __all__ = [
     "CHORDSONG_OT_Icon_Select",
     "CHORDSONG_OT_Icon_Select_Apply",
     "CHORDSONG_OT_Leader",
+    "CHORDSONG_OT_ResetState",
     "CHORDSONG_OT_Load_Autosave",
     "CHORDSONG_OT_Load_Config",
     "CHORDSONG_OT_Load_Default",
