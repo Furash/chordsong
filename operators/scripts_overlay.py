@@ -165,9 +165,9 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                 self.sub_operators = []
                 self.script_params = []
 
-        # Build buffer tokens from text buffer for header display
-        # Pass as single token to display as one string without "+" separators
-        buffer_tokens = [self._text_buffer] if self._text_buffer else []
+        # Build buffer tokens from text buffer — split into words so they
+        # align with split_chord() which splits chords by whitespace.
+        buffer_tokens = self._text_buffer.split() if self._text_buffer else []
 
         # Get max items from preferences
         max_items = p.scripts_overlay_max_items
@@ -430,6 +430,12 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                     # Show fading overlay and execute script
                     self._show_fading_and_execute(context, chord_text, script_name, script_path)
                     return {"FINISHED"}
+
+        # Handle spacebar for text input (filtering with multiple words)
+        elif event.type == "SPACE":
+            self._text_buffer += " "
+            self._tag_redraw()
+            return {"RUNNING_MODAL"}
 
         # Handle letter keys A-Z for text input (filtering)
         elif event.type in {chr(i) for i in range(ord('A'), ord('Z') + 1)}:
