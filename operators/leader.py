@@ -555,9 +555,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Detect the current editor context
         self._context_type = self._detect_context(context)
 
-        # Hide T & N panels if enabled
-        if p.overlay_hide_panels:
-            self._hide_panels(context)
+        # Hide panels (asset shelf always, T & N if enabled)
+        self._hide_panels(context)
 
         self._ensure_draw_handler(context)
         context.window_manager.modal_handler_add(self)
@@ -588,8 +587,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         return "VIEW_3D"
 
     def _hide_panels(self, context: bpy.types.Context):
-        """Hide T and N panels in the editor where Leader was invoked and all matching editor types."""
+        """Hide panels in the editor where Leader was invoked and all matching editor types.
+
+        Asset shelf is always hidden (prevents overlap with bottom overlay).
+        T and N panels are hidden only if overlay_hide_panels is enabled.
+        """
         self._panel_states = {}
+        p = prefs(context)
+        hide_tn = p.overlay_hide_panels
 
         # Get the editor type where Leader was invoked
         invoke_space = context.space_data
@@ -629,14 +634,20 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         area_ptr = area.as_pointer()
                         panel_state = {}
 
-                        # Store and hide N panel (Sidebar)
-                        if hasattr(space, 'show_region_ui'):
+                        # Always hide Asset Shelf in 3D View (prevents overlap with bottom overlay)
+                        if area.type == 'VIEW_3D' and hasattr(space, 'show_region_asset_shelf'):
+                            panel_state['asset_shelf'] = space.show_region_asset_shelf
+                            if space.show_region_asset_shelf:
+                                space.show_region_asset_shelf = False
+
+                        # Store and hide N panel (Sidebar) - only if toggle enabled
+                        if hide_tn and hasattr(space, 'show_region_ui'):
                             panel_state['n_panel'] = space.show_region_ui
                             if space.show_region_ui:
                                 space.show_region_ui = False
 
-                        # Store and hide T panel (Toolbar/Toolshelf)
-                        if hasattr(space, 'show_region_toolbar'):
+                        # Store and hide T panel (Toolbar/Toolshelf) - only if toggle enabled
+                        if hide_tn and hasattr(space, 'show_region_toolbar'):
                             panel_state['t_panel'] = space.show_region_toolbar
                             if space.show_region_toolbar:
                                 space.show_region_toolbar = False
@@ -685,6 +696,11 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                         if not space:
                             continue
+
+                        # Restore Asset Shelf
+                        if 'asset_shelf' in panel_state and hasattr(space, 'show_region_asset_shelf'):
+                            if space.show_region_asset_shelf != panel_state['asset_shelf']:
+                                space.show_region_asset_shelf = panel_state['asset_shelf']
 
                         # Restore N panel (Sidebar)
                         if 'n_panel' in panel_state and hasattr(space, 'show_region_ui'):
@@ -850,7 +866,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             # Don't restore panels here - Recents will handle them
             p = prefs(context)
             global _panel_states_global
-            if p.overlay_hide_panels:
+            if self._panel_states:
                 # Transfer panel state to Recents by storing it globally
                 # Recents will restore panels when it finishes
                 _panel_states_global = self._panel_states.copy()
@@ -863,7 +879,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             except Exception as e:
                 print(f"Chord Song: Failed to open recents: {e}")
                 # If Recents failed, restore panels now
-                if p.overlay_hide_panels:
+                if _panel_states_global:
                     self._panel_states = _panel_states_global.copy()
                     self._restore_panels(context)
                     _panel_states_global = {}
@@ -1412,7 +1428,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             should_restore_panels = (primary_operator != "chordsong.scripts_overlay")
 
             # If executing scripts_overlay, transfer panel states to global storage
-            if not should_restore_panels and p.overlay_hide_panels:
+            if not should_restore_panels and self._panel_states:
                 # Transfer panel state to Scripts overlay by storing it globally
                 # Scripts overlay will restore panels when it finishes
                 _panel_states_global = self._panel_states.copy()

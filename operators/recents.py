@@ -354,8 +354,8 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # If panels were hidden by Leader, keep them hidden
         # Retrieve panel state from global storage if available
         self._panel_states = {}
-        if p.overlay_hide_panels:
-            from ..operators.leader import _panel_states_global
+        from ..operators.leader import _panel_states_global
+        if _panel_states_global:
             self._panel_states = _panel_states_global.copy()
             # Clear the stored state so it doesn't persist
             _panel_states_global.clear()
@@ -411,11 +411,16 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                         if not space:
                             continue
                         
+                        # Restore Asset Shelf
+                        if 'asset_shelf' in panel_state and hasattr(space, 'show_region_asset_shelf'):
+                            if space.show_region_asset_shelf != panel_state['asset_shelf']:
+                                space.show_region_asset_shelf = panel_state['asset_shelf']
+
                         # Restore N panel (Sidebar)
                         if 'n_panel' in panel_state and hasattr(space, 'show_region_ui'):
                             if space.show_region_ui != panel_state['n_panel']:
                                 space.show_region_ui = panel_state['n_panel']
-                        
+
                         # Restore T panel (Toolbar/Toolshelf)
                         if 't_panel' in panel_state and hasattr(space, 'show_region_toolbar'):
                             if space.show_region_toolbar != panel_state['t_panel']:
