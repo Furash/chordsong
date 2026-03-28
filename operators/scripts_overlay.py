@@ -16,7 +16,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
     bl_idname = "chordsong.scripts_overlay"
     bl_label = "Scripts Overlay"
-    bl_options = {'REGISTER'}
+    bl_options = set()
 
     _draw_handles = {}
     _buffer = None

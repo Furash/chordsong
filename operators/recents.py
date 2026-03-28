@@ -41,7 +41,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
     bl_idname = "chordsong.recents"
     bl_label = "Chord Song Recents"
-    bl_options = {"REGISTER"}
+    bl_options = set()
 
     _buffer = None  # Buffer for capturing digits
     _draw_manager = None  # DrawHandlerManager instance
@@ -444,28 +444,26 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # Capture viewport context BEFORE finishing modal (when we have valid context)
         ctx_viewport = capture_viewport_context(context)
 
-        # Finish modal before executing
-        self._finish(context)
-
         # Execute based on mapping type
         if entry.mapping_type == "OPERATOR":
-            def execute_operator_delayed():
-                # Validate context before using it (may be invalid after undo)
-                from ..utils.render import validate_viewport_context
-                valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-                ctx_wrapper = _create_context_wrapper(valid_ctx)
-                success, error_msg = execute_history_entry_operator(ctx_wrapper, entry)
-                if success:
-                    _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
-                elif error_msg:
-                    _show_fading_overlay(bpy.context, entry.chord_tokens, error_msg, "CANCEL")
-                return None
+            # Execute operator DIRECTLY in modal context (preserves F9)
+            from ..utils.render import validate_viewport_context
+            valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+            ctx_wrapper = _create_context_wrapper(valid_ctx)
+            success, error_msg = execute_history_entry_operator(ctx_wrapper, entry)
+            if success:
+                _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
+            elif error_msg:
+                _show_fading_overlay(bpy.context, entry.chord_tokens, error_msg, "CANCEL")
+            # Finish modal AFTER execution
+            self._finish(context)
+            return
 
-            bpy.app.timers.register(execute_operator_delayed, first_interval=0.01)
+        # For non-operator types, finish modal first, then use timer
+        self._finish(context)
 
-        elif entry.mapping_type == "PYTHON_FILE":
+        if entry.mapping_type == "PYTHON_FILE":
             def execute_script_delayed():
-                # Validate context before using it (may be invalid after undo)
                 from ..utils.render import validate_viewport_context
                 valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                 ctx_wrapper = _create_context_wrapper(valid_ctx)
@@ -480,7 +478,6 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         elif entry.mapping_type == "CONTEXT_TOGGLE":
             def execute_toggle_delayed():
-                # Validate context before using it (may be invalid after undo)
                 from ..utils.render import validate_viewport_context
                 valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                 ctx_wrapper = _create_context_wrapper(valid_ctx)
@@ -496,7 +493,6 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         elif entry.mapping_type == "CONTEXT_PROPERTY":
             def execute_property_delayed():
-                # Validate context before using it (may be invalid after undo)
                 from ..utils.render import validate_viewport_context
                 valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                 ctx_wrapper = _create_context_wrapper(valid_ctx)

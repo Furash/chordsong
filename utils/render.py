@@ -278,26 +278,25 @@ def execute_history_entry_operator(context, entry):
             ctx_viewport = capture_viewport_context(context)
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
+        # Pass True as second arg to force undo registration (F9 support)
         if call_ctx == "INVOKE_DEFAULT":
             if valid_ctx:
                 try:
                     with bpy.context.temp_override(**valid_ctx):
-                        result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                        result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                    # Context became invalid, fall back to default context
-                    result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                    result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
             else:
-                result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
         else:
             if valid_ctx:
                 try:
                     with bpy.context.temp_override(**valid_ctx):
-                        result_set = opfn('EXEC_DEFAULT', **kwargs)
+                        result_set = opfn('EXEC_DEFAULT', True, **kwargs)
                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                    # Context became invalid, fall back to default context
-                    result_set = opfn('EXEC_DEFAULT', **kwargs)
+                    result_set = opfn('EXEC_DEFAULT', True, **kwargs)
             else:
-                result_set = opfn('EXEC_DEFAULT', **kwargs)
+                result_set = opfn('EXEC_DEFAULT', True, **kwargs)
 
         # Check if successful
         if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
