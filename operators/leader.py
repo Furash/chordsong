@@ -1402,7 +1402,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 operators_to_run.append({
                     "op": primary_op,
                     "kwargs": parse_kwargs(getattr(m, "kwargs_json", "{}")),
-                    "call_ctx": (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+                    "call_ctx": (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip(),
+                    "undo": bool(getattr(m, "adjust_last", True)),
                 })
 
             for sub in m.sub_operators:
@@ -1411,7 +1412,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     operators_to_run.append({
                         "op": sub_op,
                         "kwargs": parse_kwargs(getattr(sub, "kwargs_json", "{}")),
-                        "call_ctx": (getattr(sub, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+                        "call_ctx": (getattr(sub, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip(),
+                        "undo": bool(getattr(sub, "adjust_last", False)),
                     })
 
             if not operators_to_run:
@@ -1452,32 +1454,32 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         op = op_data["op"]
                         kwargs = op_data["kwargs"]
                         call_ctx = op_data["call_ctx"]
+                        undo = op_data["undo"]
 
                         mod_name, fn_name = op.split(".", 1)
                         opmod = getattr(bpy.ops, mod_name)
                         opfn = getattr(opmod, fn_name)
 
                         result_set = set()
-                        # Pass True as second arg to force undo registration,
-                        # which makes the operator appear as "last operator" for F9.
+                        # undo=True registers the op for F9 Adjust Last Operation
                         if call_ctx == "INVOKE_DEFAULT":
                             if valid_ctx:
                                 try:
                                     with bpy.context.temp_override(**valid_ctx):
-                                        result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
+                                        result_set = opfn('INVOKE_DEFAULT', undo, **kwargs)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                    result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
+                                    result_set = opfn('INVOKE_DEFAULT', undo, **kwargs)
                             else:
-                                result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
+                                result_set = opfn('INVOKE_DEFAULT', undo, **kwargs)
                         else:
                             if valid_ctx:
                                 try:
                                     with bpy.context.temp_override(**valid_ctx):
-                                        result_set = opfn('EXEC_DEFAULT', True, **kwargs)
+                                        result_set = opfn('EXEC_DEFAULT', undo, **kwargs)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                    result_set = opfn('EXEC_DEFAULT', True, **kwargs)
+                                    result_set = opfn('EXEC_DEFAULT', undo, **kwargs)
                             else:
-                                result_set = opfn('EXEC_DEFAULT', True, **kwargs)
+                                result_set = opfn('EXEC_DEFAULT', undo, **kwargs)
 
                         if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
                             success = True
