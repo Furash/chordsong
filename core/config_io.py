@@ -680,33 +680,22 @@ def _add_mapping_from_dict(prefs, item: dict, order_index: int = 0):
                     m.operator = op_id
                     m.call_context = op_ctx
                     m.kwargs_json = op_kwargs
-                    m.adjust_last = op_data.get("adjust_last", True)
                 else:
                     sub = m.sub_operators.add()
                     sub.operator = op_id
                     sub.call_context = op_ctx
                     sub.kwargs_json = op_kwargs
-                    sub.adjust_last = op_data.get("adjust_last", False)
         else:
             # Backward compatibility (Version 1)
             m.operator = (item.get("operator", "") or "").strip()
             m.call_context = (item.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
             m.kwargs_json = _kwargs_dict_to_str(item.get("kwargs", {}))
-            m.adjust_last = item.get("adjust_last", True)
             for sub_data in item.get("sub_operators", []):
                 if isinstance(sub_data, dict):
                     sub = m.sub_operators.add()
                     sub.operator = (sub_data.get("operator", "") or "").strip()
                     sub.call_context = (sub_data.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
                     sub.kwargs_json = _kwargs_dict_to_str(sub_data.get("kwargs", {}))
-                    sub.adjust_last = sub_data.get("adjust_last", False)
-
-    # Migration: if chain exists and no op has adjust_last, default to last op
-    if m.sub_operators:
-        has_any = m.adjust_last or any(s.adjust_last for s in m.sub_operators)
-        if not has_any:
-            m.adjust_last = False
-            m.sub_operators[-1].adjust_last = True
 
     for sub_data in item.get("sub_items", []):
         if isinstance(sub_data, dict):

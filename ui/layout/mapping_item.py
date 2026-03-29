@@ -355,7 +355,7 @@ def _draw_operator_mapping(layout, m, idx):
     """Draw rows for an operator mapping."""
     op_area = layout.box()
 
-    def draw_op_row(layout, m_ptr, op_prop, ctx_prop, kwargs_prop, is_primary, sub_idx=-1, mapping=None):
+    def draw_op_row(layout, m_ptr, op_prop, ctx_prop, kwargs_prop, is_primary, sub_idx=-1):
         op_block = layout.column(align=True)
         master_split = op_block.split(factor=0.7, align=True)
 
@@ -366,23 +366,7 @@ def _draw_operator_mapping(layout, m, idx):
         id_split = id_row.split(factor=gutter_f, align=True)
         id_split.alignment = 'RIGHT'
         id_split.label(text="Operator:")
-        has_chain = len(mapping.sub_operators) > 0 if mapping else False
-        if has_chain:
-            op_field_split = id_split.split(factor=0.92, align=True)
-            op_field_split.prop(m_ptr, op_prop, text="")
-            # Adjust Last toggle — exclusive per chain, controls F9 target
-            toggle_op = op_field_split.operator(
-                "chordsong.adjust_last_toggle",
-                text="",
-                icon="RECOVER_LAST" if m_ptr.adjust_last else "BLANK1",
-                emboss=False,
-                depress=m_ptr.adjust_last,
-            )
-            toggle_op.mapping_index = idx
-            toggle_op.is_primary = is_primary
-            toggle_op.sub_index = sub_idx
-        else:
-            id_split.prop(m_ptr, op_prop, text="")
+        id_split.prop(m_ptr, op_prop, text="")
 
         p_row = inputs_col.row(align=True)
         p_split = p_row.split(factor=gutter_f, align=True)
@@ -409,6 +393,6 @@ def _draw_operator_mapping(layout, m, idx):
 
         layout.separator(factor=0.4)
 
-    draw_op_row(op_area, m, "operator", "call_context", "kwargs_json", True, mapping=m)
+    draw_op_row(op_area, m, "operator", "call_context", "kwargs_json", True)
     for i, sub_op in enumerate(m.sub_operators):
-        draw_op_row(op_area, sub_op, "operator", "call_context", "kwargs_json", False, i, mapping=m)
+        draw_op_row(op_area, sub_op, "operator", "call_context", "kwargs_json", False, i)

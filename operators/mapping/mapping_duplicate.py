@@ -41,7 +41,6 @@ class CHORDSONG_OT_Mapping_Duplicate(bpy.types.Operator):
         new_m.call_context = source.call_context
         new_m.kwargs_json = source.kwargs_json
         new_m.property_value = source.property_value
-        new_m.adjust_last = source.adjust_last
         new_m.sync_toggles = source.sync_toggles
 
         # Deep-copy sub-operator chain
@@ -50,7 +49,6 @@ class CHORDSONG_OT_Mapping_Duplicate(bpy.types.Operator):
             dst.operator = src_sub.operator
             dst.call_context = src_sub.call_context
             dst.kwargs_json = src_sub.kwargs_json
-            dst.adjust_last = src_sub.adjust_last
 
         # Deep-copy sub-items (toggles/properties)
         for src_sub in source.sub_items:
