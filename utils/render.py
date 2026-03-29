@@ -252,56 +252,66 @@ class DrawHandlerManager:
     def region(self):
         return self._region
 
+def _run_single_operator(opfn, call_ctx, kwargs, valid_ctx):
+    """Run a single operator with the given context and undo=True."""
+    if call_ctx == "INVOKE_DEFAULT":
+        if valid_ctx:
+            try:
+                with bpy.context.temp_override(**valid_ctx):
+                    return opfn('INVOKE_DEFAULT', True, **kwargs)
+            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                return opfn('INVOKE_DEFAULT', True, **kwargs)
+        else:
+            return opfn('INVOKE_DEFAULT', True, **kwargs)
+    else:
+        if valid_ctx:
+            try:
+                with bpy.context.temp_override(**valid_ctx):
+                    return opfn('EXEC_DEFAULT', True, **kwargs)
+            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                return opfn('EXEC_DEFAULT', True, **kwargs)
+        else:
+            return opfn('EXEC_DEFAULT', True, **kwargs)
+
+
 def execute_history_entry_operator(context, entry):
-    """Execute an operator from history entry.
+    """Execute an operator (and sub-operators) from history entry.
 
     Returns:
         tuple: (success: bool, error_message: str or None)
     """
     try:
-        mod_name, fn_name = entry.operator.split(".", 1)
-        opmod = getattr(bpy.ops, mod_name)
-        opfn = getattr(opmod, fn_name)
-
-        kwargs = entry.kwargs or {}
-        call_ctx = entry.call_context or "EXEC_DEFAULT"
-
         # Use execution context from history if available
         if hasattr(entry, 'execution_context') and entry.execution_context:
             ctx_viewport = entry.execution_context
-            # Must validate because the area might be closed
             valid_ctx = validate_viewport_context(ctx_viewport)
             if not valid_ctx:
                 return False, "Operator area not found"
         else:
-            # Fallback for old history entries or missing context
             ctx_viewport = capture_viewport_context(context)
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
-        # Pass True as second arg to force undo registration (F9 support)
-        if call_ctx == "INVOKE_DEFAULT":
-            if valid_ctx:
-                try:
-                    with bpy.context.temp_override(**valid_ctx):
-                        result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
-                except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                    result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
-            else:
-                result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
-        else:
-            if valid_ctx:
-                try:
-                    with bpy.context.temp_override(**valid_ctx):
-                        result_set = opfn('EXEC_DEFAULT', True, **kwargs)
-                except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                    result_set = opfn('EXEC_DEFAULT', True, **kwargs)
-            else:
-                result_set = opfn('EXEC_DEFAULT', True, **kwargs)
+        # Execute primary operator
+        mod_name, fn_name = entry.operator.split(".", 1)
+        opfn = getattr(getattr(bpy.ops, mod_name), fn_name)
+        kwargs = entry.kwargs or {}
+        call_ctx = entry.call_context or "EXEC_DEFAULT"
 
-        # Check if successful
-        if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-            return True, None
-        return False, None
+        result_set = _run_single_operator(opfn, call_ctx, kwargs, valid_ctx)
+        success = bool(result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set))
+
+        # Execute sub-operators
+        for sub in (entry.sub_operators or []):
+            sub_op = sub["op"]
+            sub_mod, sub_fn = sub_op.split(".", 1)
+            sub_opfn = getattr(getattr(bpy.ops, sub_mod), sub_fn)
+            sub_result = _run_single_operator(
+                sub_opfn, sub["call_ctx"], sub["kwargs"], valid_ctx
+            )
+            if sub_result and ('FINISHED' in sub_result or 'CANCELLED' not in sub_result):
+                success = True
+
+        return (True, None) if success else (False, None)
 
     except Exception as e:
         import traceback

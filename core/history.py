@@ -18,6 +18,7 @@ class HistoryEntry:
     operator: Optional[str] = None
     kwargs: Optional[dict] = None
     call_context: Optional[str] = None
+    sub_operators: Optional[list] = None  # List of {"op", "kwargs", "call_ctx"} dicts
     # Python file-specific field
     python_file: Optional[str] = None
     # Context toggle/property-specific field
@@ -94,6 +95,7 @@ def add_to_history(
     operator: Optional[str] = None,
     kwargs: Optional[dict] = None,
     call_context: Optional[str] = None,
+    sub_operators: Optional[list] = None,
     python_file: Optional[str] = None,
     context_path: Optional[str] = None,
     property_value: Optional[str] = None,
@@ -108,6 +110,7 @@ def add_to_history(
         operator=operator,
         kwargs=kwargs,
         call_context=call_context,
+        sub_operators=sub_operators,
         python_file=python_file,
         context_path=context_path,
         property_value=property_value,

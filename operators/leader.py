@@ -1519,6 +1519,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                 operator=operators_to_run[0]["op"],
                                 kwargs=operators_to_run[0]["kwargs"],
                                 call_context=operators_to_run[0]["call_ctx"],
+                                sub_operators=operators_to_run[1:] if len(operators_to_run) > 1 else None,
                                 execution_context=ctx_viewport,
                             )
 
