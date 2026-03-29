@@ -67,7 +67,11 @@ def _serialize_mapping(m) -> dict:
         kwargs_json = get_str_attr(m, "kwargs_json")
         if kwargs_json and kwargs_json.strip():
             chord_dict["kwargs_json"] = kwargs_json
-        
+
+        # Only serialize adjust_last for primary op when it's explicitly False
+        if not getattr(m, "adjust_last", True):
+            chord_dict["adjust_last"] = False
+
         # Add sub-operators if present
         sub_operators = getattr(m, "sub_operators", [])
         if sub_operators:
@@ -80,6 +84,8 @@ def _serialize_mapping(m) -> dict:
                 kwargs = get_str_attr(sub_op, "kwargs_json")
                 if kwargs and kwargs.strip():
                     sub_op_dict["kwargs_json"] = kwargs
+                if getattr(sub_op, "adjust_last", False):
+                    sub_op_dict["adjust_last"] = True
                 sub_ops_data.append(sub_op_dict)
             chord_dict["sub_operators"] = sub_ops_data
     
