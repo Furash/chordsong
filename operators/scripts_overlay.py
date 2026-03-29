@@ -16,7 +16,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
     bl_idname = "chordsong.scripts_overlay"
     bl_label = "Scripts Overlay"
-    bl_options = {'REGISTER'}
+    bl_options = set()
 
     _draw_handles = {}
     _buffer = None
@@ -480,7 +480,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                 if not success:
                     print(f"Chord Song Scripts Overlay: {error_msg}")
                 else:
-                    self.report({'INFO'}, f"Executed: {script_name}")
+                    print(f"Chord Song Scripts Overlay: Executed: {script_name}")
 
                     # Add script to history/recents after successful execution
                     # Don't include chord tokens for scripts in recents
@@ -490,7 +490,6 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                         icon=python_icon,
                         mapping_type="PYTHON_FILE",
                         python_file=script_path,
-                        kwargs={},
                         execution_context=ctx_viewport,
                     )
 

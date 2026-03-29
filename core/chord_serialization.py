@@ -67,7 +67,7 @@ def _serialize_mapping(m) -> dict:
         kwargs_json = get_str_attr(m, "kwargs_json")
         if kwargs_json and kwargs_json.strip():
             chord_dict["kwargs_json"] = kwargs_json
-        
+
         # Add sub-operators if present
         sub_operators = getattr(m, "sub_operators", [])
         if sub_operators:

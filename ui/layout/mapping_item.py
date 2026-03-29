@@ -366,16 +366,7 @@ def _draw_operator_mapping(layout, m, idx):
         id_split = id_row.split(factor=gutter_f, align=True)
         id_split.alignment = 'RIGHT'
         id_split.label(text="Operator:")
-        # Split the operator field area to add a refresh button
-        op_field_split = id_split.split(factor=0.92, align=True)
-        op_field_split.prop(m_ptr, op_prop, text="")
-        # Add refresh button to clear operator cache (useful after installing new addons)
-        op_field_split.operator(
-            "chordsong.clear_operator_cache",
-            text="",
-            icon="DOT",
-            emboss=False
-        )
+        id_split.prop(m_ptr, op_prop, text="")
 
         p_row = inputs_col.row(align=True)
         p_split = p_row.split(factor=gutter_f, align=True)

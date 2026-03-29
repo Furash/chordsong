@@ -276,7 +276,7 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
 
 
     # Register timer with immediate first redraw
-    bpy.app.timers.register(redraw_timer, first_interval=0.0)
+    bpy.app.timers.register(redraw_timer, first_interval=0.01)
 
 def _cleanup_fading_overlay():
     """Clean up the fading overlay."""
@@ -384,7 +384,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
     bl_idname = "chordsong.leader"
     bl_label = "Chord Song Leader"
-    bl_options = {"REGISTER"}
+    bl_options = set()
 
     _draw_handles = {}  # Dictionary of space_type -> handle
     _buffer = None
@@ -1052,7 +1052,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             icon=icon,
                             mapping_type="PYTHON_FILE",
                             python_file=python_file,
-                            kwargs=script_args,
+                            script_args=script_args,
                             execution_context=ctx_viewport,
                         )
 
@@ -1402,7 +1402,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 operators_to_run.append({
                     "op": primary_op,
                     "kwargs": parse_kwargs(getattr(m, "kwargs_json", "{}")),
-                    "call_ctx": (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+                    "call_ctx": (getattr(m, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip(),
                 })
 
             for sub in m.sub_operators:
@@ -1411,7 +1411,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     operators_to_run.append({
                         "op": sub_op,
                         "kwargs": parse_kwargs(getattr(sub, "kwargs_json", "{}")),
-                        "call_ctx": (getattr(sub, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
+                        "call_ctx": (getattr(sub, "call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip(),
                     })
 
             if not operators_to_run:
@@ -1435,13 +1435,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 # Clear our state so _finish doesn't restore
                 self._panel_states = {}
 
-            # Finish the modal operator FIRST
+            # Finish the modal operator FIRST, then execute via timer.
+            # Direct execution inside modal() doesn't register as "last operator" for F9.
+            # Timer with full context override (window, screen, area, region) is the next attempt.
             self._finish(context, restore_panels=should_restore_panels)
 
             # Defer operator execution to next frame using a timer.
             def execute_operator_delayed():
                 try:
-                    # Validate context before using it
                     from ..utils.render import validate_viewport_context
                     valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
@@ -1457,39 +1458,37 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         opfn = getattr(opmod, fn_name)
 
                         result_set = set()
+                        # Pass True as second arg to force undo registration,
+                        # which makes the operator appear as "last operator" for F9.
                         if call_ctx == "INVOKE_DEFAULT":
                             if valid_ctx:
                                 try:
                                     with bpy.context.temp_override(**valid_ctx):
-                                        result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                                        result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                    result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                                    result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
                             else:
-                                result_set = opfn('INVOKE_DEFAULT', **kwargs)
+                                result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
                         else:
                             if valid_ctx:
                                 try:
                                     with bpy.context.temp_override(**valid_ctx):
-                                        result_set = opfn('EXEC_DEFAULT', **kwargs)
+                                        result_set = opfn('EXEC_DEFAULT', True, **kwargs)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                    result_set = opfn('EXEC_DEFAULT', **kwargs)
+                                    result_set = opfn('EXEC_DEFAULT', True, **kwargs)
                             else:
-                                result_set = opfn('EXEC_DEFAULT', **kwargs)
+                                result_set = opfn('EXEC_DEFAULT', True, **kwargs)
 
                         if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
                             success = True
 
                     if success:
-                        # Skip fading overlay and history for scripts_overlay operator (it handles its own overlay and adds scripts to history)
+                        # Skip fading overlay and history for scripts_overlay operator
                         primary_operator = operators_to_run[0]["op"] if operators_to_run else None
                         if primary_operator != "chordsong.scripts_overlay":
-                            # Use the original captured viewport context (ctx_viewport) for overlay
-                            # This ensures we show overlay in the editor where leader was invoked
-                            # Validate it first to ensure it's still valid
                             overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                             if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
                                 try:
-                                    # Get space_data directly from the area (area.spaces[0] is the active space)
                                     area = overlay_ctx["area"]
                                     region = overlay_ctx["region"]
                                     space_data = None
@@ -1499,7 +1498,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                     except Exception:
                                         pass
 
-                                    # Create a context-like object with the area from overlay_ctx
                                     class ContextWrapper:
                                         def __init__(self, area, region, space_data):
                                             self.area = area
@@ -1509,20 +1507,16 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                     wrapped_ctx = ContextWrapper(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                    # Context became invalid, fall back to current context
                                     _show_fading_overlay(bpy.context, chord_tokens, label, icon)
                             else:
                                 _show_fading_overlay(bpy.context, chord_tokens, label, icon)
 
-                            # Don't add scripts_overlay operator to history (scripts executed through it are added separately)
                             add_to_history(
                                 chord_tokens=chord_tokens,
                                 label=label,
                                 icon=icon,
                                 mapping_type="OPERATOR",
-                                operator=operators_to_run[0]["op"], # Log the primary operator
-                                kwargs=operators_to_run[0]["kwargs"],
-                                call_context=operators_to_run[0]["call_ctx"],
+                                operators=operators_to_run,
                                 execution_context=ctx_viewport,
                             )
 

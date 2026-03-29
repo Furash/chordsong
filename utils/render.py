@@ -252,61 +252,61 @@ class DrawHandlerManager:
     def region(self):
         return self._region
 
+def _run_single_operator(opfn, call_ctx, kwargs, valid_ctx):
+    """Run a single operator with the given context and undo=True."""
+    if call_ctx == "INVOKE_DEFAULT":
+        if valid_ctx:
+            try:
+                with bpy.context.temp_override(**valid_ctx):
+                    return opfn('INVOKE_DEFAULT', True, **kwargs)
+            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                return opfn('INVOKE_DEFAULT', True, **kwargs)
+        else:
+            return opfn('INVOKE_DEFAULT', True, **kwargs)
+    else:
+        if valid_ctx:
+            try:
+                with bpy.context.temp_override(**valid_ctx):
+                    return opfn('EXEC_DEFAULT', True, **kwargs)
+            except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                return opfn('EXEC_DEFAULT', True, **kwargs)
+        else:
+            return opfn('EXEC_DEFAULT', True, **kwargs)
+
+
 def execute_history_entry_operator(context, entry):
-    """Execute an operator from history entry.
+    """Execute the full operator chain from a history entry.
 
     Returns:
         tuple: (success: bool, error_message: str or None)
     """
     try:
-        mod_name, fn_name = entry.operator.split(".", 1)
-        opmod = getattr(bpy.ops, mod_name)
-        opfn = getattr(opmod, fn_name)
-
-        kwargs = entry.kwargs or {}
-        call_ctx = entry.call_context or "EXEC_DEFAULT"
-
-        # Use execution context from history if available
         if hasattr(entry, 'execution_context') and entry.execution_context:
             ctx_viewport = entry.execution_context
-            # Must validate because the area might be closed
             valid_ctx = validate_viewport_context(ctx_viewport)
             if not valid_ctx:
                 return False, "Operator area not found"
         else:
-            # Fallback for old history entries or missing context
             ctx_viewport = capture_viewport_context(context)
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
-        if call_ctx == "INVOKE_DEFAULT":
-            if valid_ctx:
-                try:
-                    with bpy.context.temp_override(**valid_ctx):
-                        result_set = opfn('INVOKE_DEFAULT', **kwargs)
-                except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                    # Context became invalid, fall back to default context
-                    result_set = opfn('INVOKE_DEFAULT', **kwargs)
-            else:
-                result_set = opfn('INVOKE_DEFAULT', **kwargs)
-        else:
-            if valid_ctx:
-                try:
-                    with bpy.context.temp_override(**valid_ctx):
-                        result_set = opfn('EXEC_DEFAULT', **kwargs)
-                except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                    # Context became invalid, fall back to default context
-                    result_set = opfn('EXEC_DEFAULT', **kwargs)
-            else:
-                result_set = opfn('EXEC_DEFAULT', **kwargs)
+        success = False
+        for op_data in entry.operators:
+            op_id = op_data["op"]
+            mod_name, fn_name = op_id.split(".", 1)
+            opfn = getattr(getattr(bpy.ops, mod_name), fn_name)
+            result_set = _run_single_operator(
+                opfn, op_data["call_ctx"], op_data["kwargs"], valid_ctx
+            )
+            if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                success = True
 
-        # Check if successful
-        if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-            return True, None
-        return False, None
+        return (True, None) if success else (False, None)
 
     except Exception as e:
         import traceback
-        error_msg = f"Failed to execute operator {entry.operator}: {e}"
+        op_label = entry.operators[0]["op"] if entry.operators else "unknown"
+        error_msg = f"Failed to execute operator {op_label}: {e}"
         print(f"Chord Song: {error_msg}")
         traceback.print_exc()
         return False, error_msg
@@ -431,7 +431,8 @@ def execute_history_entry_script(context, entry):
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
         # Execute using Blender's text editor (no exec/runpy)
-        return _execute_script_via_text_editor(entry.python_file, script_args=None, valid_ctx=valid_ctx, context=context)
+        script_args = getattr(entry, 'script_args', None)
+        return _execute_script_via_text_editor(entry.python_file, script_args=script_args, valid_ctx=valid_ctx, context=context)
 
     except Exception as e:
         import traceback
