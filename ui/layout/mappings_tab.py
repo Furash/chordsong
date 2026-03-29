@@ -244,7 +244,9 @@ def draw_mappings_tab(prefs, context, layout):
         search_row.operator("chordsong.clear_search", text="", icon="X", emboss=False)
 
     search_row.separator()
+    search_row.separator()
     search_row.operator("chordsong.clear_operator_cache", text="", icon="FILE_REFRESH", emboss=False)
+    search_row.separator()
 
     # Right side: Copy/Paste/Selection buttons (50%)
     button_row = search_split.row(align=True)
