@@ -4,7 +4,7 @@ Stores up to 88 recent commands (matching hotkey capacity: 1-9, a-z, A-Z, symbol
 """
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 @dataclass
@@ -14,11 +14,8 @@ class HistoryEntry:
     label: str  # The label/description of the command
     icon: str  # Optional icon
     mapping_type: str  # "OPERATOR", "PYTHON_FILE", or "CONTEXT_TOGGLE"
-    # Operator-specific fields
-    operator: Optional[str] = None
-    kwargs: Optional[dict] = None
-    call_context: Optional[str] = None
-    sub_operators: Optional[list] = None  # List of {"op", "kwargs", "call_ctx"} dicts
+    # Operator chain — list of {"op", "kwargs", "call_ctx"} dicts
+    operators: list = field(default_factory=list)
     # Python file-specific field
     python_file: Optional[str] = None
     # Context toggle/property-specific field
@@ -50,8 +47,7 @@ class ChordHistory:
             return False
 
         if entry1.mapping_type == "OPERATOR":
-            return (entry1.operator == entry2.operator and
-                    entry1.kwargs == entry2.kwargs)
+            return entry1.operators == entry2.operators
         elif entry1.mapping_type == "PYTHON_FILE":
             return entry1.python_file == entry2.python_file
         elif entry1.mapping_type == "CONTEXT_TOGGLE":
@@ -92,10 +88,7 @@ def add_to_history(
     label: str,
     icon: str,
     mapping_type: str,
-    operator: Optional[str] = None,
-    kwargs: Optional[dict] = None,
-    call_context: Optional[str] = None,
-    sub_operators: Optional[list] = None,
+    operators: Optional[list] = None,
     python_file: Optional[str] = None,
     context_path: Optional[str] = None,
     property_value: Optional[str] = None,
@@ -107,10 +100,7 @@ def add_to_history(
         label=label,
         icon=icon,
         mapping_type=mapping_type,
-        operator=operator,
-        kwargs=kwargs,
-        call_context=call_context,
-        sub_operators=sub_operators,
+        operators=operators or [],
         python_file=python_file,
         context_path=context_path,
         property_value=property_value,

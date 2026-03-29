@@ -275,13 +275,12 @@ def _run_single_operator(opfn, call_ctx, kwargs, valid_ctx):
 
 
 def execute_history_entry_operator(context, entry):
-    """Execute an operator (and sub-operators) from history entry.
+    """Execute the full operator chain from a history entry.
 
     Returns:
         tuple: (success: bool, error_message: str or None)
     """
     try:
-        # Use execution context from history if available
         if hasattr(entry, 'execution_context') and entry.execution_context:
             ctx_viewport = entry.execution_context
             valid_ctx = validate_viewport_context(ctx_viewport)
@@ -291,31 +290,23 @@ def execute_history_entry_operator(context, entry):
             ctx_viewport = capture_viewport_context(context)
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
-        # Execute primary operator
-        mod_name, fn_name = entry.operator.split(".", 1)
-        opfn = getattr(getattr(bpy.ops, mod_name), fn_name)
-        kwargs = entry.kwargs or {}
-        call_ctx = entry.call_context or "EXEC_DEFAULT"
-
-        result_set = _run_single_operator(opfn, call_ctx, kwargs, valid_ctx)
-        success = bool(result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set))
-
-        # Execute sub-operators
-        for sub in (entry.sub_operators or []):
-            sub_op = sub["op"]
-            sub_mod, sub_fn = sub_op.split(".", 1)
-            sub_opfn = getattr(getattr(bpy.ops, sub_mod), sub_fn)
-            sub_result = _run_single_operator(
-                sub_opfn, sub["call_ctx"], sub["kwargs"], valid_ctx
+        success = False
+        for op_data in entry.operators:
+            op_id = op_data["op"]
+            mod_name, fn_name = op_id.split(".", 1)
+            opfn = getattr(getattr(bpy.ops, mod_name), fn_name)
+            result_set = _run_single_operator(
+                opfn, op_data["call_ctx"], op_data["kwargs"], valid_ctx
             )
-            if sub_result and ('FINISHED' in sub_result or 'CANCELLED' not in sub_result):
+            if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
                 success = True
 
         return (True, None) if success else (False, None)
 
     except Exception as e:
         import traceback
-        error_msg = f"Failed to execute operator {entry.operator}: {e}"
+        op_label = entry.operators[0]["op"] if entry.operators else "unknown"
+        error_msg = f"Failed to execute operator {op_label}: {e}"
         print(f"Chord Song: {error_msg}")
         traceback.print_exc()
         return False, error_msg

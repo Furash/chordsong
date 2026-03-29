@@ -1052,7 +1052,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             icon=icon,
                             mapping_type="PYTHON_FILE",
                             python_file=python_file,
-                            kwargs=script_args,
                             execution_context=ctx_viewport,
                         )
 
@@ -1516,10 +1515,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                 label=label,
                                 icon=icon,
                                 mapping_type="OPERATOR",
-                                operator=operators_to_run[0]["op"],
-                                kwargs=operators_to_run[0]["kwargs"],
-                                call_context=operators_to_run[0]["call_ctx"],
-                                sub_operators=operators_to_run[1:] if len(operators_to_run) > 1 else None,
+                                operators=operators_to_run,
                                 execution_context=ctx_viewport,
                             )
 
