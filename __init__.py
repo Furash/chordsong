@@ -22,6 +22,8 @@ from .ui import (
     CHORDSONG_PG_ScriptParam,
 )
 from .operators import (
+    CHORDSONG_OT_AdjustLastToggle,
+    CHORDSONG_OT_AdjustLastToggle,
     CHORDSONG_OT_Append_Config,
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_Clear_Search,
@@ -94,6 +96,7 @@ _classes = (
     CHORDSONG_PG_Mapping,
     CHORDSONG_PG_GroupSelection,
     CHORDSONG_Preferences,
+    CHORDSONG_OT_AdjustLastToggle,
     CHORDSONG_OT_Append_Config,
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_Clear_Search,
