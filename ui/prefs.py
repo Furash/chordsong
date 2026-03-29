@@ -354,6 +354,12 @@ class CHORDSONG_PG_SubOperator(PropertyGroup):
         default="",
         update=_on_mapping_changed,
     )
+    adjust_last: BoolProperty(
+        name="Adjust Last",
+        description="Enable undo registration so F9 adjusts this operator (exclusive per chain)",
+        default=False,
+        update=_on_mapping_changed,
+    )
 
 class CHORDSONG_PG_ScriptParam(PropertyGroup):
     """Parameter row for Python script mappings."""
@@ -467,6 +473,12 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
             "Or full call: bpy.ops.mesh.primitive_cube_add(enter_editmode=False, location=(0,0,0))"
         ),
         default="",
+        update=_on_mapping_changed,
+    )
+    adjust_last: BoolProperty(
+        name="Adjust Last",
+        description="Enable undo registration so F9 adjusts this operator (exclusive per chain)",
+        default=True,
         update=_on_mapping_changed,
     )
     # Collection for multiple actions (Toggles or Properties)
