@@ -18,6 +18,11 @@ class CHORDSONG_OT_SubItem_Add(bpy.types.Operator):
         m = prefs_obj.mappings[self.mapping_index]
         if m.mapping_type == "OPERATOR":
             m.sub_operators.add()
+            # Move adjust_last to the new last operator in the chain
+            m.adjust_last = False
+            for s in m.sub_operators:
+                s.adjust_last = False
+            m.sub_operators[-1].adjust_last = True
         elif m.mapping_type == "PYTHON_FILE":
             m.script_params.add()
         else:
@@ -46,6 +51,14 @@ class CHORDSONG_OT_SubItem_Remove(bpy.types.Operator):
             if self.item_index < 0 or self.item_index >= len(m.sub_operators):
                 return {'CANCELLED'}
             m.sub_operators.remove(self.item_index)
+            # Ensure some operator in the chain still has adjust_last
+            if m.sub_operators:
+                has_any = m.adjust_last or any(s.adjust_last for s in m.sub_operators)
+                if not has_any:
+                    m.sub_operators[-1].adjust_last = True
+            else:
+                # Chain dissolved — single op always gets adjust_last
+                m.adjust_last = True
         elif m.mapping_type == "PYTHON_FILE":
             if self.item_index < 0 or self.item_index >= len(m.script_params):
                 return {'CANCELLED'}
