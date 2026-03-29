@@ -40,6 +40,28 @@ class CHORDSONG_OT_Mapping_Duplicate(bpy.types.Operator):
         new_m.context_path = source.context_path
         new_m.call_context = source.call_context
         new_m.kwargs_json = source.kwargs_json
+        new_m.property_value = source.property_value
+        new_m.adjust_last = source.adjust_last
+        new_m.sync_toggles = source.sync_toggles
+
+        # Deep-copy sub-operator chain
+        for src_sub in source.sub_operators:
+            dst = new_m.sub_operators.add()
+            dst.operator = src_sub.operator
+            dst.call_context = src_sub.call_context
+            dst.kwargs_json = src_sub.kwargs_json
+            dst.adjust_last = src_sub.adjust_last
+
+        # Deep-copy sub-items (toggles/properties)
+        for src_sub in source.sub_items:
+            dst = new_m.sub_items.add()
+            dst.path = src_sub.path
+            dst.value = src_sub.value
+
+        # Deep-copy script parameters
+        for src_param in source.script_params:
+            dst = new_m.script_params.add()
+            dst.value = src_param.value
 
         # Move the duplicated item right after the source
         new_index = len(p.mappings) - 1
