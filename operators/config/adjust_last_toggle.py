@@ -23,7 +23,7 @@ class CHORDSONG_OT_AdjustLastToggle(bpy.types.Operator):
 
     def execute(self, context):
         p = prefs(context)
-        if not p or self.mapping_index >= len(p.mappings):
+        if not p or self.mapping_index < 0 or self.mapping_index >= len(p.mappings):
             return {"CANCELLED"}
 
         m = p.mappings[self.mapping_index]
@@ -36,16 +36,14 @@ class CHORDSONG_OT_AdjustLastToggle(bpy.types.Operator):
                 return {"CANCELLED"}
             target_prop = m.sub_operators[self.sub_index]
 
-        # Toggle: if already on, turn off; if off, turn on and disable all others
-        new_value = not target_prop.adjust_last
+        # Radio button behavior: clicking the active one is a no-op,
+        # clicking a different one moves the flag exclusively
+        if target_prop.adjust_last:
+            return {"FINISHED"}
 
-        # Turn off all operators in the chain first
         m.adjust_last = False
         for sub in m.sub_operators:
             sub.adjust_last = False
-
-        # Set the target if toggling on
-        if new_value:
-            target_prop.adjust_last = True
+        target_prop.adjust_last = True
 
         return {"FINISHED"}
