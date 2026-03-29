@@ -16,6 +16,7 @@ from .icon_select import CHORDSONG_OT_Icon_Select, CHORDSONG_OT_Icon_Select_Appl
 from .leader import CHORDSONG_OT_Leader, CHORDSONG_OT_ResetState, cleanup_all_handlers
 from .config.append_config import CHORDSONG_OT_Append_Config
 from .config.clear_search import CHORDSONG_OT_Clear_Search
+from .config.adjust_last_toggle import CHORDSONG_OT_AdjustLastToggle
 from .config.clear_operator_cache import CHORDSONG_OT_Clear_Operator_Cache
 from .config.export_config import (
     CHORDSONG_OT_Export_Config,
@@ -60,6 +61,7 @@ from .test_overlay import CHORDSONG_OT_TestFadingOverlay, CHORDSONG_OT_TestMainO
 
 __all__ = [
     "CHORDSONG_OT_Append_Config",
+    "CHORDSONG_OT_AdjustLastToggle",
     "CHORDSONG_OT_ApplyConflictFix",
     "CHORDSONG_OT_Clear_Search",
     "CHORDSONG_OT_Clear_Operator_Cache",
