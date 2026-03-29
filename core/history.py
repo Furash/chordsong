@@ -16,8 +16,9 @@ class HistoryEntry:
     mapping_type: str  # "OPERATOR", "PYTHON_FILE", or "CONTEXT_TOGGLE"
     # Operator chain — list of {"op", "kwargs", "call_ctx"} dicts
     operators: list = field(default_factory=list)
-    # Python file-specific field
+    # Script-specific fields
     python_file: Optional[str] = None
+    script_args: Optional[dict] = None
     # Context toggle/property-specific field
     context_path: Optional[str] = None
     property_value: Optional[str] = None
@@ -90,6 +91,7 @@ def add_to_history(
     mapping_type: str,
     operators: Optional[list] = None,
     python_file: Optional[str] = None,
+    script_args: Optional[dict] = None,
     context_path: Optional[str] = None,
     property_value: Optional[str] = None,
     execution_context: Optional[dict] = None,
@@ -102,6 +104,7 @@ def add_to_history(
         mapping_type=mapping_type,
         operators=operators or [],
         python_file=python_file,
+        script_args=script_args,
         context_path=context_path,
         property_value=property_value,
         execution_context=execution_context,

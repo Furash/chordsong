@@ -431,7 +431,8 @@ def execute_history_entry_script(context, entry):
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
 
         # Execute using Blender's text editor (no exec/runpy)
-        return _execute_script_via_text_editor(entry.python_file, script_args=None, valid_ctx=valid_ctx, context=context)
+        script_args = getattr(entry, 'script_args', None)
+        return _execute_script_via_text_editor(entry.python_file, script_args=script_args, valid_ctx=valid_ctx, context=context)
 
     except Exception as e:
         import traceback

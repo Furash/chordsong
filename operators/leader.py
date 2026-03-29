@@ -1052,6 +1052,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             icon=icon,
                             mapping_type="PYTHON_FILE",
                             python_file=python_file,
+                            script_args=script_args,
                             execution_context=ctx_viewport,
                         )
 
