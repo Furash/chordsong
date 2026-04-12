@@ -412,7 +412,7 @@ def parse_kwargs(kwargs_json: str) -> dict:
             if not in_quotes:
                 if char in ('(', '[', '{'):
                     nesting_level += 1
-                elif char in (')', ']', '}'):
+                elif char in (')', ']', '}') and nesting_level > 0:
                     nesting_level -= 1
 
             if char == ',' and not in_quotes and nesting_level == 0:

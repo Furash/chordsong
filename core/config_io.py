@@ -135,20 +135,20 @@ def dump_prefs(prefs) -> dict:
             "toggle_multi_modifier": getattr(prefs, "toggle_multi_modifier", "CTRL"),
             "show_header": bool(getattr(prefs, "overlay_show_header", True)),
             "show_footer": bool(getattr(prefs, "overlay_show_footer", True)),
-            "max_items": int(getattr(prefs, "overlay_max_items", 14)),
-            "column_rows": int(getattr(prefs, "overlay_column_rows", 12)),
-            "font_size_header": int(getattr(prefs, "overlay_font_size_header", 14)),
-            "font_size_chord": int(getattr(prefs, "overlay_font_size_chord", 12)),
-            "font_size_body": int(getattr(prefs, "overlay_font_size_body", 12)),
+            "max_items": int(getattr(prefs, "overlay_max_items", 50)),
+            "column_rows": int(getattr(prefs, "overlay_column_rows", 8)),
+            "font_size_header": int(getattr(prefs, "overlay_font_size_header", 16)),
+            "font_size_chord": int(getattr(prefs, "overlay_font_size_chord", 16)),
+            "font_size_body": int(getattr(prefs, "overlay_font_size_body", 15)),
             "font_size_footer": int(getattr(prefs, "overlay_font_size_footer", 12)),
             "font_size_fading": int(getattr(prefs, "overlay_font_size_fading", 24)),
-            "font_size_toggle": int(getattr(prefs, "overlay_font_size_toggle", 12)),
+            "font_size_toggle": int(getattr(prefs, "overlay_font_size_toggle", 23)),
             "font_size_separator": int(getattr(prefs, "overlay_font_size_separator", 15)),
-            "toggle_offset_y": int(getattr(prefs, "overlay_toggle_offset_y", 0)),
+            "toggle_offset_y": int(getattr(prefs, "overlay_toggle_offset_y", -4)),
             "color_chord": list(getattr(prefs, "overlay_color_chord", (0.65, 0.8, 1.0, 1.0))),
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
             "color_header": list(getattr(prefs, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))),
-            "color_icon": list(getattr(prefs, "overlay_color_icon", (0.8, 0.8, 0.8, 0.7))),
+            "color_icon": list(getattr(prefs, "overlay_color_icon", (0.80, 0.80, 0.80, 1.00))),
             "color_group": list(getattr(prefs, "overlay_color_group", (0.90, 0.90, 0.50, 1.00))),
             "color_counter": list(getattr(prefs, "overlay_color_counter", (0.80, 0.80, 0.80, 0.80))),
             "color_toggle_on": list(getattr(prefs, "overlay_color_toggle_on", (0.65, 0.8, 1.0, 0.4))),
@@ -159,28 +159,28 @@ def dump_prefs(prefs) -> dict:
             "color_header_background": list(getattr(prefs, "overlay_header_background", (0.0, 0.0, 0.0, 0.35))),
             "color_footer_background": list(getattr(prefs, "overlay_footer_background", (0.0, 0.0, 0.0, 0.35))),
             "gap": int(getattr(prefs, "overlay_gap", 10)),
-            "column_gap": int(getattr(prefs, "overlay_column_gap", 30)),
+            "column_gap": int(getattr(prefs, "overlay_column_gap", 100)),
             "line_height": float(getattr(prefs, "overlay_line_height", 1.5)),
-            "footer_gap": int(getattr(prefs, "overlay_footer_gap", 20)),
-            "footer_token_gap": int(getattr(prefs, "overlay_footer_token_gap", 10)),
-            "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
-            "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
-            "style": getattr(prefs, "overlay_item_format", "GROUPS_FIRST"),
-            "format_folder": getattr(prefs, "overlay_format_folder", "C G S N"),
-            "format_item": getattr(prefs, "overlay_format_item", "C I L"),
+            "footer_gap": int(getattr(prefs, "overlay_footer_gap", 50)),
+            "footer_token_gap": int(getattr(prefs, "overlay_footer_token_gap", 4)),
+            "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 8)),
+            "position": getattr(prefs, "overlay_position", "BOTTOM_LEFT"),
+            "style": getattr(prefs, "overlay_item_format", "DEFAULT"),
+            "format_folder": getattr(prefs, "overlay_format_folder", "C n s G L"),
+            "format_item": getattr(prefs, "overlay_format_item", "C I S L T"),
             "separator_a": getattr(prefs, "overlay_separator_a", "→"),
             "separator_b": getattr(prefs, "overlay_separator_b", "::"),
             "max_label_length": int(getattr(prefs, "overlay_max_label_length", 0)),
             "sort_mode": getattr(prefs, "overlay_sort_mode", "PRESET_GDO"),
             "sort_string": getattr(prefs, "overlay_sort_string", "g d c"),
-            "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
-            "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
+            "offset_x": int(getattr(prefs, "overlay_offset_x", 65)),
+            "offset_y": int(getattr(prefs, "overlay_offset_y", -15)),
             "ungrouped_expanded": bool(getattr(prefs, "ungrouped_expanded", False)),
             "scripts_overlay": {
-                "max_items": int(getattr(prefs, "scripts_overlay_max_items", 20)),
-                "column_rows": int(getattr(prefs, "scripts_overlay_column_rows", 20)),
-                "gap": float(getattr(prefs, "scripts_overlay_gap", 8.0)),
-                "column_gap": float(getattr(prefs, "scripts_overlay_column_gap", 20.0)),
+                "max_items": int(getattr(prefs, "scripts_overlay_max_items", 50)),
+                "column_rows": int(getattr(prefs, "scripts_overlay_column_rows", 10)),
+                "gap": float(getattr(prefs, "scripts_overlay_gap", 5.0)),
+                "column_gap": float(getattr(prefs, "scripts_overlay_column_gap", 25.0)),
                 "max_label_length": int(getattr(prefs, "scripts_overlay_max_label_length", 0)),
             },
         },
@@ -220,20 +220,20 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             "hide_panels": bool(getattr(prefs, "overlay_hide_panels", True)),
             "show_header": bool(getattr(prefs, "overlay_show_header", True)),
             "show_footer": bool(getattr(prefs, "overlay_show_footer", True)),
-            "max_items": int(getattr(prefs, "overlay_max_items", 14)),
-            "column_rows": int(getattr(prefs, "overlay_column_rows", 12)),
-            "font_size_header": int(getattr(prefs, "overlay_font_size_header", 14)),
-            "font_size_chord": int(getattr(prefs, "overlay_font_size_chord", 12)),
-            "font_size_body": int(getattr(prefs, "overlay_font_size_body", 12)),
+            "max_items": int(getattr(prefs, "overlay_max_items", 50)),
+            "column_rows": int(getattr(prefs, "overlay_column_rows", 8)),
+            "font_size_header": int(getattr(prefs, "overlay_font_size_header", 16)),
+            "font_size_chord": int(getattr(prefs, "overlay_font_size_chord", 16)),
+            "font_size_body": int(getattr(prefs, "overlay_font_size_body", 15)),
             "font_size_footer": int(getattr(prefs, "overlay_font_size_footer", 12)),
             "font_size_fading": int(getattr(prefs, "overlay_font_size_fading", 24)),
-            "font_size_toggle": int(getattr(prefs, "overlay_font_size_toggle", 12)),
+            "font_size_toggle": int(getattr(prefs, "overlay_font_size_toggle", 23)),
             "font_size_separator": int(getattr(prefs, "overlay_font_size_separator", 15)),
-            "toggle_offset_y": int(getattr(prefs, "overlay_toggle_offset_y", 0)),
+            "toggle_offset_y": int(getattr(prefs, "overlay_toggle_offset_y", -4)),
             "color_chord": list(getattr(prefs, "overlay_color_chord", (0.65, 0.8, 1.0, 1.0))),
             "color_label": list(getattr(prefs, "overlay_color_label", (1.0, 1.0, 1.0, 1.0))),
             "color_header": list(getattr(prefs, "overlay_color_header", (1.0, 1.0, 1.0, 1.0))),
-            "color_icon": list(getattr(prefs, "overlay_color_icon", (0.8, 0.8, 0.8, 0.7))),
+            "color_icon": list(getattr(prefs, "overlay_color_icon", (0.80, 0.80, 0.80, 1.00))),
             "color_group": list(getattr(prefs, "overlay_color_group", (0.90, 0.90, 0.50, 1.00))),
             "color_counter": list(getattr(prefs, "overlay_color_counter", (0.80, 0.80, 0.80, 0.80))),
             "color_toggle_on": list(getattr(prefs, "overlay_color_toggle_on", (0.65, 0.8, 1.0, 0.4))),
@@ -244,28 +244,28 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
             "color_header_background": list(getattr(prefs, "overlay_header_background", (0.0, 0.0, 0.0, 0.35))),
             "color_footer_background": list(getattr(prefs, "overlay_footer_background", (0.0, 0.0, 0.0, 0.35))),
             "gap": int(getattr(prefs, "overlay_gap", 10)),
-            "column_gap": int(getattr(prefs, "overlay_column_gap", 30)),
+            "column_gap": int(getattr(prefs, "overlay_column_gap", 100)),
             "line_height": float(getattr(prefs, "overlay_line_height", 1.5)),
-            "footer_gap": int(getattr(prefs, "overlay_footer_gap", 20)),
-            "footer_token_gap": int(getattr(prefs, "overlay_footer_token_gap", 10)),
-            "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 10)),
-            "position": getattr(prefs, "overlay_position", "TOP_LEFT"),
-            "style": getattr(prefs, "overlay_item_format", "GROUPS_FIRST"),
-            "format_folder": getattr(prefs, "overlay_format_folder", "C G S N"),
-            "format_item": getattr(prefs, "overlay_format_item", "C I L"),
+            "footer_gap": int(getattr(prefs, "overlay_footer_gap", 50)),
+            "footer_token_gap": int(getattr(prefs, "overlay_footer_token_gap", 4)),
+            "footer_label_gap": int(getattr(prefs, "overlay_footer_label_gap", 8)),
+            "position": getattr(prefs, "overlay_position", "BOTTOM_LEFT"),
+            "style": getattr(prefs, "overlay_item_format", "DEFAULT"),
+            "format_folder": getattr(prefs, "overlay_format_folder", "C n s G L"),
+            "format_item": getattr(prefs, "overlay_format_item", "C I S L T"),
             "separator_a": getattr(prefs, "overlay_separator_a", "→"),
             "separator_b": getattr(prefs, "overlay_separator_b", "::"),
             "max_label_length": int(getattr(prefs, "overlay_max_label_length", 0)),
             "sort_mode": getattr(prefs, "overlay_sort_mode", "PRESET_GDO"),
             "sort_string": getattr(prefs, "overlay_sort_string", "g d c"),
-            "offset_x": int(getattr(prefs, "overlay_offset_x", 14)),
-            "offset_y": int(getattr(prefs, "overlay_offset_y", 14)),
+            "offset_x": int(getattr(prefs, "overlay_offset_x", 65)),
+            "offset_y": int(getattr(prefs, "overlay_offset_y", -15)),
             "ungrouped_expanded": bool(getattr(prefs, "ungrouped_expanded", False)),
             "scripts_overlay": {
-                "max_items": int(getattr(prefs, "scripts_overlay_max_items", 20)),
-                "column_rows": int(getattr(prefs, "scripts_overlay_column_rows", 20)),
-                "gap": float(getattr(prefs, "scripts_overlay_gap", 8.0)),
-                "column_gap": float(getattr(prefs, "scripts_overlay_column_gap", 20.0)),
+                "max_items": int(getattr(prefs, "scripts_overlay_max_items", 50)),
+                "column_rows": int(getattr(prefs, "scripts_overlay_column_rows", 10)),
+                "gap": float(getattr(prefs, "scripts_overlay_gap", 5.0)),
+                "column_gap": float(getattr(prefs, "scripts_overlay_column_gap", 25.0)),
                 "max_label_length": int(getattr(prefs, "scripts_overlay_max_label_length", 0)),
             },
         }
@@ -499,7 +499,7 @@ def apply_config(prefs, data: dict) -> list[str]:
         if pos in _enum_items_as_set(prefs, "overlay_position"):
             prefs.overlay_position = pos
 
-        style = overlay.get("style", "GROUPS_FIRST")
+        style = overlay.get("style", "DEFAULT")
         if style in _enum_items_as_set(prefs, "overlay_item_format"):
             prefs.overlay_item_format = style
 
@@ -627,16 +627,21 @@ def _add_mapping_from_dict(prefs, item: dict, order_index: int = 0):
             # Reconstruct rows based on underscore-prefixed keys
             current_row = {}
             rows = []
-            
+            is_first_key = True
+
             for key, value in kwargs_dict.items():
                 if key.startswith("_"):
                     # This key starts a new row - save previous row and start new one
                     if current_row:
                         rows.append(current_row)
+                    elif is_first_key:
+                        # First key is underscore-prefixed, meaning row 0 was empty
+                        rows.append({})
                     current_row = {key[1:]: value}  # Remove underscore prefix
                 else:
                     # Same row as previous
                     current_row[key] = value
+                is_first_key = False
             
             # Don't forget the last row
             if current_row:

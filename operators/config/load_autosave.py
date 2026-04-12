@@ -8,6 +8,7 @@ import bpy  # type: ignore
 
 from ...core.autosave import autosave_path
 from ...core.config_io import apply_config, loads_json
+from ...ui import prefs as prefs_module
 from ..common import prefs
 
 class CHORDSONG_OT_Load_Autosave(bpy.types.Operator):
@@ -23,6 +24,7 @@ class CHORDSONG_OT_Load_Autosave(bpy.types.Operator):
             return {"CANCELLED"}
 
         try:
+            prefs_module._SUSPEND_CALLBACKS = True
             p._chordsong_suspend_autosave = True
             with open(ap, "r", encoding="utf-8") as f:
                 data = loads_json(f.read())
@@ -35,4 +37,5 @@ class CHORDSONG_OT_Load_Autosave(bpy.types.Operator):
             self.report({"ERROR"}, f"Failed to restore autosave: {ex}")
             return {"CANCELLED"}
         finally:
+            prefs_module._SUSPEND_CALLBACKS = False
             p._chordsong_suspend_autosave = False

@@ -9,6 +9,7 @@ from bpy_extras.io_utils import ImportHelper  # type: ignore
 from bpy.props import StringProperty  # type: ignore
 
 from ...core.config_io import apply_config_append, loads_json, CHORDSONG_CONFIG_VERSION
+from ...ui import prefs as prefs_module
 from ..common import prefs
 
 def _validate_chordsong_config(data: dict) -> tuple[bool, str]:
@@ -83,6 +84,7 @@ class CHORDSONG_OT_Append_Config(bpy.types.Operator, ImportHelper):
                 # Show warning but proceed anyway
                 self.report({"WARNING"}, f"File validation warning: {error_msg}")
             
+            prefs_module._SUSPEND_CALLBACKS = True
             p._chordsong_suspend_autosave = True
             warns = apply_config_append(p, data)
             
@@ -104,4 +106,5 @@ class CHORDSONG_OT_Append_Config(bpy.types.Operator, ImportHelper):
             self.report({"ERROR"}, f"Failed to append config: {ex}")
             return {"CANCELLED"}
         finally:
+            prefs_module._SUSPEND_CALLBACKS = False
             p._chordsong_suspend_autosave = False

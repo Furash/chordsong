@@ -9,6 +9,7 @@ from bpy_extras.io_utils import ImportHelper  # type: ignore
 from bpy.props import StringProperty  # type: ignore
 
 from ...core.config_io import apply_config, loads_json
+from ...ui import prefs as prefs_module
 from ..common import prefs
 
 class CHORDSONG_OT_Load_Config(bpy.types.Operator, ImportHelper):
@@ -31,6 +32,7 @@ class CHORDSONG_OT_Load_Config(bpy.types.Operator, ImportHelper):
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
         try:
+            prefs_module._SUSPEND_CALLBACKS = True
             p._chordsong_suspend_autosave = True
             with open(self.filepath, "r", encoding="utf-8") as f:
                 data = loads_json(f.read())
@@ -48,4 +50,5 @@ class CHORDSONG_OT_Load_Config(bpy.types.Operator, ImportHelper):
             self.report({"ERROR"}, f"Failed to load config: {ex}")
             return {"CANCELLED"}
         finally:
+            prefs_module._SUSPEND_CALLBACKS = False
             p._chordsong_suspend_autosave = False
