@@ -1,4 +1,5 @@
 import json
+import warnings
 from dataclasses import dataclass
 
 def get_str_attr(obj, attr, default=""):
@@ -432,7 +433,9 @@ def parse_kwargs(kwargs_json: str) -> dict:
 
                 # Try to evaluate the value safely using ast.literal_eval
                 try:
-                    result[key] = ast.literal_eval(value)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", SyntaxWarning)
+                        result[key] = ast.literal_eval(value)
                 except (ValueError, SyntaxError):
                     # Keep as string if can't evaluate (strip extra quotes)
                     result[key] = value.strip('"\'')
