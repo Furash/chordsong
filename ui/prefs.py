@@ -53,7 +53,7 @@ def default_config_path() -> str:
         except Exception:
             # Silently fallback if extension_path_user fails
             pass
-    
+
     # Fallback to user_resource if extension_path_user is not available
     # (for backward compatibility with older Blender versions)
     # Note: This respects BLENDER_USER_RESOURCES and BLENDER_USER_SCRIPTS env vars
@@ -96,7 +96,7 @@ def _check_conflicts_silent(context):
     try:
         from ..operators.check_conflicts import CHORDSONG_OT_CheckConflicts, find_conflicts
         prefs = context.preferences.addons[_addon_root_pkg()].preferences
-        
+
         conflicts = find_conflicts(prefs.mappings)
         CHORDSONG_OT_CheckConflicts.conflicts = conflicts
     except Exception:
@@ -108,7 +108,7 @@ def _on_prefs_changed(self, _context):
         # Skip callbacks during bulk operations (config loading, etc.)
         if _SUSPEND_CALLBACKS:
             return
-        
+
         self.ensure_defaults()
         _autosave_now(self)
     except Exception:
@@ -119,18 +119,18 @@ def _on_mapping_changed(_self, context):
         # Skip callbacks during bulk operations (config loading, etc.)
         if _SUSPEND_CALLBACKS:
             return
-        
+
         prefs = context.preferences.addons[_addon_root_pkg()].preferences
         prefs.ensure_defaults()
         _autosave_now(prefs)
-        
+
         # Clear overlay cache so changes appear immediately
         from .overlay import clear_overlay_cache
         clear_overlay_cache()
-        
+
         # Sync groups after a short delay to avoid crashing during rapid typing/redraws
         prefs.sync_groups_delayed()
-        
+
         # Check conflicts silently to update UI highlighting
         _check_conflicts_silent(context)
     except Exception:
@@ -142,7 +142,7 @@ def _on_group_changed(_self, context):
         # Skip callbacks during bulk operations (config loading, etc.)
         if _SUSPEND_CALLBACKS:
             return
-        
+
         prefs = context.preferences.addons[_addon_root_pkg()].preferences
         _autosave_now(prefs)
     except Exception:
@@ -167,7 +167,7 @@ def clear_operator_cache():
 def _build_operator_cache():
     """
     Build cached list of all operator idnames.
-    
+
     Note: Cache persists until explicitly cleared. Operators registered/unregistered
     after cache creation won't appear until cache is cleared. This is acceptable
     since operator registration typically happens at addon enable time.
@@ -177,10 +177,10 @@ def _build_operator_cache():
         # Return cached list if available
         if _operator_cache is not None:
             return _operator_cache
-        
+
         operators = []
         seen = set()
-        
+
         # Iterate through bpy.ops modules (most reliable method)
         # Cache module names to avoid repeated dir() calls
         try:
@@ -188,7 +188,7 @@ def _build_operator_cache():
         except Exception:
             # Fallback: return empty list if bpy.ops is not accessible
             return []
-        
+
         for module_name in op_modules:
             try:
                 op_module = getattr(bpy.ops, module_name)
@@ -205,7 +205,7 @@ def _build_operator_cache():
             except Exception:
                 # Skip any other errors to prevent one bad module from breaking everything
                 continue
-        
+
         _operator_cache = sorted(operators)
         return _operator_cache
     except Exception:
@@ -218,22 +218,22 @@ def _fuzzy_match_operator(query: str, operator_idname: str) -> tuple[bool, int]:
     Normalizes dots and underscores to spaces before matching.
     """
     from ..utils.fuzzy import fuzzy_match
-    
+
     # Normalize: treat dots and underscores as spaces (in addition to what fuzzy_match does)
     query_normalized = query.replace('.', ' ').replace('_', ' ')
     text_normalized = operator_idname.replace('.', ' ').replace('_', ' ')
-    
+
     # Remove extra spaces
     query_normalized = ' '.join(query_normalized.split())
     text_normalized = ' '.join(text_normalized.split())
-    
+
     # Use the existing fuzzy_match function
     return fuzzy_match(query_normalized, text_normalized)
 
 def _operator_search_callback(_self, _context, edit_text):
     """
     Search callback for operator idname field - provides Blender's operator search.
-    
+
     Returns a list of operator idnames matching the search text.
     Uses cached operator list for performance.
     Supports fuzzy matching: "add op" will match "addon.operator"
@@ -241,29 +241,29 @@ def _operator_search_callback(_self, _context, edit_text):
     try:
         # Get cached operator list
         all_operators = _build_operator_cache()
-        
+
         if not all_operators:
             # Return empty if cache building failed
             return []
-        
+
         if not edit_text:
             # Return all operators if no search text (limited to prevent UI lag)
             # Limit to first 10 to prevent UI slowdown with very large lists
             return all_operators[:10]
-        
+
         edit_text_clean = edit_text.strip()
-        
+
         # Use fuzzy matching for better search experience
         matched_operators = []
         for op in all_operators:
             matched, score = _fuzzy_match_operator(edit_text_clean, op)
             if matched:
                 matched_operators.append((score, op))
-        
+
         # Sort by score (lower is better) and return just the operator names
         matched_operators.sort(key=lambda x: x[0])
         results = [op for _, op in matched_operators]
-        
+
         # Limit results to prevent UI lag with very broad searches
         # 50 is a reasonable limit that still shows plenty of results
         return results[:50]
@@ -614,7 +614,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         default=True,
         update=_on_prefs_changed,
     )
-    
+
     toggle_multi_modifier: EnumProperty(
         name="Multi-Toggle Modifier",
         description="Hold this modifier while executing a toggle to keep overlay open for multiple toggles",
@@ -939,7 +939,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         default="DEFAULT",
         update=_on_prefs_changed,
     )
-    
+
     # Custom format strings
     overlay_format_folder: StringProperty(
         name="Folder Format",
@@ -950,7 +950,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         default="C n s G L",
         update=_on_prefs_changed,
     )
-    
+
     overlay_format_item: StringProperty(
         name="Item Format",
         description=(
@@ -960,21 +960,21 @@ class CHORDSONG_Preferences(AddonPreferences):
         default="C I S L T",
         update=_on_prefs_changed,
     )
-    
+
     overlay_separator_a: StringProperty(
         name="Separator A",
         description="Primary separator (used by S token)",
         default="→",
         update=_on_prefs_changed,
     )
-    
+
     overlay_separator_b: StringProperty(
-        name="Separator B", 
+        name="Separator B",
         description="Secondary separator (used by s token)",
         default="::",
         update=_on_prefs_changed,
     )
-    
+
     overlay_max_label_length: IntProperty(
         name="Max Label Length",
         description="Maximum character length for labels before truncation. The longest label in each column sets the width for toggle icon alignment. Set to 0 for no limit.",
@@ -1034,6 +1034,24 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
+    # ============================================================
+    # MIGRATION CODE: double-leader Recents notification
+    # ============================================================
+    # TO REMOVE LATER ON: just delete all "MIGRATION CODE" blocks in this file as
+    # well as in operators/leader.py.
+    #
+    # N.B. Also delete the _show_recents_migration_notice function in leader.py, and the
+    # recents_notice_dismissed property in prefs.py (this property).
+    # ============================================================
+    recents_notice_dismissed: BoolProperty(
+        name="Recents Notice Dismissed",
+        default=False,
+        options={"HIDDEN"},
+    )
+    # ============================================================
+    # END MIGRATION CODE
+    # ============================================================
+
     def ensure_defaults(self):
         """Ensure default config path and nerd icons are initialized."""
         # Only set config_path if it's truly empty (first time setup)
@@ -1057,7 +1075,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         if CHORDSONG_Preferences._sync_timer_fn:
             if bpy.app.timers.is_registered(CHORDSONG_Preferences._sync_timer_fn):
                 bpy.app.timers.unregister(CHORDSONG_Preferences._sync_timer_fn)
-        
+
         def run_sync():
             try:
                 # We need to re-fetch prefs since self might be invalid if reloaded
@@ -1092,19 +1110,19 @@ class CHORDSONG_Preferences(AddonPreferences):
             name = (getattr(m, "group", "") or "").strip()
             if name:
                 used_names.add(name)
-        
+
         # 2. Collect current names in the groups collection
         existing_names = {grp.name for grp in self.groups if grp.name}
-        
+
         # 3. Determine changes
         to_add = used_names - existing_names
         to_remove = set()
         if remove_unused:
             to_remove = existing_names - used_names
-        
+
         # 4. Apply changes surgically
         has_changes = False
-        
+
         # Removing first (reverse order to preserve indices)
         if to_remove:
             for i in range(len(self.groups) - 1, -1, -1):
@@ -1124,8 +1142,8 @@ class CHORDSONG_Preferences(AddonPreferences):
 
     def _sort_groups(self):
         """Preserve user-defined group order (no longer auto-sorts).
-        
-        Previously sorted alphabetically, but now users can manually 
+
+        Previously sorted alphabetically, but now users can manually
         reorder groups with up/down buttons. New groups are added at the end.
         """
         # No longer auto-sort - preserve user order

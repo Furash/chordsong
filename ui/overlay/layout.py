@@ -1,5 +1,5 @@
 """Layout calculation functions for overlay."""
-from ...core.engine import get_leader_key_token
+from ...core.engine import get_leader_key_token, get_str_attr
 from .tokenizer import (
     parse_format_string,
     generate_tokens_for_folder,
@@ -9,19 +9,19 @@ from .tokenizer import (
 
 def _get_preset_formats(style):
     """Get format strings for preset styles.
-    
+
     Each preset maps to specific format strings for folders and items:
     - DEFAULT: Simple count display
       Folder: "a → +5 keymaps"
       Item: "a  Save"
     - CUSTOM: User-defined format strings
-    
+
     Token types:
     - C: Chord, I: Icon, i: Group Icon, G: Groups (all), g: Group (first only)
     - L: Label, N: Count (verbose), n: Count (compact)
     - S: Separator A (→), s: Separator B (::)
     - T: Toggle icon
-    
+
     Returns: (folder_format, item_format, separator_a, separator_b)
     """
     presets = {
@@ -39,10 +39,10 @@ def build_overlay_rows(cands, has_buffer, p=None):
         p: Preferences object (optional)
     """
     rows = []
-    
+
     # Get style from prefs if available
     style = getattr(p, "overlay_item_format", "DEFAULT") if p else "DEFAULT"
-    
+
     # Get format strings based on style
     if style == "CUSTOM" and p:
         # Use user-defined format strings
@@ -57,14 +57,14 @@ def build_overlay_rows(cands, has_buffer, p=None):
             format_folder, format_item, separator_a, separator_b = preset
         else:
             format_folder, format_item, separator_a, separator_b = "C S N", "C I L T", "→", "::"
-    
+
     # Build group icons dictionary from preferences
     group_icons = {}
     if p:
         for grp in p.groups:
             if grp.name and grp.icon:
                 group_icons[grp.name] = grp.icon
-    
+
     # Build group display_order lookup from preferences
     group_order = {}
     if p:
@@ -128,11 +128,11 @@ def build_overlay_rows(cands, has_buffer, p=None):
         return tuple(key)
 
     sorted_cands = sorted(cands, key=_sort_key)
-    
+
     for c in sorted_cands:
         token = c.next_token
         icon = c.icon if c.icon else ""
-        
+
         if c.count > 1 or not c.is_final:
             # Folder/Summary row - use tokenization for all styles
             token_types = parse_format_string(format_folder)
@@ -146,7 +146,7 @@ def build_overlay_rows(cands, has_buffer, p=None):
                 separator_b=separator_b,
                 group_icons=group_icons,
             )
-            
+
             # Store tokens in the row for rendering
             rows.append({
                 "kind": "item",
@@ -181,7 +181,7 @@ def build_overlay_rows(cands, has_buffer, p=None):
                 mapping_type=c.mapping_type,
                 group_icons=group_icons,
             )
-            
+
             rows.append({
                 "kind": "item",
                 "token": token,
@@ -194,16 +194,67 @@ def build_overlay_rows(cands, has_buffer, p=None):
 
     # Footer items (always at bottom)
     footer = []
-    
+
     # 1. Mod hints (informational)
     footer.append({"kind": "hint", "token": ">R  ^Ctrl  !Alt  +Shift  #Win", "label": "", "icon": ""})
 
     if not has_buffer:
         # Only show recents at root level (no buffer)
-        leader_token = get_leader_key_token()
-        footer.append({"kind": "item", "token": f"{leader_token}+{leader_token}", "label": "Recent Commands", "icon": ""})
+        # Find single-token Recents chords only (no spaces)
+        recents_chords = []
+        if p:
+            for m in p.mappings:
+                if getattr(m, "mapping_type", "OPERATOR") == "OPERATOR":
+                    if get_str_attr(m, "operator") == "chordsong.recents" and getattr(m, "enabled", True):
+                        chord = get_str_attr(m, "chord")
+                        # Only include single-token chords (no spaces)
+                        if chord and " " not in chord:
+                            recents_chords.append(chord)
 
-    footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})
+        if recents_chords:
+            # Use the first single-token chord
+            display_chord = recents_chords[0].replace(" ", "+")
+            footer.append({"kind": "item", "token": display_chord, "label": "Recent Commands", "icon": ""})
+        else:
+            # Fallback to original behavior (double leader)
+            leader_token = get_leader_key_token()
+            footer.append({"kind": "item", "token": f"{leader_token}+{leader_token}", "label": "Recent Commands", "icon": ""})
+
+    # Close button with optional custom close chord (dynamic based on whether close key is a valid next token)
+    # Find single-token Close Overlay chords (no spaces)
+    close_chords = []
+    if p:
+        for m in p.mappings:
+            if getattr(m, "mapping_type", "OPERATOR") == "OPERATOR":
+                if get_str_attr(m, "operator") == "chordsong.close_overlay" and getattr(m, "enabled", True):
+                    chord = get_str_attr(m, "chord")
+                    # Only include single-token chords (no spaces)
+                    if chord and " " not in chord:
+                        close_chords.append(chord)
+
+    if close_chords:
+        if not has_buffer:
+            # At root level, close is always available
+            display_chord = close_chords[0].replace(" ", "+")
+            footer.append({"kind": "item", "token": f"ESC|{display_chord}", "label": "Close", "icon": ""})
+        else:
+            # Check if any close chord appears as a candidate for the next token
+            close_key_available = False
+            for c in cands:
+                if c.next_token in close_chords:
+                    close_key_available = True
+                    break
+
+            if close_key_available:
+                # Close key is a valid next token, so it won't close
+                footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})
+            else:
+                # Close key is not a valid next token, so it would close
+                display_chord = close_chords[0].replace(" ", "+")
+                footer.append({"kind": "item", "token": f"ESC|{display_chord}", "label": "Close", "icon": ""})
+    else:
+        footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})
+
     if has_buffer:
         footer.append({"kind": "item", "token": "BS", "label": "Back", "icon": ""})
 
@@ -230,16 +281,16 @@ def wrap_into_columns(rows, max_rows):
 
 def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
     """Calculate token and label widths per column and for footer.
-    
+
     Each format token type becomes its own sub-column with calculated width.
     """
     import blf  # type: ignore
 
     column_metrics = []
-    
+
     # Get max label length setting for truncation during width calculation
     max_label_length = getattr(p, "overlay_max_label_length", 0) if p else 0
-    
+
     # Get font sizes for different token types
     icon_size = chord_size
     toggle_size = max(int(getattr(p, "overlay_font_size_toggle", 16)), 6) if p else 16
@@ -251,7 +302,7 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
     for col in columns:
         # Dynamic sub-columns: track max width for each token type
         token_widths = {}  # token_type -> max_width
-        
+
         # Legacy fields
         col_max_header_w = 0.0
         has_any_icon = False
@@ -277,7 +328,7 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
                             blf.size(0, toggle_size)
                         else:  # G, g, L, N, n, S, s - use body size
                             blf.size(0, body_size)
-                        
+
                         # Apply truncation for label tokens
                         content = tok.content
                         if tok.type == 'L' and max_label_length > 0 and len(content) > max_label_length:
@@ -285,10 +336,10 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
                                 content = content[:max_label_length-3] + "..."
                             else:
                                 content = content[:max_label_length]
-                        
+
                         # Measure width
                         w, _ = blf.dimensions(0, content)
-                        
+
                         # Track maximum width for this token type
                         token_widths[tok.type] = max(token_widths.get(tok.type, 0.0), w)
                 else:
@@ -299,7 +350,7 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
                         has_any_icon = True
                         iw, _ = blf.dimensions(0, r["icon"])
                         token_widths['I'] = max(token_widths.get('I', 0.0), iw)
-                    
+
                     tw, _ = blf.dimensions(0, f"{r['token'].upper()}")
                     token_widths['C'] = max(token_widths.get('C', 0.0), tw)
 
@@ -308,23 +359,23 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
                     full_txt = r["label"]
                     if r.get("label_extra"):
                         full_txt += "  " + r["label_extra"]
-                    
+
                     # Extract label without toggle icons
                     label_txt = full_txt
                     for toggle_icon in ["  󰨚", "  󰨙", "󰨚", "󰨙"]:
                         label_txt = label_txt.replace(toggle_icon, "")
                     label_txt = label_txt.rstrip()
-                    
+
                     # Apply max_label_length truncation
                     if max_label_length > 0 and len(label_txt) > max_label_length:
                         if max_label_length > 3:
                             label_txt = label_txt[:max_label_length-3] + "..."
                         else:
                             label_txt = label_txt[:max_label_length]
-                    
+
                     lw, _ = blf.dimensions(0, label_txt)
                     token_widths['L'] = max(token_widths.get('L', 0.0), lw)
-                    
+
                     # Toggle column
                     if r.get("mapping_type") == "CONTEXT_TOGGLE":
                         blf.size(0, toggle_size)
@@ -332,7 +383,7 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
                         tw_off, _ = blf.dimensions(0, "󰨙")
                         toggle_w = max(tw_on, tw_off)
                         token_widths['T'] = max(token_widths.get('T', 0.0), toggle_w)
-                
+
                 blf.size(0, chord_size)
 
         # Build metrics dict with dynamic token widths

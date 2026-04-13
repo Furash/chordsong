@@ -15,6 +15,10 @@ from ..core.engine import (
     parse_kwargs,
     filter_mappings_by_context,
     get_leader_key_type,
+    get_leader_key_token,
+    split_chord,
+    tokens_match,
+    get_str_attr,
 )
 from ..core.history import add_to_history
 from ..ui.overlay import draw_overlay, draw_fading_overlay
@@ -37,6 +41,32 @@ _fading_overlay_state = {
 
 # Global state for panel visibility (shared between Leader and Recents)
 _panel_states_global = {}
+
+# ============================================================
+# MIGRATION CODE: double-leader Recents notification
+# ============================================================
+# TO REMOVE LATER ON: just delete all "MIGRATION CODE" blocks in this file as
+# well as in ui/prefs.py.
+#
+# N.B. Also delete the _recents_notice_dismissed property in prefs.py, and the
+# _show_recents_migration_notice function in leader.py (below).
+# ============================================================
+def _show_recents_migration_notice(context, p, leader_token):
+    """Show one-time notification about Recents moving to chord mappings."""
+    def draw_notice(self, context):
+        layout = self.layout
+        layout.label(text="Recents has been moved to a chord mapping", icon='INFO')
+        layout.separator()
+        layout.label(text="The double-tap Recents feature has been replaced.")
+        layout.label(text=f"To restore it, add a chord like '{leader_token}' → chordsong.recents.")
+        layout.label(text="You can also bind it to any other key (e.g., 'r').")
+        layout.separator()
+        layout.prop(p, "recents_notice_dismissed", text="Don't show again")
+
+    context.window_manager.popup_menu(draw_notice, title="Chord Song Update", icon='INFO')
+# ============================================================
+# END MIGRATION CODE
+# ============================================================
 
 def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
     """Start showing a fading overlay for the executed chord.
@@ -379,6 +409,18 @@ class CHORDSONG_OT_ResetState(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class CHORDSONG_OT_CloseOverlay(bpy.types.Operator):
+    """Close the Chord Song overlay if it's open"""
+
+    bl_idname = "chordsong.close_overlay"
+    bl_label = "Close Overlay"
+    bl_options = {"REGISTER"}
+
+    def execute(self, context: bpy.types.Context):
+        # Simply call reset_state which already does the cleanup
+        return bpy.ops.chordsong.reset_state('EXEC_DEFAULT')
+
+
 class CHORDSONG_OT_Leader(bpy.types.Operator):
     """Start chord capture (leader)"""
 
@@ -520,7 +562,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     self.area = area
                 def __getattr__(self, name):
                     return getattr(self._ctx, name)
-            
+
             context = ContextWithRegion(bpy.context, self._region, self._area)
 
         # Filter mappings by context for overlay display
@@ -543,7 +585,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self._ctrl_held = False
         self._alt_held = False
         self._shift_held = False
-        
+
         # Store the leader key to ignore its first RELEASE if it's a mouse button
         # This prevents double-triggering when mouse buttons are used as leader key
         self._leader_key_type = get_leader_key_type()
@@ -753,6 +795,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             return {"CANCELLED"}
 
     def _modal_inner(self, context: bpy.types.Context, event: bpy.types.Event):
+        # Ignore leader key repeat events
+        if event.type == get_leader_key_type() and event.value == 'PRESS' and event.is_repeat:
+            return {"RUNNING_MODAL"}
+
         global _panel_states_global
         p = prefs(context)
 
@@ -760,7 +806,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if event.type == "ESC" and event.value == "PRESS":
             self._finish(context)
             return {"CANCELLED"}
-
 
         # Backspace to go up one level
         if event.type == "BACK_SPACE" and event.value == "PRESS":
@@ -773,6 +818,77 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 # No buffer, treat as cancel
                 self._finish(context)
                 return {"CANCELLED"}
+
+        # ============================================================
+        # MIGRATION CODE: double-leader Recents notification
+        # ============================================================
+        # TO REMOVE LATER ON: just delete all "MIGRATION CODE" blocks in this file as
+        # well as in ui/prefs.py.
+        #
+        # N.B. Also delete the recents_notice_dismissed property in prefs.py, and the
+        # _show_recents_migration_notice function in leader.py.
+        # ============================================================
+        leader_key = get_leader_key_type()
+        if not self._buffer and event.type == leader_key:
+            # Check if user has any single-token Recents chord
+            has_any_recents_chord = False
+            for m in p.mappings:
+                if getattr(m, "mapping_type", "OPERATOR") == "OPERATOR":
+                    if get_str_attr(m, "operator") == "chordsong.recents" and getattr(m, "enabled", True):
+                        chord = get_str_attr(m, "chord")
+                        if chord and " " not in chord:
+                            has_any_recents_chord = True
+                            break
+
+            # If user already has a Recents chord, auto-dismiss the notice
+            if has_any_recents_chord:
+                if not getattr(p, "recents_notice_dismissed", False):
+                    p.recents_notice_dismissed = True
+            else:
+                # Existing users = have any mappings at all (not fresh install)
+                is_existing_user = len(p.mappings) > 0
+
+                if is_existing_user and not getattr(p, "recents_notice_dismissed", False):
+                    leader_token = get_leader_key_token()
+                    _show_recents_migration_notice(context, p, leader_token)
+                    return {"RUNNING_MODAL"}
+        # ============================================================
+        # END MIGRATION CODE
+        # ============================================================
+
+        # Check for close chord (intelligent: only close if pressing the key wouldn't form a valid chord prefix)
+        pressed_key = normalize_token(event.type, shift=event.shift, ctrl=event.ctrl, alt=event.alt, oskey=event.oskey)
+
+        # Find all single-token close chords
+        close_chords = []
+        for m in p.mappings:
+            if getattr(m, "mapping_type", "OPERATOR") == "OPERATOR":
+                if get_str_attr(m, "operator") == "chordsong.close_overlay" and getattr(m, "enabled", True):
+                    chord = get_str_attr(m, "chord")
+                    if chord and " " not in chord:
+                        close_chords.append(chord)
+
+        # If pressed key is a close chord
+        if pressed_key in close_chords:
+            # Check if adding this key would create a valid prefix for any chord
+            test_buffer = self._buffer + [pressed_key]
+
+            # Check if any enabled mapping starts with this test_buffer as a prefix
+            is_prefix = False
+            for m in p.mappings:
+                if not getattr(m, "enabled", True):
+                    continue
+                chord_tokens = split_chord(get_str_attr(m, "chord"))
+                if len(chord_tokens) >= len(test_buffer):
+                    if all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(chord_tokens[:len(test_buffer)], test_buffer)):
+                        is_prefix = True
+                        break
+
+            # If not a prefix of any chord, close immediately
+            if not is_prefix:
+                self._finish(context)
+                return {"CANCELLED"}
+            # Otherwise, let it be processed as a normal token below
 
         # Handle modifier key events BEFORE checking event.value to catch RELEASE events
         # Track CTRL
@@ -811,10 +927,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Mouse buttons should trigger on RELEASE to avoid conflicts with Blender's default actions
         # (e.g., M3 triggering rotate view on PRESS, getting stuck if we consume the event)
         is_mouse_button = event.type in {
-            "LEFTMOUSE", "RIGHTMOUSE", "MIDDLEMOUSE", 
+            "LEFTMOUSE", "RIGHTMOUSE", "MIDDLEMOUSE",
             "BUTTON4MOUSE", "BUTTON5MOUSE", "BUTTON6MOUSE", "BUTTON7MOUSE"
         }
-        
+
         # For mouse buttons, wait for RELEASE; for everything else (including wheel), wait for PRESS
         if is_mouse_button:
             if event.value != "RELEASE":
@@ -850,40 +966,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
         # Reset last modifier type after a non-modifier key is processed
         self._last_mod_type = None
-
-        # Check for <leader><leader>
-        # If buffer is empty and user presses the leader key again, show recents
-        leader_key = get_leader_key_type()
-        
-        # Ignore the first RELEASE of a mouse button leader key to prevent double-trigger
-        if hasattr(self, '_ignore_leader_release') and self._ignore_leader_release:
-            if event.type == self._leader_key_type and event.value == "RELEASE":
-                self._ignore_leader_release = False
-                return {"RUNNING_MODAL"}
-        
-        if not self._buffer and event.type == leader_key:
-            # Open recents instead of repeat
-            # Don't restore panels here - Recents will handle them
-            p = prefs(context)
-            global _panel_states_global
-            if self._panel_states:
-                # Transfer panel state to Recents by storing it globally
-                # Recents will restore panels when it finishes
-                _panel_states_global = self._panel_states.copy()
-                # Clear our state so _finish doesn't restore
-                self._panel_states = {}
-            # Finish without restoring panels (they'll be handled by Recents)
-            self._finish(context, restore_panels=False)
-            try:
-                bpy.ops.chordsong.recents('INVOKE_DEFAULT')
-            except Exception as e:
-                print(f"Chord Song: Failed to open recents: {e}")
-                # If Recents failed, restore panels now
-                if _panel_states_global:
-                    self._panel_states = _panel_states_global.copy()
-                    self._restore_panels(context)
-                    _panel_states_global = {}
-            return {"FINISHED"}
 
         # Normal mode - accumulate tokens in buffer
         self._buffer.append(tok)
@@ -1485,7 +1567,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     if success:
                         # Skip fading overlay and history for scripts_overlay operator
                         primary_operator = operators_to_run[0]["op"] if operators_to_run else None
-                        if primary_operator != "chordsong.scripts_overlay":
+                        skip_operators = ("chordsong.scripts_overlay", "chordsong.recents", "chordsong.close_overlay")
+                        if primary_operator not in skip_operators:
                             overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                             if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
                                 try:

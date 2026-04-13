@@ -11,6 +11,7 @@ from ..core.engine import (
     normalize_token,
     get_leader_key_type,
     get_leader_key_token,
+    get_str_attr,
 )
 from ..utils.render import (
     DrawHandlerManager,
@@ -45,6 +46,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
     _buffer = None  # Buffer for capturing digits
     _draw_manager = None  # DrawHandlerManager instance
+    _should_close = False  # Flag to indicate modal should close
 
     def _draw_callback(self):
         """Draw callback for the recents overlay."""
@@ -79,7 +81,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                     self.area = area
                 def __getattr__(self, name):
                     return getattr(self._ctx, name)
-            
+
             context = ContextWithRegion(bpy.context, self._draw_manager.region, self._draw_manager.area)
 
         # Draw the recents overlay
@@ -209,8 +211,8 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 iw, _ = blf.dimensions(0, entry.icon)
                 max_icon_w = max(max_icon_w, iw)
 
-            # Chord width
-            chord_text = "+".join(entry.chord_tokens)
+            # Chord width (display with spaces, not plus signs)
+            chord_text = " ".join(entry.chord_tokens)
             cw, _ = blf.dimensions(0, chord_text)
             max_chord_w = max(max_chord_w, cw)
 
@@ -242,11 +244,39 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         footer_bg_top = footer_y + chord_size # Default if no footer
 
         if p.overlay_show_footer:
-            leader_token = get_leader_key_token()
-            footer_items = [
-                {"token": "ESC", "label": "Close", "icon": ""},
-                {"token": leader_token, "label": "Repeat Most Recent", "icon": ""}
-            ]
+            # Find single-token Recents chords only (no spaces)
+            recents_chords = []
+            for m in p.mappings:
+                if getattr(m, "mapping_type", "OPERATOR") == "OPERATOR":
+                    if get_str_attr(m, "operator") == "chordsong.recents" and getattr(m, "enabled", True):
+                        chord = get_str_attr(m, "chord")
+                        # Only include single-token chords (no spaces)
+                        if chord and " " not in chord:
+                            recents_chords.append(chord)
+
+            # Find single-token Close Overlay chords (no spaces)
+            close_chords = []
+            for m in p.mappings:
+                if getattr(m, "mapping_type", "OPERATOR") == "OPERATOR":
+                    if get_str_attr(m, "operator") == "chordsong.close_overlay" and getattr(m, "enabled", True):
+                        chord = get_str_attr(m, "chord")
+                        # Only include single-token chords (no spaces)
+                        if chord and " " not in chord:
+                            close_chords.append(chord)
+
+            # Build footer items
+            if close_chords:
+                display_chord = close_chords[0].replace(" ", "+")
+                footer_items = [{"token": f"ESC|{display_chord}", "label": "Close", "icon": ""}]
+            else:
+                footer_items = [{"token": "ESC", "label": "Close", "icon": ""}]
+
+            if recents_chords:
+                display_chord = recents_chords[0].replace(" ", "+")
+                footer_items.append({"token": display_chord, "label": "Repeat Most Recent", "icon": ""})
+            else:
+                leader_token = get_leader_key_token()
+                footer_items.append({"token": leader_token, "label": "Repeat Most Recent", "icon": ""})
 
             # Use prefs for footer text size
             footer_text_size_base = getattr(p, "overlay_font_size_footer", 12)
@@ -309,7 +339,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
             # For scripts (PYTHON_FILE), draw icon in icon column and skip chord
             is_script = entry.mapping_type == "PYTHON_FILE"
-            
+
             if is_script:
                 # Draw Python icon in icon column (aligned with other icons)
                 if entry.icon:
@@ -329,13 +359,13 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                     except Exception:
                         pass
 
-                # Draw chord (50% alpha)
-                chord_text = "+".join(entry.chord_tokens)
+                # Draw chord (50% alpha) - using spaces
+                chord_text = " ".join(entry.chord_tokens)
                 blf.size(0, chord_size)
                 blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * 0.25)
                 blf.position(0, chord_col_x, current_y, 0)
                 blf.draw(0, chord_text)
-                
+
                 label_start_x = label_col_x
 
             # Draw label
@@ -361,6 +391,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             _panel_states_global.clear()
 
         self._buffer = []
+        self._should_close = False
         self._draw_manager = DrawHandlerManager()
         self._draw_manager.ensure_handler(context, self._draw_callback, p)
 
@@ -381,7 +412,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         """Restore T and N panels to their original visibility state."""
         if not hasattr(self, '_panel_states') or not self._panel_states:
             return
-        
+
         # Iterate through all areas in all windows
         for window in context.window_manager.windows:
             try:
@@ -393,24 +424,24 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                         area_ptr = area.as_pointer()
                         if area_ptr not in self._panel_states:
                             continue
-                        
+
                         panel_state = self._panel_states[area_ptr]
                         space_type = panel_state.get('space_type', 'VIEW_3D')
-                        
+
                         # Only restore panels in areas matching the stored space type
                         if area.type != space_type:
                             continue
-                        
+
                         # Get the space data
                         space = None
                         for s in area.spaces:
                             if s.type == space_type:
                                 space = s
                                 break
-                        
+
                         if not space:
                             continue
-                        
+
                         # Restore Asset Shelf
                         if 'asset_shelf' in panel_state and hasattr(space, 'show_region_asset_shelf'):
                             if space.show_region_asset_shelf != panel_state['asset_shelf']:
@@ -429,7 +460,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                         continue
             except Exception:
                 continue
-        
+
         # Clear stored states
         self._panel_states = {}
 
@@ -438,7 +469,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         self._finish(context)
 
     def _execute_history_entry(self, context, entry):
-        """Execute a history entry."""
+        """Execute a history entry. Returns True if modal should close."""
         from ..operators.leader import _show_fading_overlay
 
         # Capture viewport context BEFORE finishing modal (when we have valid context)
@@ -446,7 +477,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         # Execute based on mapping type
         if entry.mapping_type == "OPERATOR":
-            # Execute operator DIRECTLY in modal context (preserves F9)
+            # Execute operator
             from ..utils.render import validate_viewport_context
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
             ctx_wrapper = _create_context_wrapper(valid_ctx)
@@ -455,11 +486,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
             elif error_msg:
                 _show_fading_overlay(bpy.context, entry.chord_tokens, error_msg, "CANCEL")
-            # Finish modal AFTER execution
-            self._finish(context)
-            return
+            # Signal that modal should close
+            return True
 
-        # For non-operator types, finish modal first, then use timer
+        # For non-operator types, close modal first, then use timer
         self._finish(context)
 
         if entry.mapping_type == "PYTHON_FILE":
@@ -505,6 +535,8 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
             bpy.app.timers.register(execute_property_delayed, first_interval=0.01)
 
+        return True  # Close modal after non-operator types as well
+
     def modal(self, context: bpy.types.Context, event: bpy.types.Event):
         try:
             return self._modal_inner(context, event)
@@ -519,6 +551,15 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             return {"CANCELLED"}
 
     def _modal_inner(self, context: bpy.types.Context, event: bpy.types.Event):
+        # Ignore leader key repeat events
+        if event.type == get_leader_key_type() and event.value == 'PRESS' and event.is_repeat:
+            return {"RUNNING_MODAL"}
+
+        # If modal should close, do it now
+        if self._should_close:
+            self._finish(context)
+            return {"FINISHED"}
+
         history = get_history()
 
         # Cancel keys
@@ -529,13 +570,42 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         if event.value != "PRESS":
             return {"RUNNING_MODAL"}
 
-        # Check for leader key to repeat most recent
-        leader_key = get_leader_key_type()
-        if event.type == leader_key:
+        # Check for single-token Close Overlay chord to close the overlay
+        p = prefs(context)
+        pressed_key = normalize_token(event.type, shift=event.shift, ctrl=event.ctrl, alt=event.alt, oskey=event.oskey)
+
+        # Find all single-token Close Overlay chords (no spaces)
+        single_token_close = []
+        for m in p.mappings:
+            if getattr(m, "mapping_type", "OPERATOR") == "OPERATOR":
+                if get_str_attr(m, "operator") == "chordsong.close_overlay" and getattr(m, "enabled", True):
+                    chord = get_str_attr(m, "chord")
+                    if chord and " " not in chord:
+                        single_token_close.append(chord)
+
+        if pressed_key in single_token_close:
+            self._finish(context)
+            return {"CANCELLED"}
+
+        # Check for single-token Recents chord to repeat most recent
+        # Find all single-token Recents chords (no spaces)
+        single_token_recents = []
+        for m in p.mappings:
+            if getattr(m, "mapping_type", "OPERATOR") == "OPERATOR":
+                if get_str_attr(m, "operator") == "chordsong.recents" and getattr(m, "enabled", True):
+                    chord = get_str_attr(m, "chord")
+                    if chord and " " not in chord:
+                        single_token_recents.append(chord)
+
+        if pressed_key in single_token_recents:
             entry = history.get(0)
             if entry:
-                self._execute_history_entry(context, entry)
-                return {"FINISHED"}
+                should_close = self._execute_history_entry(context, entry)
+                if should_close:
+                    self._should_close = True
+                    return {"RUNNING_MODAL"}  # Will close on next event cycle
+                else:
+                    return {"FINISHED"}
             else:
                 self.report({"WARNING"}, "No history entry to repeat")
                 self._finish(context)
@@ -549,8 +619,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 if 1 <= number <= 9:
                     entry = history.get(number - 1)  # Convert to 0-based index
                     if entry:
-                        self._execute_history_entry(context, entry)
-                        return {"FINISHED"}
+                        should_close = self._execute_history_entry(context, entry)
+                        if should_close:
+                            self._should_close = True
+                            return {"RUNNING_MODAL"}
+                        else:
+                            return {"FINISHED"}
                     else:
                         self.report({"WARNING"}, f"No history entry #{number}")
                         self._finish(context)
@@ -564,8 +638,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             index = ord(tok) - ord('a') + 9
             entry = history.get(index)
             if entry:
-                self._execute_history_entry(context, entry)
-                return {"FINISHED"}
+                should_close = self._execute_history_entry(context, entry)
+                if should_close:
+                    self._should_close = True
+                    return {"RUNNING_MODAL"}
+                else:
+                    return {"FINISHED"}
             else:
                 self.report({"WARNING"}, f"No history entry at position '{tok}'")
                 self._finish(context)
@@ -577,8 +655,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             index = ord(tok[1]) - ord('a') + 35
             entry = history.get(index)
             if entry:
-                self._execute_history_entry(context, entry)
-                return {"FINISHED"}
+                should_close = self._execute_history_entry(context, entry)
+                if should_close:
+                    self._should_close = True
+                    return {"RUNNING_MODAL"}
+                else:
+                    return {"FINISHED"}
             else:
                 self.report({"WARNING"}, f"No history entry at position '{tok}'")
                 self._finish(context)
@@ -590,8 +672,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             index = shifted_map[tok]
             entry = history.get(index)
             if entry:
-                self._execute_history_entry(context, entry)
-                return {"FINISHED"}
+                should_close = self._execute_history_entry(context, entry)
+                if should_close:
+                    self._should_close = True
+                    return {"RUNNING_MODAL"}
+                else:
+                    return {"FINISHED"}
             else:
                 self.report({"WARNING"}, f"No history entry at position '{tok}'")
                 self._finish(context)
@@ -603,8 +689,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             index = extra_map[tok]
             entry = history.get(index)
             if entry:
-                self._execute_history_entry(context, entry)
-                return {"FINISHED"}
+                should_close = self._execute_history_entry(context, entry)
+                if should_close:
+                    self._should_close = True
+                    return {"RUNNING_MODAL"}
+                else:
+                    return {"FINISHED"}
             else:
                 self.report({"WARNING"}, f"No history entry at position '{tok}'")
                 self._finish(context)
@@ -621,8 +711,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             index = punct_map[tok]
             entry = history.get(index)
             if entry:
-                self._execute_history_entry(context, entry)
-                return {"FINISHED"}
+                should_close = self._execute_history_entry(context, entry)
+                if should_close:
+                    self._should_close = True
+                    return {"RUNNING_MODAL"}
+                else:
+                    return {"FINISHED"}
             else:
                 self.report({"WARNING"}, f"No history entry at position '{tok}'")
                 self._finish(context)

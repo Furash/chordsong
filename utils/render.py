@@ -124,19 +124,19 @@ def calculate_scale_factor(context) -> float:
     try:
         # Access preferences via bpy.context for robustness in draw handlers
         prefs = bpy.context.preferences
-        
+
         # Respect UI Scale (System > Interface > Resolution Scale)
         # Note: view.ui_scale is often 1.0, while system.dpi reflects the Resolution Scale.
         ui_scale = getattr(prefs.view, "ui_scale", 1.0)
-        
+
         # Respect DPI (System > Interface > Resolution Scale also affects this)
-        # Standard DPI is 72. 
+        # Standard DPI is 72.
         dpi = prefs.system.dpi
-        
+
         # Respect Pixel Size (1 for standard, 2 for Retina/HighDPI)
         # This is the most reliable way to scale for High DPI.
         pixel_size = getattr(prefs.system, "pixel_size", 1.0)
-        
+
         # Respect Line Width (System > Interface > Line Width)
         # This affects the 'thickness' of the UI.
         # Enums: 'THIN', 'AUTO', 'THICK'
@@ -150,10 +150,10 @@ def calculate_scale_factor(context) -> float:
 
         # Base scale factor combines DPI and UI scale
         scale = ui_scale * (dpi / 72.0)
-        
+
         # Ensure it's at least pixel_size
         scale = max(scale, pixel_size)
-        
+
         return scale * line_width_mult
     except Exception:
         try:
@@ -275,17 +275,10 @@ def _run_single_operator(opfn, call_ctx, kwargs, valid_ctx):
 
 
 def execute_history_entry_operator(context, entry):
-    """Execute the full operator chain from a history entry.
-
-    Returns:
-        tuple: (success: bool, error_message: str or None)
-    """
     try:
         if hasattr(entry, 'execution_context') and entry.execution_context:
             ctx_viewport = entry.execution_context
             valid_ctx = validate_viewport_context(ctx_viewport)
-            if not valid_ctx:
-                return False, "Operator area not found"
         else:
             ctx_viewport = capture_viewport_context(context)
             valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
@@ -300,26 +293,21 @@ def execute_history_entry_operator(context, entry):
             )
             if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
                 success = True
-
         return (True, None) if success else (False, None)
-
     except Exception as e:
         import traceback
-        op_label = entry.operators[0]["op"] if entry.operators else "unknown"
-        error_msg = f"Failed to execute operator {op_label}: {e}"
-        print(f"Chord Song: {error_msg}")
         traceback.print_exc()
-        return False, error_msg
+        return False, str(e)
 
 def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None, context=None):
     """Execute a Python script using Blender's text editor (avoids exec/runpy).
-    
+
     Args:
         filepath: Path to the Python script file
         script_args: Optional dictionary of arguments to pass as 'args' global
         valid_ctx: Optional validated viewport context dictionary
         context: Blender context (required for preference check)
-        
+
     Returns:
         tuple: (success: bool, error_message: str or None)
     """
@@ -328,16 +316,16 @@ def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None, 
         from ..operators.common import prefs
         if not prefs(context).allow_custom_user_scripts:
             return False, "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences."
-    
+
     try:
         import os
         if not os.path.exists(filepath):
             return False, f"Script file not found: {filepath}"
-        
+
         # Read the script file
         with open(filepath, 'r', encoding='utf-8') as f:
             script_content = f.read()
-        
+
         # Prepend code to set up globals (args, context)
         # This allows scripts to access 'args' dictionary and ensures 'context' is available
         import json
@@ -345,24 +333,24 @@ def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None, 
         args_dict = script_args if script_args is not None else {}
         args_json = json.dumps(args_dict, default=str)
         prepend_code = f"import json\nimport bpy\nargs = json.loads({repr(args_json)})\ncontext = bpy.context\n"
-        
+
         # Combine prepended code with original script
         full_script = prepend_code + script_content
-        
+
         # Create a temporary text block
         temp_name = f"__chordsong_temp_{os.path.basename(filepath)}"
         # Remove existing temp block if it exists
         if temp_name in bpy.data.texts:
             bpy.data.texts.remove(bpy.data.texts[temp_name])
-        
+
         # Create new text block with the script content
         text_block = bpy.data.texts.new(temp_name)
         text_block.write(full_script)
-        
+
         # Prepare context override
         override = bpy.context.copy()
         override["edit_text"] = text_block
-        
+
         # Execute the script
         if valid_ctx:
             try:
@@ -377,12 +365,12 @@ def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None, 
         else:
             with bpy.context.temp_override(**override):
                 bpy.ops.text.run_script()
-        
+
         # Clean up temporary text block
         bpy.data.texts.remove(text_block)
-        
+
         return True, None
-        
+
     except Exception as e:
         import traceback
         # Clean up text block if it exists
@@ -392,7 +380,7 @@ def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None, 
                 bpy.data.texts.remove(bpy.data.texts[temp_name])
             except Exception:
                 pass
-        
+
         error_msg = f"Failed to execute script {filepath}: {e}"
         print(f"Chord Song: {error_msg}")
         traceback.print_exc()
@@ -411,7 +399,7 @@ def execute_history_entry_script(context, entry):
             error_msg = "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences."
             print(f"Chord Song: {error_msg}")
             return False, error_msg
-        
+
         import os
         if not os.path.exists(entry.python_file):
             error_msg = f"Script file not found: {entry.python_file}"

@@ -48,6 +48,7 @@ from .operators import (
     CHORDSONG_OT_ImportOverlayTheme,
     CHORDSONG_OT_Leader,
     CHORDSONG_OT_ResetState,
+    CHORDSONG_OT_CloseOverlay,
     CHORDSONG_OT_Load_Autosave,
     CHORDSONG_OT_Load_Config,
     CHORDSONG_OT_Load_Default,
@@ -119,6 +120,7 @@ _classes = (
     CHORDSONG_OT_ImportOverlayTheme,
     CHORDSONG_OT_Leader,
     CHORDSONG_OT_ResetState,
+    CHORDSONG_OT_CloseOverlay,
     CHORDSONG_OT_Load_Autosave,
     CHORDSONG_OT_Load_Config,
     CHORDSONG_OT_Load_Default,
@@ -177,7 +179,7 @@ def register():
     """Register addon classes and keymaps."""
     for cls in _classes:
         _safe_register_class(cls)
-    
+
     # Clear operator cache on addon enable to ensure fresh operator list
     try:
         from .ui.prefs import clear_operator_cache
@@ -213,6 +215,7 @@ def register():
                 # Create default SPACE key binding
                 # User customizations in keyconfigs.user take precedence automatically
                 kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
+                kmi.repeat = False  # Disable key repeat by default
 
             addon_keymaps.append((km, kmi))
 
@@ -295,7 +298,7 @@ def register():
             elif not user_config_path and not has_existing_mappings:
                 if hasattr(prefs, "ensure_defaults"):
                     prefs.ensure_defaults()
-            
+
             # Normalize order indices (for existing blend files with old data)
             # This ensures no gaps in the sequence even if loading old configs
             from .core.config_io import _normalize_order_indices
@@ -342,7 +345,7 @@ def unregister():
                 pass
 
     addon_keymaps.clear()
-    
+
     # Clear operator cache on addon disable
     try:
         from .ui.prefs import clear_operator_cache
