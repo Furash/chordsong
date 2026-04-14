@@ -263,11 +263,11 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
         if not getattr(m, "enabled", True):
             continue
 
-        # Skip chordsong.recents operator
+        # Skip meta-operators (not shown in overlay, but matched by find_exact_mapping)
         mapping_type = get_str_attr(m, "mapping_type", "OPERATOR")
         if mapping_type == "OPERATOR":
             operator = get_str_attr(m, "operator")
-            if operator == "chordsong.recents":
+            if operator in ("chordsong.recents", "chordsong.close_overlay"):
                 continue
 
         tokens = split_chord(get_str_attr(m, "chord"))

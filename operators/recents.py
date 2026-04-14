@@ -11,6 +11,7 @@ from ..core.engine import (
     normalize_token,
     get_leader_key_type,
     get_leader_key_token,
+    get_str_attr,
 )
 from ..utils.render import (
     DrawHandlerManager,
@@ -242,10 +243,32 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         footer_bg_top = footer_y + chord_size # Default if no footer
 
         if p.overlay_show_footer:
-            leader_token = get_leader_key_token()
+            # Scan for single-token meta-operator chords
+            close_chord = None
+            recents_chord = None
+            for m in p.mappings:
+                if not getattr(m, "enabled", True):
+                    continue
+                if getattr(m, "mapping_type", "OPERATOR") != "OPERATOR":
+                    continue
+                op = get_str_attr(m, "operator")
+                chord = get_str_attr(m, "chord")
+                if not chord or " " in chord:
+                    continue
+                if op == "chordsong.close_overlay" and close_chord is None:
+                    close_chord = chord
+                elif op == "chordsong.recents" and recents_chord is None:
+                    recents_chord = chord
+
+            # Build footer items
+            from ..core.engine import humanize_token
+            close_token = f"ESC|{humanize_token(close_chord)}" if close_chord else "ESC"
+            # Leader key always works for "Repeat Most Recent" inside the recents modal
+            # (recents has its own key handling, not the chord engine)
+            recents_token = humanize_token(recents_chord) if recents_chord else get_leader_key_token()
             footer_items = [
-                {"token": "ESC", "label": "Close", "icon": ""},
-                {"token": leader_token, "label": "Repeat Most Recent", "icon": ""}
+                {"token": close_token, "label": "Close", "icon": ""},
+                {"token": recents_token, "label": "Repeat Most Recent", "icon": ""},
             ]
 
             # Use prefs for footer text size

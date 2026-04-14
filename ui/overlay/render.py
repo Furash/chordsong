@@ -221,14 +221,9 @@ def draw_overlay_footer(p, region_w, footer_y, footer_items, chord_size, body_si
         label_txt = r["label"]
         icon_text = r.get("icon", "")
 
-        # Token for "Recent Commands"
-        if label_txt == "Recent Commands" and "+" in token_txt:
-            leader_token = get_leader_key_token()
-            token_txt = f"{leader_token}+{leader_token}"
-
         # Measure token
         blf.size(0, chord_size)
-        display_token = token_txt if kind == "hint" else f"<{token_txt.upper()}>"
+        display_token = token_txt if kind == "hint" else f"<{token_txt}>"
         tw, _ = blf.dimensions(0, display_token)
         
         # Measure label
@@ -851,7 +846,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         line_h = int(body_size * p.overlay_line_height)
 
         # Build rows and footer (sorted by group display_order, then chord order_index)
-        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p)
+        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, is_scripts_overlay=bool(scripts_overlay_settings))
         max_rows = max(int(max_rows_setting), 1)
         columns = wrap_into_columns(rows, max_rows)
 

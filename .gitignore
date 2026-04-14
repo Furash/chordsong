@@ -159,6 +159,9 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
+# Superpowers (specs/plans)
+docs/superpowers/
+
 # mkdocs documentation
 /site
 

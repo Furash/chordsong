@@ -1,5 +1,5 @@
 """Layout calculation functions for overlay."""
-from ...core.engine import get_leader_key_token
+from ...core.engine import get_leader_key_token, get_str_attr, humanize_token
 from .tokenizer import (
     parse_format_string,
     generate_tokens_for_folder,
@@ -30,7 +30,7 @@ def _get_preset_formats(style):
     }
     return presets.get(style, presets["DEFAULT"])
 
-def build_overlay_rows(cands, has_buffer, p=None):
+def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False):
     """Build display rows from candidates, footer returned separately.
 
     Args:
@@ -194,16 +194,55 @@ def build_overlay_rows(cands, has_buffer, p=None):
 
     # Footer items (always at bottom)
     footer = []
-    
+
     # 1. Mod hints (informational)
     footer.append({"kind": "hint", "token": ">R  ^Ctrl  !Alt  +Shift  #Win", "label": "", "icon": ""})
 
-    if not has_buffer:
-        # Only show recents at root level (no buffer)
-        leader_token = get_leader_key_token()
-        footer.append({"kind": "item", "token": f"{leader_token}+{leader_token}", "label": "Recent Commands", "icon": ""})
+    # Scan mappings once for meta-operator chords (single-token only)
+    recents_chord = None
+    close_chord = None
+    if p:
+        for m in p.mappings:
+            if not getattr(m, "enabled", True):
+                continue
+            if getattr(m, "mapping_type", "OPERATOR") != "OPERATOR":
+                continue
+            op = get_str_attr(m, "operator")
+            chord = get_str_attr(m, "chord")
+            if not chord or " " in chord:
+                continue
+            if op == "chordsong.recents" and recents_chord is None:
+                recents_chord = chord
+            elif op == "chordsong.close_overlay" and close_chord is None:
+                close_chord = chord
 
-    footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})
+    if not has_buffer and not is_scripts_overlay:
+        # Recents footer (root level only, not in scripts overlay)
+        if recents_chord:
+            footer.append({"kind": "item", "token": humanize_token(recents_chord), "label": "Recent Commands", "icon": ""})
+        else:
+            # Check if the leader key is claimed by any single-token mapping
+            # If claimed, the double-leader fallback won't fire
+            leader_token = get_leader_key_token()
+            leader_claimed = False
+            if p:
+                for m in p.mappings:
+                    if not getattr(m, "enabled", True):
+                        continue
+                    if get_str_attr(m, "chord") == leader_token:
+                        leader_claimed = True
+                        break
+            if leader_claimed:
+                footer.append({"kind": "hint", "token": "", "label": "No Recents chord mapped", "icon": ""})
+            else:
+                footer.append({"kind": "item", "token": leader_token, "label": "Recent Commands", "icon": ""})
+
+    # Close footer
+    if close_chord:
+        footer.append({"kind": "item", "token": f"ESC|{humanize_token(close_chord)}", "label": "Close", "icon": ""})
+    else:
+        footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})
+
     if has_buffer:
         footer.append({"kind": "item", "token": "BS", "label": "Back", "icon": ""})
 
