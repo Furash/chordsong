@@ -50,6 +50,9 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
     def _draw_callback(self):
         """Draw callback for the recents overlay."""
         try:
+            from .leader import _is_reloading
+            if _is_reloading():
+                return
             # Check if self is still valid (operator not removed during addon disable)
             try:
                 _ = self.bl_idname
@@ -542,6 +545,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             return {"CANCELLED"}
 
     def _modal_inner(self, context: bpy.types.Context, event: bpy.types.Event):
+        from .leader import _is_reloading
+        if _is_reloading():
+            self._finish(context)
+            return {"CANCELLED"}
         history = get_history()
 
         # Cancel keys

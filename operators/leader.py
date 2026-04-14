@@ -22,6 +22,12 @@ from ..utils.render import capture_viewport_context
 from .common import prefs
 from .test_overlay import disable_test_overlays
 
+
+def _is_reloading():
+    """Check if blinker hot-reload is in progress."""
+    return bpy.app.driver_namespace.get("_blinker_reloading", False)
+
+
 # Global state for fading overlay
 _fading_overlay_state = {
     "active": False,
@@ -108,6 +114,8 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
 
     def draw_callback():
         try:
+            if _is_reloading():
+                return
             # Check if fading overlay is still active
             if not state["active"]:
                 return
@@ -501,6 +509,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
     def _draw_callback(self):
         """Draw callback for the overlay."""
+        if _is_reloading():
+            return
         # Use bpy.context directly - it's more reliable for draw handlers
         context = bpy.context
         try:
@@ -764,6 +774,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             return {"CANCELLED"}
 
     def _modal_inner(self, context: bpy.types.Context, event: bpy.types.Event):
+        if _is_reloading():
+            self._finish(context)
+            return {"CANCELLED"}
         global _panel_states_global
         p = prefs(context)
 

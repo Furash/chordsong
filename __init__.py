@@ -313,6 +313,26 @@ def register():
     except Exception:
         pass
 
+def blinker_pre_reload():
+    """Called by blinker before addon disable during hot-reload.
+
+    Cleans up modal draw handlers and timers so the reload cycle
+    (disable -> purge modules -> re-enable) doesn't leave orphaned
+    callbacks that reference freed operator instances.
+    """
+    try:
+        cleanup_all_handlers()
+    except Exception:
+        pass
+    # Cancel pending autosave timer
+    try:
+        from .core.autosave import _timer_cb
+        if bpy.app.timers.is_registered(_timer_cb):
+            bpy.app.timers.unregister(_timer_cb)
+    except Exception:
+        pass
+
+
 def unregister():
     """Unregister addon classes and keymaps."""
     # Clean up active draw handlers to prevent callbacks accessing invalid prefs
