@@ -237,8 +237,9 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False):
             else:
                 footer.append({"kind": "item", "token": leader_token, "label": "Recent Commands", "icon": ""})
 
-    # Close footer
-    if close_chord:
+    # Close footer — don't show mapped close chord in scripts overlay
+    # since letters are used for script selection there
+    if close_chord and not is_scripts_overlay:
         footer.append({"kind": "item", "token": f"ESC|{humanize_token(close_chord)}", "label": "Close", "icon": ""})
     else:
         footer.append({"kind": "item", "token": "ESC", "label": "Close", "icon": ""})

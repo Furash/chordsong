@@ -891,7 +891,7 @@ class CHORDSONG_Preferences(AddonPreferences):
     overlay_column_gap: IntProperty(
         name="Column Gap",
         description="Gap between columns",
-        default=100,
+        default=130,
         min=-100,
         max=200,
         update=_on_prefs_changed,

@@ -685,7 +685,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
     if cache_valid:
         # Use cached layout data
         layout = _overlay_cache["layout_data"]
-        prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
+        prefix = " ".join(buffer_tokens) if buffer_tokens else "> ..."
         if custom_header is not None:
             header_left = custom_header
         else:
@@ -801,8 +801,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
             # Don't sort - preserve the order from prefs.mappings (manual ordering)
             cands = cands[: p.overlay_max_items]
 
-        # Display buffer with + separator instead of spaces
-        prefix = "+".join(buffer_tokens) if buffer_tokens else "> ..."
+        # Display buffer with space separator
+        prefix = " ".join(buffer_tokens) if buffer_tokens else "> ..."
         
         # Use custom header if provided, otherwise use blend file name
         if custom_header is not None:

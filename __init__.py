@@ -215,6 +215,7 @@ def register():
                 # Create default SPACE key binding
                 # User customizations in keyconfigs.user take precedence automatically
                 kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
+                kmi.repeat = False
 
             addon_keymaps.append((km, kmi))
 
