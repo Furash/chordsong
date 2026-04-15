@@ -157,6 +157,21 @@ _classes = (
 
 addon_keymaps = []
 
+@bpy.app.handlers.persistent
+def _on_file_loaded(*_args):
+    """Clear stale Blender C-data pointers from history after file load.
+
+    When a new file is opened, all old window/screen/area/region objects are
+    freed.  History entries cache these as execution_context; accessing them
+    later crashes Blender at the C level.  Clearing them here makes replay
+    fall back to the current (valid) context instead.
+    """
+    try:
+        from .core.history import get_history
+        get_history().clear_execution_contexts()
+    except Exception:
+        pass
+
 def _safe_register_class(cls):
     """Register a class, recovering from partial/failed previous registrations."""
     try:
@@ -220,6 +235,10 @@ def register():
             addon_keymaps.append((km, kmi))
 
     register_context_menu()
+
+    # Clear stale execution contexts from history when a new file is loaded
+    if _on_file_loaded not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(_on_file_loaded)
 
     # Restore user's config and auto-load their mappings on addon enable
     try:
@@ -348,6 +367,13 @@ def unregister():
         import bpy
         if bpy.app.timers.is_registered(_timer_cb):
             bpy.app.timers.unregister(_timer_cb)
+    except Exception:
+        pass
+
+    # Remove file-load handler
+    try:
+        if _on_file_loaded in bpy.app.handlers.load_post:
+            bpy.app.handlers.load_post.remove(_on_file_loaded)
     except Exception:
         pass
 

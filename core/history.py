@@ -73,6 +73,17 @@ class ChordHistory:
         """Clear all history."""
         self._history.clear()
 
+    def clear_execution_contexts(self):
+        """Clear cached execution_context from all entries.
+
+        Must be called on file load (load_post) because the Blender C-data
+        pointers (window, screen, area, region) stored in execution_context
+        become dangling after a new file is opened.  Accessing them crashes
+        Blender at the C level — Python try/except cannot catch this.
+        """
+        for entry in self._history:
+            entry.execution_context = None
+
     def __len__(self):
         """Return number of entries in history."""
         return len(self._history)
