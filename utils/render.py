@@ -53,13 +53,24 @@ def validate_viewport_context(ctx_viewport) -> dict:
         return {}
 
     try:
-        # Check if window is still valid by trying to access its properties
+        # Check if window is still valid.
+        # IMPORTANT: We must verify the window is still in the window manager's
+        # list BEFORE accessing any of its RNA properties.  After a file-open
+        # the old window C-data is freed, and accessing e.g. window.screen
+        # crashes Blender at the C level (segfault / access-violation) — Python
+        # try/except cannot catch that.  Iterating wm.windows is safe because
+        # the window-manager itself is always valid.
         window = ctx_viewport.get("window")
         if window:
             try:
-                # Try to access a property to see if window is still valid
+                # bpy_prop_collection doesn't support `in` with objects, so
+                # iterate and compare.  Comparing a valid window `w` against a
+                # freed `window` raises ReferenceError (caught below).
+                wm = bpy.context.window_manager
+                if not any(w == window for w in wm.windows):
+                    return {}
                 _ = window.screen
-            except (AttributeError, RuntimeError, ReferenceError):
+            except (AttributeError, RuntimeError, ReferenceError, TypeError):
                 return {}
 
         # Check if screen is still valid

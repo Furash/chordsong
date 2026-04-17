@@ -139,7 +139,7 @@ def generate_chord(base_chord, all_chords, exclude_chord=None, exclude_symbols=N
 
     # Absolute last resort - just return something that is likely unique
     # We use a timestamp-like suffix or just keep trying more symbols
-    suffix_list = "xyzuvwabcdefghijklmnopqrt0123456789"
+    suffix_list = "xyzuvwabcdefghijklmnopqrst0123456789"
     for s in suffix_list:
         if s not in exclude_symbols:
             if change_last and len(base_tokens) > 0:

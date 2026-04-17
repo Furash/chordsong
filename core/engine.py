@@ -1,4 +1,5 @@
 import json
+import warnings
 from dataclasses import dataclass
 
 def get_str_attr(obj, attr, default=""):
@@ -263,6 +264,7 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
             continue
 
         # Skip chordsong.recents and chordsong.close_overlay operators
+        # Skip meta-operators (not shown in overlay, but matched by find_exact_mapping)
         mapping_type = get_str_attr(m, "mapping_type", "OPERATOR")
         if mapping_type == "OPERATOR":
             operator = get_str_attr(m, "operator")
@@ -411,7 +413,7 @@ def parse_kwargs(kwargs_json: str) -> dict:
             if not in_quotes:
                 if char in ('(', '[', '{'):
                     nesting_level += 1
-                elif char in (')', ']', '}'):
+                elif char in (')', ']', '}') and nesting_level > 0:
                     nesting_level -= 1
 
             if char == ',' and not in_quotes and nesting_level == 0:
@@ -432,7 +434,9 @@ def parse_kwargs(kwargs_json: str) -> dict:
 
                 # Try to evaluate the value safely using ast.literal_eval
                 try:
-                    result[key] = ast.literal_eval(value)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", SyntaxWarning)
+                        result[key] = ast.literal_eval(value)
                 except (ValueError, SyntaxError):
                     # Keep as string if can't evaluate (strip extra quotes)
                     result[key] = value.strip('"\'')

@@ -157,6 +157,21 @@ _classes = (
 
 addon_keymaps = []
 
+@bpy.app.handlers.persistent
+def _on_file_loaded(*_args):
+    """Clear stale Blender C-data pointers from history after file load.
+
+    When a new file is opened, all old window/screen/area/region objects are
+    freed.  History entries cache these as execution_context; accessing them
+    later crashes Blender at the C level.  Clearing them here makes replay
+    fall back to the current (valid) context instead.
+    """
+    try:
+        from .core.history import get_history
+        get_history().clear_execution_contexts()
+    except Exception:
+        pass
+
 def _safe_register_class(cls):
     """Register a class, recovering from partial/failed previous registrations."""
     try:
@@ -216,10 +231,15 @@ def register():
                 # User customizations in keyconfigs.user take precedence automatically
                 kmi = km.keymap_items.new(CHORDSONG_OT_Leader.bl_idname, 'SPACE', 'PRESS')
                 kmi.repeat = False  # Disable key repeat by default
+                kmi.repeat = False
 
             addon_keymaps.append((km, kmi))
 
     register_context_menu()
+
+    # Clear stale execution contexts from history when a new file is loaded
+    if _on_file_loaded not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(_on_file_loaded)
 
     # Restore user's config and auto-load their mappings on addon enable
     try:
@@ -314,6 +334,26 @@ def register():
     except Exception:
         pass
 
+def blinker_pre_reload():
+    """Called by blinker before addon disable during hot-reload.
+
+    Cleans up modal draw handlers and timers so the reload cycle
+    (disable -> purge modules -> re-enable) doesn't leave orphaned
+    callbacks that reference freed operator instances.
+    """
+    try:
+        cleanup_all_handlers()
+    except Exception:
+        pass
+    # Cancel pending autosave timer
+    try:
+        from .core.autosave import _timer_cb
+        if bpy.app.timers.is_registered(_timer_cb):
+            bpy.app.timers.unregister(_timer_cb)
+    except Exception:
+        pass
+
+
 def unregister():
     """Unregister addon classes and keymaps."""
     # Clean up active draw handlers to prevent callbacks accessing invalid prefs
@@ -328,6 +368,13 @@ def unregister():
         import bpy
         if bpy.app.timers.is_registered(_timer_cb):
             bpy.app.timers.unregister(_timer_cb)
+    except Exception:
+        pass
+
+    # Remove file-load handler
+    try:
+        if _on_file_loaded in bpy.app.handlers.load_post:
+            bpy.app.handlers.load_post.remove(_on_file_loaded)
     except Exception:
         pass
 

@@ -12,6 +12,7 @@ from ..core.engine import (
     get_leader_key_type,
     get_leader_key_token,
     get_str_attr,
+    tokens_match,
 )
 from ..utils.render import (
     DrawHandlerManager,
@@ -44,6 +45,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
     bl_label = "Chord Song Recents"
     bl_options = set()
 
+    repeat_recent: bpy.props.BoolProperty(
+        name="Repeat Recent",
+        description="When triggered again inside Recents, repeat the most recent entry. If False, close the overlay instead",
+        default=True,
+    )
+
     _buffer = None  # Buffer for capturing digits
     _draw_manager = None  # DrawHandlerManager instance
     _should_close = False  # Flag to indicate modal should close
@@ -51,6 +58,9 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
     def _draw_callback(self):
         """Draw callback for the recents overlay."""
         try:
+            from .leader import _is_reloading
+            if _is_reloading():
+                return
             # Check if self is still valid (operator not removed during addon disable)
             try:
                 _ = self.bl_idname
@@ -212,6 +222,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                 max_icon_w = max(max_icon_w, iw)
 
             # Chord width (display with spaces, not plus signs)
+            # Chord width
             chord_text = " ".join(entry.chord_tokens)
             cw, _ = blf.dimensions(0, chord_text)
             max_chord_w = max(max_chord_w, cw)
@@ -277,6 +288,33 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             else:
                 leader_token = get_leader_key_token()
                 footer_items.append({"token": leader_token, "label": "Repeat Most Recent", "icon": ""})
+            # Scan for single-token meta-operator chords
+            close_chord = None
+            recents_chord = None
+            for m in p.mappings:
+                if not getattr(m, "enabled", True):
+                    continue
+                if getattr(m, "mapping_type", "OPERATOR") != "OPERATOR":
+                    continue
+                op = get_str_attr(m, "operator")
+                chord = get_str_attr(m, "chord")
+                if not chord or " " in chord:
+                    continue
+                if op == "chordsong.close_overlay" and close_chord is None:
+                    close_chord = chord
+                elif op == "chordsong.recents" and recents_chord is None:
+                    recents_chord = chord
+
+            # Build footer items
+            from ..core.engine import humanize_token
+            close_token = f"ESC|{humanize_token(close_chord)}" if close_chord else "ESC"
+            # Leader key always works for "Repeat Most Recent" inside the recents modal
+            # (recents has its own key handling, not the chord engine)
+            recents_token = humanize_token(recents_chord) if recents_chord else get_leader_key_token()
+            footer_items = [
+                {"token": close_token, "label": "Close", "icon": ""},
+                {"token": recents_token, "label": "Repeat Most Recent", "icon": ""},
+            ]
 
             # Use prefs for footer text size
             footer_text_size_base = getattr(p, "overlay_font_size_footer", 12)
@@ -342,13 +380,18 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
             if is_script:
                 # Draw Python icon in icon column (aligned with other icons)
+            # For scripts without chord tokens (launched from scripts overlay),
+            # draw icon at full alpha and skip chord column.
+            # Scripts with chord tokens (direct PYTHON_FILE mappings) render normally.
+            is_script_no_chord = entry.mapping_type == "PYTHON_FILE" and not entry.chord_tokens
+
+            if is_script_no_chord:
                 if entry.icon:
                     try:
                         blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3])
                         draw_icon(entry.icon, icon_col_x, current_y, icon_size)
                     except Exception:
                         pass
-                # Skip chord for scripts, label starts after icon column
                 label_start_x = icon_col_x + icon_part_w
             else:
                 # Draw icon if present (50% alpha)
@@ -360,6 +403,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                         pass
 
                 # Draw chord (50% alpha) - using spaces
+                # Draw chord (50% alpha)
                 chord_text = " ".join(entry.chord_tokens)
                 blf.size(0, chord_size)
                 blf.color(0, col_chord[0], col_chord[1], col_chord[2], col_chord[3] * 0.25)
@@ -475,6 +519,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # Capture viewport context BEFORE finishing modal (when we have valid context)
         ctx_viewport = capture_viewport_context(context)
 
+        # Finish modal FIRST, then execute via timer.
+        # Direct execution inside modal() breaks window-launching operators
+        # (e.g. screen.userpref_show) — Blender's event routing gets stuck
+        # because the new window's modal starts while Recents is still active.
+        self._finish(context)
+
         # Execute based on mapping type
         if entry.mapping_type == "OPERATOR":
             # Execute operator
@@ -491,6 +541,19 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         # For non-operator types, close modal first, then use timer
         self._finish(context)
+            def execute_operator_delayed():
+                from ..utils.render import validate_viewport_context
+                valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                ctx_wrapper = _create_context_wrapper(valid_ctx)
+                success, error_msg = execute_history_entry_operator(ctx_wrapper, entry)
+                if success:
+                    _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
+                elif error_msg:
+                    _show_fading_overlay(bpy.context, entry.chord_tokens, error_msg, "CANCEL")
+                return None
+
+            bpy.app.timers.register(execute_operator_delayed, first_interval=0.01)
+            return
 
         if entry.mapping_type == "PYTHON_FILE":
             def execute_script_delayed():
@@ -560,6 +623,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             self._finish(context)
             return {"FINISHED"}
 
+        from .leader import _is_reloading
+        if _is_reloading():
+            self._finish(context)
+            return {"CANCELLED"}
         history = get_history()
 
         # Cancel keys
@@ -598,6 +665,47 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                         single_token_recents.append(chord)
 
         if pressed_key in single_token_recents:
+        # Ignore key-repeat — holding should not rapid-fire repeat-most-recent
+        if event.is_repeat:
+            return {"RUNNING_MODAL"}
+
+        tok = normalize_token(event.type, shift=event.shift, ctrl=event.ctrl, alt=event.alt, oskey=event.oskey)
+        p = prefs(context)
+
+        # Check for single-token close_overlay chord
+        for m in p.mappings:
+            if not getattr(m, "enabled", True):
+                continue
+            if getattr(m, "mapping_type", "OPERATOR") != "OPERATOR":
+                continue
+            op = get_str_attr(m, "operator")
+            chord = get_str_attr(m, "chord")
+            if op == "chordsong.close_overlay" and chord and " " not in chord and tokens_match(chord, tok):
+                self._finish(context)
+                return {"CANCELLED"}
+
+        # Check for leader key or custom recents chord to repeat most recent
+        repeat = False
+        leader_key = get_leader_key_type()
+        if event.type == leader_key:
+            repeat = True
+        else:
+            # Check if a custom single-token chord is mapped to chordsong.recents
+            for m in p.mappings:
+                if not getattr(m, "enabled", True):
+                    continue
+                if getattr(m, "mapping_type", "OPERATOR") != "OPERATOR":
+                    continue
+                op = get_str_attr(m, "operator")
+                chord = get_str_attr(m, "chord")
+                if op == "chordsong.recents" and chord and " " not in chord and tokens_match(chord, tok):
+                    repeat = True
+                    break
+
+        if repeat:
+            if not self.repeat_recent:
+                self._finish(context)
+                return {"CANCELLED"}
             entry = history.get(0)
             if entry:
                 should_close = self._execute_history_entry(context, entry)

@@ -26,6 +26,12 @@ from ..utils.render import capture_viewport_context
 from .common import prefs
 from .test_overlay import disable_test_overlays
 
+
+def _is_reloading():
+    """Check if blinker hot-reload is in progress."""
+    return bpy.app.driver_namespace.get("_blinker_reloading", False)
+
+
 # Global state for fading overlay
 _fading_overlay_state = {
     "active": False,
@@ -138,6 +144,8 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
 
     def draw_callback():
         try:
+            if _is_reloading():
+                return
             # Check if fading overlay is still active
             if not state["active"]:
                 return
@@ -532,6 +540,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
     def _draw_callback(self):
         """Draw callback for the overlay."""
+        if _is_reloading():
+            return
         # Use bpy.context directly - it's more reliable for draw handlers
         context = bpy.context
         try:
@@ -799,6 +809,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if event.type == get_leader_key_type() and event.value == 'PRESS' and event.is_repeat:
             return {"RUNNING_MODAL"}
 
+        if _is_reloading():
+            self._finish(context)
+            return {"CANCELLED"}
         global _panel_states_global
         p = prefs(context)
 
@@ -967,6 +980,34 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Reset last modifier type after a non-modifier key is processed
         self._last_mod_type = None
 
+        # Ignore key-repeat for leader key — holding it should not rapid-fire
+        if event.is_repeat:
+            return {"RUNNING_MODAL"}
+
+        # Fallback: double-leader opens Recents if no mapping claims the leader key
+        leader_key = get_leader_key_type()
+        if not self._buffer and event.type == leader_key:
+            # Check if any enabled mapping has a single-token chord for this key
+            leader_token = normalize_token(leader_key)
+            filtered = filter_mappings_by_context(p.mappings, self._context_type)
+            claimed = find_exact_mapping(filtered, [leader_token])
+            if not claimed:
+                # No mapping claims the leader key — open Recents (default behavior)
+                if self._panel_states:
+                    _panel_states_global = self._panel_states.copy()
+                    self._panel_states = {}
+                self._finish(context, restore_panels=False)
+                try:
+                    bpy.ops.chordsong.recents('INVOKE_DEFAULT')
+                except Exception as e:
+                    print(f"Chord Song: Failed to open recents: {e}")
+                    if _panel_states_global:
+                        self._panel_states = _panel_states_global.copy()
+                        self._restore_panels(context)
+                        _panel_states_global = {}
+                return {"FINISHED"}
+            # If claimed, fall through to normal chord matching below
+
         # Normal mode - accumulate tokens in buffer
         self._buffer.append(tok)
 
@@ -1038,6 +1079,27 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         # Update buffer to remove modifier tokens for consistency
                         self._buffer = buffer_without_modifier
         if m:
+            # Short-circuit for meta-operators (no fading overlay, no history)
+            operator_id = (getattr(m, "operator", "") or "").strip()
+            if operator_id == "chordsong.close_overlay":
+                self._finish(context)
+                return {"CANCELLED"}
+            if operator_id == "chordsong.recents":
+                if self._panel_states:
+                    _panel_states_global = self._panel_states.copy()
+                    self._panel_states = {}
+                self._finish(context, restore_panels=False)
+                try:
+                    recents_kwargs = parse_kwargs(getattr(m, "kwargs_json", "{}"))
+                    bpy.ops.chordsong.recents('INVOKE_DEFAULT', **recents_kwargs)
+                except Exception as e:
+                    print(f"Chord Song: Failed to open recents: {e}")
+                    if _panel_states_global:
+                        self._panel_states = _panel_states_global.copy()
+                        self._restore_panels(context)
+                        _panel_states_global = {}
+                return {"FINISHED"}
+
             mapping_type = getattr(m, "mapping_type", "OPERATOR")
 
             # Get label and icon for fading overlay
@@ -1565,10 +1627,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             success = True
 
                     if success:
-                        # Skip fading overlay and history for scripts_overlay operator
+                        # Skip fading overlay and history for meta-operators
+                        _meta_ops = ("chordsong.scripts_overlay", "chordsong.recents", "chordsong.close_overlay")
                         primary_operator = operators_to_run[0]["op"] if operators_to_run else None
                         skip_operators = ("chordsong.scripts_overlay", "chordsong.recents", "chordsong.close_overlay")
                         if primary_operator not in skip_operators:
+                        if primary_operator not in _meta_ops:
                             overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                             if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
                                 try:
@@ -1617,6 +1681,31 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if cands:
             self._tag_redraw()
             return {"RUNNING_MODAL"}
+
+        # No match — check if the last token alone is a meta-operator (close/recents).
+        # This lets the close key work from any depth in the chord tree, not just root.
+        if len(self._buffer) > 1:
+            last_token_match = find_exact_mapping(filtered_mappings, [self._buffer[-1]])
+            if last_token_match:
+                meta_op = (getattr(last_token_match, "operator", "") or "").strip()
+                if meta_op == "chordsong.close_overlay":
+                    self._finish(context)
+                    return {"CANCELLED"}
+                if meta_op == "chordsong.recents":
+                    if self._panel_states:
+                        _panel_states_global = self._panel_states.copy()
+                        self._panel_states = {}
+                    self._finish(context, restore_panels=False)
+                    try:
+                        recents_kwargs = parse_kwargs(getattr(last_token_match, "kwargs_json", "{}"))
+                        bpy.ops.chordsong.recents('INVOKE_DEFAULT', **recents_kwargs)
+                    except Exception as e:
+                        print(f"Chord Song: Failed to open recents: {e}")
+                        if _panel_states_global:
+                            self._panel_states = _panel_states_global.copy()
+                            self._restore_panels(context)
+                            _panel_states_global = {}
+                    return {"FINISHED"}
 
         # No match - remove only the last token and keep modal running so user can try again
         chord_str = humanize_chord(self._buffer)

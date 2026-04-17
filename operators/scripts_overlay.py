@@ -101,6 +101,9 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
     def _draw_callback(self):
         """Draw callback for the scripts overlay."""
+        from .leader import _is_reloading
+        if _is_reloading():
+            return
         context = bpy.context
         try:
             p = prefs(context)
@@ -358,6 +361,10 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             return {"CANCELLED"}
 
     def _modal_inner(self, context: bpy.types.Context, event: bpy.types.Event):
+        from .leader import _is_reloading
+        if _is_reloading():
+            self._finish(context)
+            return {"CANCELLED"}
         # Check if cancellation was requested from re-invocation (toggle)
         if CHORDSONG_OT_ScriptsOverlay._cancel_requested:
             CHORDSONG_OT_ScriptsOverlay._cancel_requested = False

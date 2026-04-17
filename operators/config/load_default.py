@@ -7,6 +7,7 @@ import os
 import bpy  # type: ignore
 
 from ...core.config_io import apply_config, loads_json
+from ...ui import prefs as prefs_module
 from ...ui.prefs import default_config_path
 from ..common import prefs
 
@@ -33,6 +34,7 @@ class CHORDSONG_OT_Load_Default(bpy.types.Operator):
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
         try:
+            prefs_module._SUSPEND_CALLBACKS = True
             p._chordsong_suspend_autosave = True
 
             # Load default config from JSON file
@@ -66,6 +68,7 @@ class CHORDSONG_OT_Load_Default(bpy.types.Operator):
             self.report({"ERROR"}, f"Failed to load default config: {ex}")
             return {"CANCELLED"}
         finally:
+            prefs_module._SUSPEND_CALLBACKS = False
             p._chordsong_suspend_autosave = False
     
     def _reset_prefs_to_defaults(self, prefs_obj):
