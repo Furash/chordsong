@@ -309,6 +309,104 @@ def _cleanup_fading_overlay():
             pass
 
 
+def _toggle_mapping_paths(mapping, ctx_viewport=None):
+    """Execute the toggle logic for `mapping`. Returns the list of new values
+    per toggled path (same order as they appeared)."""
+    context_path = (getattr(mapping, "context_path", "") or "").strip()
+
+    paths = []
+    if context_path:
+        paths.append(context_path)
+    for item in getattr(mapping, "sub_items", []) or []:
+        if item.path.strip():
+            paths.append(item.path.strip())
+
+    def do_toggle_path(path):
+        parts = path.split('.')
+        obj = bpy.context
+        for part in parts[:-1]:
+            next_obj = getattr(obj, part, None)
+            if next_obj is None:
+                return None
+            obj = next_obj
+        prop_name = parts[-1]
+        if not hasattr(obj, prop_name):
+            return None
+        current_value = getattr(obj, prop_name)
+        if not isinstance(current_value, bool):
+            return None
+        set_val = not current_value
+        setattr(obj, prop_name, set_val)
+        return set_val
+
+    def do_set_path(path, value):
+        parts = path.split('.')
+        obj = bpy.context
+        for part in parts[:-1]:
+            next_obj = getattr(obj, part, None)
+            if next_obj is None:
+                return None
+            obj = next_obj
+        prop_name = parts[-1]
+        if not hasattr(obj, prop_name):
+            return None
+        setattr(obj, prop_name, value)
+        return value
+
+    sync = getattr(mapping, "sync_toggles", False)
+    results = []
+    master_new_val = None
+
+    def run_logic():
+        nonlocal master_new_val
+        for i, path in enumerate(paths):
+            if i == 0:
+                master_new_val = do_toggle_path(path)
+                if master_new_val is not None:
+                    results.append(master_new_val)
+            else:
+                if sync and master_new_val is not None:
+                    res = do_set_path(path, master_new_val)
+                else:
+                    res = do_toggle_path(path)
+                if res is not None:
+                    results.append(res)
+
+    from ..utils.render import validate_viewport_context
+    valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+    if valid_ctx:
+        try:
+            with bpy.context.temp_override(**valid_ctx):
+                run_logic()
+        except (TypeError, RuntimeError, AttributeError, ReferenceError):
+            run_logic()
+    else:
+        run_logic()
+
+    return results
+
+
+def fire_toggle_from_click(mapping, context):
+    """Schedule a deferred toggle for `mapping` as triggered by an overlay click.
+
+    Keeps the modal open, skips the fading confirmation overlay, and does not
+    add a history entry (clicks are meant to feel direct, not logged).
+    """
+    ctx_viewport = capture_viewport_context(context)
+
+    def delayed():
+        try:
+            _toggle_mapping_paths(mapping, ctx_viewport)
+            from ..ui.overlay.cache import clear_overlay_cache
+            clear_overlay_cache()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        return None
+
+    bpy.app.timers.register(delayed, first_interval=0.01)
+
+
 def cleanup_all_handlers():
     """Clean up all draw handlers and timers. Called on addon unregister."""
     _cleanup_fading_overlay()
@@ -418,6 +516,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     _ctrl_held = False  # Track modifier keys for multi-toggle feature
     _alt_held = False
     _shift_held = False
+    _swallow_leftmouse_release = False  # Set when LEFTMOUSE PRESS hit an overlay widget
 
     def _is_area_valid(self, area):
         """Check if an area is still valid without accessing type (which can crash)."""
@@ -565,6 +664,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self._ctrl_held = False
         self._alt_held = False
         self._shift_held = False
+        self._swallow_leftmouse_release = False
         
         # Store the leader key to ignore its first RELEASE if it's a mouse button
         # This prevents double-triggering when mouse buttons are used as leader key
@@ -829,10 +929,36 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 self._last_mod_type = event.type
                 return {"RUNNING_MODAL"}
 
+        # LEFTMOUSE PRESS over a clickable overlay widget (e.g. toggle) fires the
+        # associated action and keeps the modal open. Misses fall through to the
+        # chord-token handling below so mouse buttons remain usable as chord keys.
+        # Swallow the paired RELEASE when the PRESS was consumed, otherwise it
+        # would resurface as an `m1` chord token and trigger "Unknown chord".
+        if event.type == "LEFTMOUSE" and event.value == "RELEASE" and self._swallow_leftmouse_release:
+            self._swallow_leftmouse_release = False
+            return {"RUNNING_MODAL"}
+        if event.type == "LEFTMOUSE" and event.value == "PRESS":
+            try:
+                from ..ui.overlay import find_hit
+                hit = find_hit(event.mouse_region_x, event.mouse_region_y)
+            except Exception:
+                hit = None
+            if hit and hit["kind"] == "toggle":
+                mapping_ref = hit["payload"].get("mapping_ref")
+                chord_tokens_hit = hit["payload"].get("chord_tokens") or []
+                if mapping_ref is None and chord_tokens_hit:
+                    filtered = filter_mappings_by_context(p.mappings, self._context_type)
+                    mapping_ref = find_exact_mapping(filtered, chord_tokens_hit)
+                if mapping_ref is not None:
+                    fire_toggle_from_click(mapping_ref, context)
+                    self._tag_redraw()
+                self._swallow_leftmouse_release = True
+                return {"RUNNING_MODAL"}
+
         # Mouse buttons should trigger on RELEASE to avoid conflicts with Blender's default actions
         # (e.g., M3 triggering rotate view on PRESS, getting stuck if we consume the event)
         is_mouse_button = event.type in {
-            "LEFTMOUSE", "RIGHTMOUSE", "MIDDLEMOUSE", 
+            "LEFTMOUSE", "RIGHTMOUSE", "MIDDLEMOUSE",
             "BUTTON4MOUSE", "BUTTON5MOUSE", "BUTTON6MOUSE", "BUTTON7MOUSE"
         }
         

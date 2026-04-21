@@ -130,6 +130,7 @@ class Candidate:
     depth: int = 0          # Max remaining chord depth after this token (0 = final)
     count: int = 1          # Number of mappings reachable through this token
     groups: tuple[str, ...] = () # Unique groups reachable through this token
+    mapping_ref: object = None  # Underlying mapping when this is a final item; None otherwise
 
 def build_match_sets(mappings):
     """
@@ -338,9 +339,10 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
         is_final = len(tokens) == len(bt) + 1
         remaining_depth = len(tokens) - len(bt) - 1  # 0 = final, 1 = one more level, etc.
         # Track counts and keep first label per next token for minimal UI
+        ref = m if is_final else None
         if nxt not in out:
             out[nxt] = {
-                "cand": Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index),
+                "cand": Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index, mapping_ref=ref),
                 "count": 1,
                 "groups": {group} if group else set(),
                 "max_depth": remaining_depth,
@@ -356,7 +358,7 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
             # If we already have a non-final candidate, but found a final one, update the candidate
             # but keep the accumulated count and groups
             if not out[nxt]["cand"].is_final and is_final:
-                out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index)
+                out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index, mapping_ref=ref)
 
     # Convert back to Candidate list with updated counts
     result = []
@@ -373,7 +375,8 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
             order_index=data["min_order"],
             depth=data["max_depth"],
             count=data["count"],
-            groups=tuple(sorted(data["groups"]))
+            groups=tuple(sorted(data["groups"])),
+            mapping_ref=c.mapping_ref,
         ))
     return result
 

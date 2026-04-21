@@ -30,14 +30,16 @@ def _get_preset_formats(style):
     }
     return presets.get(style, presets["DEFAULT"])
 
-def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False):
+def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buffer_tokens=None):
     """Build display rows from candidates, footer returned separately.
 
     Args:
         cands: List of Candidate objects
         has_buffer: Whether there's a buffer (affects footer display)
         p: Preferences object (optional)
+        buffer_tokens: Current chord buffer; used to compute click-target chord_tokens on final rows
     """
+    buffer_tokens = list(buffer_tokens) if buffer_tokens else []
     rows = []
     
     # Get style from prefs if available
@@ -182,6 +184,12 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False):
                 group_icons=group_icons,
             )
             
+            # Compute the full chord path for click-dispatch. Empty token means
+            # "no chord" (scripts overlay items beyond the first 9) — leave None.
+            if token:
+                chord_tokens = buffer_tokens + [token]
+            else:
+                chord_tokens = None
             rows.append({
                 "kind": "item",
                 "token": token,
@@ -190,6 +198,8 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False):
                 "icon": "",
                 "mapping_type": c.mapping_type,
                 "tokens": tokens,  # Tokens for rendering
+                "chord_tokens": chord_tokens,
+                "mapping_ref": c.mapping_ref,
             })
 
     # Footer items (always at bottom)

@@ -27,6 +27,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
     _invoke_area_ptr = None
     _panel_states = {}  # Store original panel visibility states: {area_ptr: {"n_panel": bool, "t_panel": bool}}
     _cancel_requested = False  # Class-level flag to allow cancellation from re-invocation
+    _hover_script_path = None  # Currently hovered script path, or None
 
     def _ensure_draw_handler(self, context: bpy.types.Context):
         p = prefs(context)
@@ -224,6 +225,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             "max_label_length": p.scripts_overlay_max_label_length,
             "gap": p.scripts_overlay_gap,
             "column_gap": p.scripts_overlay_column_gap,
+            "hover_script_path": self._hover_script_path,
         }
 
         # Use the overlay rendering with fake mappings
@@ -331,6 +333,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         self._buffer = []
         self._text_buffer = ""
         self._filtered_scripts_list = []
+        self._hover_script_path = None
         self._filter_scripts()  # Initial filter (shows all scripts)
         self._ensure_draw_handler(context)
         context.window_manager.modal_handler_add(self)
@@ -386,6 +389,46 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         if event.type in {"ESC", "RIGHTMOUSE"} and event.value == "PRESS":
             self._finish(context)
             return {"CANCELLED"}
+
+        # Hover tracking: update highlighted row under cursor.
+        if event.type == "MOUSEMOVE":
+            try:
+                from ..ui.overlay import find_hit
+                hit = find_hit(event.mouse_region_x, event.mouse_region_y)
+            except Exception:
+                hit = None
+            new_path = None
+            if hit and hit["kind"] == "script":
+                ref = hit["payload"].get("mapping_ref")
+                new_path = getattr(ref, "python_file", None) if ref is not None else None
+            if new_path != self._hover_script_path:
+                self._hover_script_path = new_path
+                self._tag_redraw()
+            return {"RUNNING_MODAL"}
+
+        # LEFTMOUSE: plain click executes + closes; CTRL+click executes + stays open.
+        if event.type == "LEFTMOUSE" and event.value == "PRESS":
+            try:
+                from ..ui.overlay import find_hit
+                hit = find_hit(event.mouse_region_x, event.mouse_region_y)
+            except Exception:
+                hit = None
+            if hit and hit["kind"] == "script":
+                ref = hit["payload"].get("mapping_ref")
+                script_path = getattr(ref, "python_file", None) if ref is not None else None
+                script_label = getattr(ref, "label", "") if ref is not None else ""
+                if script_path:
+                    chord_tokens = hit["payload"].get("chord_tokens") or []
+                    chord_text = " ".join(chord_tokens) if chord_tokens else script_label
+                    if event.ctrl:
+                        # Stay open, just execute the script (no fade, no close).
+                        self._execute_script_stay_open(context, script_path, script_label)
+                        return {"RUNNING_MODAL"}
+                    else:
+                        self._finish(context)
+                        self._show_fading_and_execute(context, chord_text, script_label, script_path)
+                        return {"FINISHED"}
+            return {"RUNNING_MODAL"}
 
         # Backspace to remove last character
         if event.type == "BACK_SPACE" and event.value == "PRESS":
@@ -453,6 +496,35 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             return {"RUNNING_MODAL"}
 
         return {"RUNNING_MODAL"}
+
+    def _execute_script_stay_open(self, context, script_path, script_name):
+        """Execute a script without closing the overlay (CTRL+click path).
+
+        Skips the fading confirmation overlay and history write — the user
+        stays in the scripts overlay and may fire more scripts in a row.
+        """
+        from ..utils.render import capture_viewport_context, validate_viewport_context, _execute_script_via_text_editor
+        ctx_viewport = capture_viewport_context(context)
+
+        def execute_delayed():
+            try:
+                valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                success, error_msg = _execute_script_via_text_editor(
+                    script_path,
+                    script_args={},
+                    valid_ctx=valid_ctx,
+                    context=bpy.context,
+                )
+                if not success:
+                    print(f"Chord Song Scripts Overlay: {error_msg}")
+                else:
+                    print(f"Chord Song Scripts Overlay: Executed (stay open): {script_name}")
+            except Exception:
+                import traceback
+                traceback.print_exc()
+            return None
+
+        bpy.app.timers.register(execute_delayed, first_interval=0.01)
 
     def _show_fading_and_execute(self, context, chord_text, script_name, script_path):
         """Show fading overlay and execute script."""

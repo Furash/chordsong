@@ -8,6 +8,27 @@ from ...core.engine import candidates_for_prefix, get_leader_key_token
 from .cache import _overlay_cache, get_prefs_hash
 from .layout import build_overlay_rows, wrap_into_columns, calculate_column_widths
 
+# Hit-boxes for clickable rows emitted by the most recent render pass.
+# Each entry: {"x1", "y1", "x2", "y2", "kind", "payload"} in region coords.
+# Cleared at the top of every draw_overlay; modal operators read this after draw.
+_hit_boxes: list = []
+
+
+def clear_hit_boxes():
+    _hit_boxes.clear()
+
+
+def get_hit_boxes():
+    return _hit_boxes
+
+
+def find_hit(x, y):
+    """Return the topmost hit-box containing (x, y), or None."""
+    for hb in _hit_boxes:
+        if hb["x1"] <= x <= hb["x2"] and hb["y1"] <= y <= hb["y2"]:
+            return hb
+    return None
+
 def linear_to_srgb(color):
     """Convert a linear color (stored) to sRGB color space (displayed).
     
@@ -368,6 +389,22 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
             icon_text = r.get("icon", "")
             custom_tokens = r.get("tokens", None)
 
+            # Capture clickable-row identity. Actual hit-box emission happens
+            # after rendering, once we know the real right edge (current_x).
+            row_chord_tokens = r.get("chord_tokens")
+            row_mapping_ref = r.get("mapping_ref")
+            row_mapping_type = r.get("mapping_type")
+            row_hovered = False
+            row_hit_kind = None
+            if scripts_overlay_settings and row_mapping_ref is not None:
+                row_hit_kind = "script"
+                hover_path = scripts_overlay_settings.get("hover_script_path")
+                if hover_path and getattr(row_mapping_ref, "python_file", None) == hover_path:
+                    row_hovered = True
+            elif row_mapping_type == "CONTEXT_TOGGLE" and row_chord_tokens:
+                row_hit_kind = "toggle"
+            row_cy_top = cy + line_h  # Top of this row's slot
+
             # Check if this row uses custom tokenization
             if custom_tokens:
                 # Render using custom tokens with column-based alignment
@@ -428,6 +465,9 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                         if tok.type == 'T':
                             is_on = tok.content == "󰨚"
                             col = linear_to_srgb(p.overlay_color_toggle_on if is_on else p.overlay_color_toggle_off)
+                        elif row_hovered and tok.type in ('L', 'l'):
+                            # Hover feedback for scripts overlay: recolor the label.
+                            col = linear_to_srgb(p.overlay_color_chord)
                         else:
                             col = linear_to_srgb(getattr(p, color_key, (1.0, 1.0, 1.0, 1.0)))
                         
@@ -477,7 +517,23 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                     col_width = token_widths.get(token_type, 0.0)
                     if col_width > 0:
                         current_x += col_width + gap
-                
+
+                if row_hit_kind:
+                    # Right edge = wherever the final token landed (current_x). Trim
+                    # the trailing gap we may have appended after the last token.
+                    right_x = max(current_x - gap, cx + col_total_w)
+                    _hit_boxes.append({
+                        "x1": cx,
+                        "y1": cy,
+                        "x2": right_x,
+                        "y2": row_cy_top,
+                        "kind": row_hit_kind,
+                        "payload": {
+                            "mapping_ref": row_mapping_ref,
+                            "chord_tokens": row_chord_tokens,
+                        },
+                    })
+
                 cy -= line_h
                 continue
 
@@ -648,6 +704,9 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
     except Exception:
         return
 
+    # Reset clickable hit-boxes — render_overlay repopulates them per frame.
+    clear_hit_boxes()
+
     # Use filtered mappings if provided, otherwise use all mappings
     if filtered_mappings is None:
         filtered_mappings = p.mappings
@@ -734,7 +793,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
                         mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
                         property_value=None,
                         count=1,
-                        groups=()
+                        groups=(),
+                        mapping_ref=m,
                     ))
                 elif len(tokens) == len(buffer_tokens) + 1:
                     # This is a final item (one more token than buffer)
@@ -753,7 +813,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
                         mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
                         property_value=None,
                         count=1,
-                        groups=()
+                        groups=(),
+                        mapping_ref=m,
                     ))
                 elif len(tokens) > len(buffer_tokens) + 1:
                     # Has more tokens than buffer + 1, show next token (not final yet)
@@ -772,7 +833,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
                         mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
                         property_value=None,
                         count=1,
-                        groups=()
+                        groups=(),
+                        mapping_ref=m,
                     ))
                 elif len(tokens) == len(buffer_tokens):
                     # Exact match - final item (buffer fully matches chord)
@@ -790,7 +852,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
                         mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
                         property_value=None,
                         count=1,
-                        groups=()
+                        groups=(),
+                        mapping_ref=m,
                     ))
             # Don't sort - maintain original order from filtered list to preserve numbered order
             # Apply scripts overlay max items limit (use scripts_overlay_max_items preference)
@@ -846,7 +909,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         line_h = int(body_size * p.overlay_line_height)
 
         # Build rows and footer (sorted by group display_order, then chord order_index)
-        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, is_scripts_overlay=bool(scripts_overlay_settings))
+        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, is_scripts_overlay=bool(scripts_overlay_settings), buffer_tokens=buffer_tokens)
         max_rows = max(int(max_rows_setting), 1)
         columns = wrap_into_columns(rows, max_rows)
 
