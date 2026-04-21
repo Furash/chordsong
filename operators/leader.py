@@ -45,6 +45,20 @@ _fading_overlay_state = {
 # Global state for panel visibility (shared between Leader and Recents)
 _panel_states_global = {}
 
+
+def _safe_report(op, level, msg):
+    """Surface `msg` to the Blender INFO panel and stdout.
+
+    Wrapped in try/except because operator instance `op` may be freed when
+    called from inside a bpy.app.timer callback — `self.report` raises on a
+    finished operator in some Blender versions. Falls back to print.
+    """
+    try:
+        op.report({level}, msg)
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+    print(f"Chord Song: {msg}")
+
 def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
     """Start showing a fading overlay for the executed chord.
 
@@ -1063,6 +1077,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 try:
                     bpy.ops.chordsong.recents('INVOKE_DEFAULT')
                 except Exception as e:
+                    self.report({'ERROR'}, f"Failed to open recents: {e}")
                     print(f"Chord Song: Failed to open recents: {e}")
                     if _panel_states_global:
                         self._panel_states = _panel_states_global.copy()
@@ -1156,6 +1171,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     recents_kwargs = parse_kwargs(getattr(m, "kwargs_json", "{}"))
                     bpy.ops.chordsong.recents('INVOKE_DEFAULT', **recents_kwargs)
                 except Exception as e:
+                    self.report({'ERROR'}, f"Failed to open recents: {e}")
                     print(f"Chord Song: Failed to open recents: {e}")
                     if _panel_states_global:
                         self._panel_states = _panel_states_global.copy()
@@ -1219,7 +1235,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         )
 
                         if not success:
-                            print(f"Chord Song: {error_msg}")
+                            _safe_report(self, 'ERROR', error_msg or "Script execution failed")
                             return None
 
                         # Show fading overlay using the original captured context (ctx_viewport)
@@ -1266,7 +1282,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                     except Exception as e:
                         import traceback
-                        print(f"Chord Song: Failed to execute script {python_file}: {e}")
+                        _safe_report(self, 'ERROR', f"Failed to execute script {python_file}: {e}")
                         traceback.print_exc()
                     return None
 
@@ -1382,7 +1398,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                     except Exception as e:
                         import traceback
-                        print(f"Chord Song: Failed to toggle context '{context_path}': {e}")
+                        _safe_report(self, 'ERROR', f"Failed to toggle context '{context_path}': {e}")
                         traceback.print_exc()
                     return None
 
@@ -1520,7 +1536,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                     except Exception as e:
                         import traceback
-                        print(f"Chord Song: Failed to set property '{context_path}': {e}")
+                        _safe_report(self, 'ERROR', f"Failed to set property '{context_path}': {e}")
                         traceback.print_exc()
                     return None
 
@@ -1656,7 +1672,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                 except Exception as e:
                     import traceback
-                    print(f"Chord Song: Failed to execute operators: {e}")
+                    _safe_report(self, 'ERROR', f"Failed to execute operators: {e}")
                     traceback.print_exc()
                 return None
 
@@ -1687,6 +1703,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         recents_kwargs = parse_kwargs(getattr(last_token_match, "kwargs_json", "{}"))
                         bpy.ops.chordsong.recents('INVOKE_DEFAULT', **recents_kwargs)
                     except Exception as e:
+                        self.report({'ERROR'}, f"Failed to open recents: {e}")
                         print(f"Chord Song: Failed to open recents: {e}")
                         if _panel_states_global:
                             self._panel_states = _panel_states_global.copy()

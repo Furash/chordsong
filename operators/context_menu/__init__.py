@@ -473,6 +473,7 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
                             sub.kwargs_json = sub_data['kwargs']
                             sub.call_context = "EXEC_DEFAULT"
                 except Exception as e:
+                    self.report({'WARNING'}, f"Failed to parse sub-operators: {e}")
                     print(f"Chord Song: Failed to parse sub-operators: {e}")
 
             msg = f"Added chord '{self.chord}' for: {self.operator}"
