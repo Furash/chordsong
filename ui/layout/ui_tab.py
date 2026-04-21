@@ -197,10 +197,12 @@ def draw_ui_tab(prefs, layout):
         col1.label(text=label)
         col2.prop(prefs, prop, text="")
 
-    # Testing Section
+    # Previews + quick-access tools. The two preview buttons let users
+    # see overlay styling against sample data before they've created real
+    # mappings; the Scripts Overlay button is a user-facing feature.
     box_test = layout.box()
     header = box_test.row()
-    header.label(text="Debug Tools", icon='TOOL_SETTINGS')
+    header.label(text="Previews & Tools", icon='TOOL_SETTINGS')
     row = box_test.row()
     row.operator("chordsong.test_main_overlay", text="Preview Main", icon="PLAY")
     row.operator("chordsong.test_fading_overlay", text="Preview Fading", icon="PLAY")
