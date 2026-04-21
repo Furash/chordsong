@@ -324,24 +324,37 @@ def execute_history_entry_operator(context, entry):
 
 def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None, context=None):
     """Execute a Python script using Blender's text editor (avoids exec/runpy).
-    
+
     Args:
         filepath: Path to the Python script file
         script_args: Optional dictionary of arguments to pass as 'args' global
         valid_ctx: Optional validated viewport context dictionary
         context: Blender context (required for preference check)
-        
+
     Returns:
         tuple: (success: bool, error_message: str or None)
     """
+    import os
+
     # Check if custom scripts are enabled (safety check)
+    scripts_folder = ""
     if context:
         from ..operators.common import prefs
-        if not prefs(context).allow_custom_user_scripts:
+        p = prefs(context)
+        if not p.allow_custom_user_scripts:
             return False, "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences."
-    
+        scripts_folder = (getattr(p, "scripts_folder", "") or "").strip()
+
+    # Path confinement: once the user has declared a scripts_folder, refuse to
+    # execute anything outside it. Blocks "shared config with absolute paths
+    # pointing at /etc/..." style footguns. If no folder is set, legacy
+    # behavior preserved — power users who never set one keep working.
+    from .context_path import is_script_path_allowed
+    allowed, reason = is_script_path_allowed(filepath, scripts_folder)
+    if not allowed:
+        return False, reason
+
     try:
-        import os
         if not os.path.exists(filepath):
             return False, f"Script file not found: {filepath}"
         

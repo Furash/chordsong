@@ -416,15 +416,16 @@ def apply_config(prefs, data: dict) -> list[str]:
         if isinstance(scripts_folder, str):
             prefs.scripts_folder = scripts_folder.strip()
     
-    # Allow custom user scripts - default to False for security
-    # Only enable if explicitly set to True in config
-    if "allow_custom_user_scripts" in data:
-        allow_scripts = data.get("allow_custom_user_scripts", False)
-        if isinstance(allow_scripts, bool):
-            prefs.allow_custom_user_scripts = allow_scripts
-    else:
-        # Explicitly set to False if not in config (for backward compatibility and security)
-        prefs.allow_custom_user_scripts = False
+    # Script-execution permission is never imported from a config file.
+    # A shared config could otherwise silently flip the flag ON and ship
+    # PYTHON_FILE mappings that run arbitrary code the next time the user
+    # hits the associated chord. The prefs checkbox is the only way to
+    # enable script execution — with its accompanying security warning.
+    if data.get("allow_custom_user_scripts") is True:
+        warnings.append(
+            "Imported config requested script execution; flag NOT changed. "
+            "Enable 'Allow Custom User Scripts' manually in Preferences if intended."
+        )
 
     overlay = data.get("overlay", {})
     if isinstance(overlay, dict):

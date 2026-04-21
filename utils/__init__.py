@@ -1,25 +1,7 @@
-"""Utility modules for Chord Song."""
+"""Utility modules for Chord Song.
 
-from .fuzzy import fuzzy_match
-from .context_path import normalize_bpy_data_path
-from .render import (
-    DrawHandlerManager,
-    calculate_overlay_position,
-    calculate_scale_factor,
-    capture_viewport_context,
-    execute_history_entry_operator,
-    execute_history_entry_script,
-    execute_history_entry_toggle,
-)
-
-__all__ = [
-    "fuzzy_match",
-    "normalize_bpy_data_path",
-    "DrawHandlerManager",
-    "calculate_overlay_position",
-    "calculate_scale_factor",
-    "capture_viewport_context",
-    "execute_history_entry_operator",
-    "execute_history_entry_script",
-    "execute_history_entry_toggle",
-]
+No package-level re-exports — callers import from submodules directly
+(`from ..utils.render import capture_viewport_context`). Keeping this module
+empty lets bpy-free submodules (context_path, fuzzy, addon_package) be
+imported in unit tests without pulling bpy via render.py.
+"""
