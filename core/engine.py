@@ -6,6 +6,41 @@ def get_str_attr(obj, attr, default=""):
     """Get string attribute with fallback and strip whitespace."""
     return (getattr(obj, attr, default) or default).strip()
 
+
+def collect_toggle_paths(mapping):
+    """Collect and validate CONTEXT_TOGGLE mapping paths.
+
+    Returns (valid_paths, error_messages). A path without a '.' is rejected
+    because the executor walks bpy.context attribute-by-attribute; a bare name
+    can't address a bool on any real bpy object.
+    """
+    valid = []
+    errors = []
+
+    context_path = (getattr(mapping, "context_path", "") or "").strip()
+    if context_path:
+        if "." not in context_path:
+            errors.append(
+                f'Invalid context path "{context_path}" — must include context '
+                f'(e.g. "space_data.overlay.show_stats")'
+            )
+        else:
+            valid.append(context_path)
+
+    for item in getattr(mapping, "sub_items", []) or []:
+        item_path = (getattr(item, "path", "") or "").strip()
+        if not item_path:
+            continue
+        if "." not in item_path:
+            errors.append(f'Invalid sub-item path "{item_path}" — must include context')
+            continue
+        valid.append(item_path)
+
+    if not valid and not errors:
+        errors.append("Toggle mapping has no context path or sub-items")
+
+    return valid, errors
+
 def normalize_token(event_type: str, shift: bool = False, ctrl: bool = False, alt: bool = False, oskey: bool = False, mod_side: str = None):
     """
     Convert a Blender event into a chord token using AHK-style modifier symbols.
@@ -130,6 +165,7 @@ class Candidate:
     depth: int = 0          # Max remaining chord depth after this token (0 = final)
     count: int = 1          # Number of mappings reachable through this token
     groups: tuple[str, ...] = () # Unique groups reachable through this token
+    mapping_ref: object = None  # Underlying mapping when this is a final item; None otherwise
 
 def build_match_sets(mappings):
     """
@@ -338,9 +374,10 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
         is_final = len(tokens) == len(bt) + 1
         remaining_depth = len(tokens) - len(bt) - 1  # 0 = final, 1 = one more level, etc.
         # Track counts and keep first label per next token for minimal UI
+        ref = m if is_final else None
         if nxt not in out:
             out[nxt] = {
-                "cand": Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index),
+                "cand": Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index, mapping_ref=ref),
                 "count": 1,
                 "groups": {group} if group else set(),
                 "max_depth": remaining_depth,
@@ -356,7 +393,7 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
             # If we already have a non-final candidate, but found a final one, update the candidate
             # but keep the accumulated count and groups
             if not out[nxt]["cand"].is_final and is_final:
-                out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index)
+                out[nxt]["cand"] = Candidate(nxt, label, group, icon, is_final, mapping_type, property_value, order_index, mapping_ref=ref)
 
     # Convert back to Candidate list with updated counts
     result = []
@@ -373,7 +410,8 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
             order_index=data["min_order"],
             depth=data["max_depth"],
             count=data["count"],
-            groups=tuple(sorted(data["groups"]))
+            groups=tuple(sorted(data["groups"])),
+            mapping_ref=c.mapping_ref,
         ))
     return result
 
