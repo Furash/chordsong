@@ -6,6 +6,41 @@ def get_str_attr(obj, attr, default=""):
     """Get string attribute with fallback and strip whitespace."""
     return (getattr(obj, attr, default) or default).strip()
 
+
+def collect_toggle_paths(mapping):
+    """Collect and validate CONTEXT_TOGGLE mapping paths.
+
+    Returns (valid_paths, error_messages). A path without a '.' is rejected
+    because the executor walks bpy.context attribute-by-attribute; a bare name
+    can't address a bool on any real bpy object.
+    """
+    valid = []
+    errors = []
+
+    context_path = (getattr(mapping, "context_path", "") or "").strip()
+    if context_path:
+        if "." not in context_path:
+            errors.append(
+                f'Invalid context path "{context_path}" — must include context '
+                f'(e.g. "space_data.overlay.show_stats")'
+            )
+        else:
+            valid.append(context_path)
+
+    for item in getattr(mapping, "sub_items", []) or []:
+        item_path = (getattr(item, "path", "") or "").strip()
+        if not item_path:
+            continue
+        if "." not in item_path:
+            errors.append(f'Invalid sub-item path "{item_path}" — must include context')
+            continue
+        valid.append(item_path)
+
+    if not valid and not errors:
+        errors.append("Toggle mapping has no context path or sub-items")
+
+    return valid, errors
+
 def normalize_token(event_type: str, shift: bool = False, ctrl: bool = False, alt: bool = False, oskey: bool = False, mod_side: str = None):
     """
     Convert a Blender event into a chord token using AHK-style modifier symbols.

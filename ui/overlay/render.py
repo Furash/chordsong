@@ -731,13 +731,22 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
     buffer_key = tuple(buffer_tokens) if buffer_tokens else ()
     prefs_hash = get_prefs_hash(p, region_w, region_h)
 
+    # Exclude hover_script_path from the cache key: hover is a presentation-
+    # only overlay on top of the cached layout (changes row color, not size).
+    # Keeping it in the key rebuilt the full candidate/layout tree on every
+    # MOUSEMOVE.
+    settings_cache_key = (
+        {k: v for k, v in scripts_overlay_settings.items() if k != "hover_script_path"}
+        if scripts_overlay_settings else scripts_overlay_settings
+    )
+
     cache_valid = (
         _overlay_cache["buffer_tokens"] == buffer_key and
         _overlay_cache["prefs_hash"] == prefs_hash and
         _overlay_cache.get("mappings_sig") == mappings_sig and
         _overlay_cache.get("filepath") == blend_filepath and
         _overlay_cache.get("custom_header") == custom_header and
-        _overlay_cache.get("scripts_overlay_settings") == scripts_overlay_settings and
+        _overlay_cache.get("scripts_overlay_settings") == settings_cache_key and
         _overlay_cache["layout_data"] is not None
     )
 
@@ -758,7 +767,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         header_size = max(int(p.overlay_font_size_header * scale_factor), 12)
         blf.size(0, header_size)
         layout["header_w"], layout["header_h"] = blf.dimensions(0, layout["header"])
-        scripts_overlay_settings = _overlay_cache.get("scripts_overlay_settings")
+        # Keep the caller's live scripts_overlay_settings (with current hover)
+        # so the row-color lookup in render_overlay sees the latest hover path.
         if scripts_overlay_settings:
             layout["scripts_overlay_settings"] = scripts_overlay_settings
     else:
@@ -985,7 +995,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         _overlay_cache["mappings_sig"] = mappings_sig
         _overlay_cache["filepath"] = blend_filepath
         _overlay_cache["custom_header"] = custom_header
-        _overlay_cache["scripts_overlay_settings"] = scripts_overlay_settings
+        # Store the hover-stripped key so hover-only changes hit cache next time.
+        _overlay_cache["scripts_overlay_settings"] = settings_cache_key
         if scripts_overlay_settings:
             layout["scripts_overlay_settings"] = scripts_overlay_settings
         _overlay_cache["layout_data"] = layout

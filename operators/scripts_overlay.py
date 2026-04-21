@@ -391,16 +391,21 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             return {"CANCELLED"}
 
         # Hover tracking: update highlighted row under cursor.
+        # Only trust mouse_region_x/y when the event fired in the invoke region;
+        # otherwise those coords are relative to a different region and could
+        # spuriously hover items.
         if event.type == "MOUSEMOVE":
-            try:
-                from ..ui.overlay import find_hit
-                hit = find_hit(event.mouse_region_x, event.mouse_region_y)
-            except Exception:
-                hit = None
+            from .common import event_in_invoke_region
             new_path = None
-            if hit and hit["kind"] == "script":
-                ref = hit["payload"].get("mapping_ref")
-                new_path = getattr(ref, "python_file", None) if ref is not None else None
+            if event_in_invoke_region(context, self._invoke_area_ptr, getattr(self, "_region", None)):
+                try:
+                    from ..ui.overlay import find_hit
+                    hit = find_hit(event.mouse_region_x, event.mouse_region_y)
+                except Exception:  # pylint: disable=broad-exception-caught
+                    hit = None
+                if hit and hit["kind"] == "script":
+                    ref = hit["payload"].get("mapping_ref")
+                    new_path = getattr(ref, "python_file", None) if ref is not None else None
             if new_path != self._hover_script_path:
                 self._hover_script_path = new_path
                 self._tag_redraw()
@@ -408,32 +413,35 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
         # LEFTMOUSE: plain click executes + closes; CTRL+click executes + stays open.
         if event.type == "LEFTMOUSE" and event.value == "PRESS":
-            try:
-                from ..ui.overlay import find_hit
-                hit = find_hit(event.mouse_region_x, event.mouse_region_y)
-            except Exception:
-                hit = None
-            if hit and hit["kind"] == "script":
-                ref = hit["payload"].get("mapping_ref")
-                script_path = getattr(ref, "python_file", None) if ref is not None else None
-                script_label = getattr(ref, "label", "") if ref is not None else ""
-                if script_path:
-                    chord_tokens = hit["payload"].get("chord_tokens") or []
-                    chord_text = " ".join(chord_tokens) if chord_tokens else script_label
-                    if event.ctrl:
-                        # Stay open, just execute the script (no fade, no close).
-                        self._execute_script_stay_open(context, script_path, script_label)
-                        return {"RUNNING_MODAL"}
-                    else:
-                        self._finish(context)
-                        self._show_fading_and_execute(context, chord_text, script_label, script_path)
-                        return {"FINISHED"}
+            from .common import event_in_invoke_region
+            if event_in_invoke_region(context, self._invoke_area_ptr, getattr(self, "_region", None)):
+                try:
+                    from ..ui.overlay import find_hit
+                    hit = find_hit(event.mouse_region_x, event.mouse_region_y)
+                except Exception:  # pylint: disable=broad-exception-caught
+                    hit = None
+                if hit and hit["kind"] == "script":
+                    ref = hit["payload"].get("mapping_ref")
+                    script_path = getattr(ref, "python_file", None) if ref is not None else None
+                    script_label = getattr(ref, "label", "") if ref is not None else ""
+                    if script_path:
+                        chord_tokens = hit["payload"].get("chord_tokens") or []
+                        chord_text = " ".join(chord_tokens) if chord_tokens else script_label
+                        if event.ctrl:
+                            # Stay open, just execute the script (no fade, no close).
+                            self._execute_script_stay_open(context, script_path, script_label)
+                            return {"RUNNING_MODAL"}
+                        else:
+                            self._finish(context)
+                            self._show_fading_and_execute(context, chord_text, script_label, script_path)
+                            return {"FINISHED"}
             return {"RUNNING_MODAL"}
 
         # Backspace to remove last character
         if event.type == "BACK_SPACE" and event.value == "PRESS":
             if self._text_buffer:
                 self._text_buffer = self._text_buffer[:-1]
+                self._invalidate_hit_boxes()
                 self._tag_redraw()
                 return {"RUNNING_MODAL"}
             else:
@@ -484,6 +492,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         # Handle spacebar for text input (filtering with multiple words)
         elif event.type == "SPACE":
             self._text_buffer += " "
+            self._invalidate_hit_boxes()
             self._tag_redraw()
             return {"RUNNING_MODAL"}
 
@@ -492,10 +501,20 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             # Convert to lowercase and add to text buffer
             char = event.type.lower()
             self._text_buffer += char
+            self._invalidate_hit_boxes()
             self._tag_redraw()
             return {"RUNNING_MODAL"}
 
         return {"RUNNING_MODAL"}
+
+    def _invalidate_hit_boxes(self):
+        # Drop stale hit-boxes synchronously so a click arriving before the
+        # next draw can't land on the old filtered list's rects.
+        try:
+            from ..ui.overlay import clear_hit_boxes
+            clear_hit_boxes()
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
 
     def _execute_script_stay_open(self, context, script_path, script_name):
         """Execute a script without closing the overlay (CTRL+click path).

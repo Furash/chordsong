@@ -310,16 +310,18 @@ def _cleanup_fading_overlay():
 
 
 def _toggle_mapping_paths(mapping, ctx_viewport=None):
-    """Execute the toggle logic for `mapping`. Returns the list of new values
-    per toggled path (same order as they appeared)."""
-    context_path = (getattr(mapping, "context_path", "") or "").strip()
+    """Execute the toggle logic for `mapping`.
 
-    paths = []
-    if context_path:
-        paths.append(context_path)
-    for item in getattr(mapping, "sub_items", []) or []:
-        if item.path.strip():
-            paths.append(item.path.strip())
+    Returns the list of new values, one per successfully toggled path. Paths
+    that fail validation (empty / missing context / non-bool / wrong type) are
+    silently skipped here — callers are expected to pre-validate via
+    ``collect_toggle_paths`` and surface errors to the user; this function
+    stays best-effort so a partially broken mapping still toggles what it can.
+    """
+    from ..core.engine import collect_toggle_paths
+    paths, _errors = collect_toggle_paths(mapping)
+    if not paths:
+        return []
 
     def do_toggle_path(path):
         parts = path.split('.')
@@ -842,6 +844,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self._ctrl_held = False
         self._alt_held = False
         self._shift_held = False
+        # Reset so a stranded PRESS from a prior cancel/cleanup can't eat the
+        # user's next real LEFTMOUSE RELEASE on re-invoke.
+        self._swallow_leftmouse_release = False
         # Restore T & N panels if they were hidden (unless transitioning to Recents)
         if restore_panels:
             self._restore_panels(context)
@@ -888,6 +893,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             if self._buffer:
                 self._buffer.pop()
                 self._scroll_offset = 0
+                # Invalidate hit-boxes immediately — a click arriving before
+                # the next draw would otherwise land against the old buffer's
+                # rects and fire an item no longer displayed.
+                try:
+                    from ..ui.overlay import clear_hit_boxes
+                    clear_hit_boxes()
+                except Exception:  # pylint: disable=broad-exception-caught
+                    pass
                 self._tag_redraw()
                 return {"RUNNING_MODAL"}
             else:
@@ -929,31 +942,63 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 self._last_mod_type = event.type
                 return {"RUNNING_MODAL"}
 
-        # LEFTMOUSE PRESS over a clickable overlay widget (e.g. toggle) fires the
-        # associated action and keeps the modal open. Misses fall through to the
-        # chord-token handling below so mouse buttons remain usable as chord keys.
-        # Swallow the paired RELEASE when the PRESS was consumed, otherwise it
-        # would resurface as an `m1` chord token and trigger "Unknown chord".
+        # LEFTMOUSE over a clickable overlay widget fires the associated action.
+        # Misses fall through to the chord-token handling below so mouse buttons
+        # remain usable as chord keys. Swallow the paired RELEASE when the PRESS
+        # was consumed, otherwise it would resurface as an `m1` chord token and
+        # trigger "Unknown chord".
         if event.type == "LEFTMOUSE" and event.value == "RELEASE" and self._swallow_leftmouse_release:
             self._swallow_leftmouse_release = False
             return {"RUNNING_MODAL"}
         if event.type == "LEFTMOUSE" and event.value == "PRESS":
-            try:
-                from ..ui.overlay import find_hit
-                hit = find_hit(event.mouse_region_x, event.mouse_region_y)
-            except Exception:
-                hit = None
-            if hit and hit["kind"] == "toggle":
-                mapping_ref = hit["payload"].get("mapping_ref")
-                chord_tokens_hit = hit["payload"].get("chord_tokens") or []
-                if mapping_ref is None and chord_tokens_hit:
-                    filtered = filter_mappings_by_context(p.mappings, self._context_type)
-                    mapping_ref = find_exact_mapping(filtered, chord_tokens_hit)
-                if mapping_ref is not None:
-                    fire_toggle_from_click(mapping_ref, context)
-                    self._tag_redraw()
-                self._swallow_leftmouse_release = True
-                return {"RUNNING_MODAL"}
+            # Only trust event.mouse_region_x/y when the event fired in the same
+            # area+region the overlay was drawn in; otherwise those coords are
+            # relative to whichever region happens to be under the cursor and
+            # can false-hit our stored hit-boxes.
+            from .common import event_in_invoke_region
+            if event_in_invoke_region(context, self._invoke_area_ptr, self._region):
+                try:
+                    from ..ui.overlay import find_hit
+                    hit = find_hit(event.mouse_region_x, event.mouse_region_y)
+                except Exception:  # pylint: disable=broad-exception-caught
+                    hit = None
+                if hit and hit["kind"] == "toggle":
+                    chord_tokens_hit = hit["payload"].get("chord_tokens") or []
+                    # Always refetch from current mappings. A cached mapping_ref
+                    # can be stale if prefs were edited between draw and click;
+                    # chord_tokens_hit identifies the row authoritatively.
+                    mapping_ref = None
+                    if chord_tokens_hit:
+                        filtered = filter_mappings_by_context(p.mappings, self._context_type)
+                        mapping_ref = find_exact_mapping(filtered, chord_tokens_hit)
+                    self._swallow_leftmouse_release = True
+                    if mapping_ref is None:
+                        return {"RUNNING_MODAL"}
+                    # Pre-validate so bad context_paths surface to the user
+                    # instead of silently no-opping inside the timer callback.
+                    # Valid paths still fire — matches the "partial mapping
+                    # still works" behavior of the keyboard path.
+                    from ..core.engine import collect_toggle_paths
+                    valid_paths, errors = collect_toggle_paths(mapping_ref)
+                    for err in errors:
+                        self.report({"WARNING"}, err)
+                    if valid_paths:
+                        fire_toggle_from_click(mapping_ref, context)
+                        self._tag_redraw()
+                    # Modifier-held click stays open for chained toggles; plain
+                    # click closes, mirroring the keyboard toggle path and
+                    # scripts_overlay's CTRL-click = stay-open semantics.
+                    # If nothing fired, stay open so the user can retry.
+                    toggle_modifier = getattr(p, "toggle_multi_modifier", "CTRL")
+                    modifier_held = (
+                        (toggle_modifier == "CTRL" and event.ctrl) or
+                        (toggle_modifier == "ALT" and event.alt) or
+                        (toggle_modifier == "SHIFT" and event.shift)
+                    )
+                    if modifier_held or not valid_paths:
+                        return {"RUNNING_MODAL"}
+                    self._finish(context)
+                    return {"FINISHED"}
 
         # Mouse buttons should trigger on RELEASE to avoid conflicts with Blender's default actions
         # (e.g., M3 triggering rotate view on PRESS, getting stuck if we consume the event)
@@ -1230,19 +1275,17 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
             # Handle context toggle execution
             if mapping_type == "CONTEXT_TOGGLE":
+                # Pre-validate paths once; surface all issues and bail only if
+                # nothing is left to toggle. Partial validity (one good path +
+                # one bad sub-item) still fires the good path.
+                from ..core.engine import collect_toggle_paths
+                valid_paths, path_errors = collect_toggle_paths(m)
+                for err in path_errors:
+                    self.report({"WARNING"}, err)
+                if not valid_paths:
+                    self._finish(context)
+                    return {"CANCELLED"}
                 context_path = (getattr(m, "context_path", "") or "").strip()
-                if not context_path:
-                    self.report({"ERROR"}, f'Toggle mapping "{" ".join(self._buffer)}" has no context path. Please fix in preferences.')
-                    print(f"Chord Song: Toggle mapping '{' '.join(self._buffer)}' is missing context_path property")
-                    self._finish(context)
-                    return {"CANCELLED"}
-
-                # Validate that the context path has at least one part
-                if '.' not in context_path:
-                    self.report({"ERROR"}, f'Invalid context path "{context_path}" - must include context (e.g., "space_data.overlay.show_stats")')
-                    print(f"Chord Song: Invalid context path '{context_path}' for chord '{' '.join(self._buffer)}'")
-                    self._finish(context)
-                    return {"CANCELLED"}
 
                 # Capture viewport context BEFORE modifying buffer
                 ctx_viewport = capture_viewport_context(context)
@@ -1274,81 +1317,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                 def execute_toggle_delayed():
                     try:
-                        # Define helpers for context execution
-                        def do_toggle_path(path):
-                            parts = path.split('.')
-                            obj = bpy.context
-                            for part in parts[:-1]:
-                                next_obj = getattr(obj, part, None)
-                                if next_obj is None:
-                                    return None
-                                obj = next_obj
-                            prop_name = parts[-1]
-                            if not hasattr(obj, prop_name):
-                                return None
-                            current_value = getattr(obj, prop_name)
-                            if not isinstance(current_value, bool):
-                                return None
-                            set_val = not current_value
-                            setattr(obj, prop_name, set_val)
-                            return set_val
+                        results = _toggle_mapping_paths(m, ctx_viewport)
 
-                        def do_set_path(path, value):
-                            parts = path.split('.')
-                            obj = bpy.context
-                            for part in parts[:-1]:
-                                next_obj = getattr(obj, part, None)
-                                if next_obj is None:
-                                    return None
-                                obj = next_obj
-                            prop_name = parts[-1]
-                            if not hasattr(obj, prop_name):
-                                return None
-                            setattr(obj, prop_name, value)
-                            return value
-
-                        # Collect all paths
-                        paths = []
-                        if context_path:
-                            paths.append(context_path)
-                        for item in m.sub_items:
-                            if item.path.strip():
-                                paths.append(item.path.strip())
-
-                        # Execute state logic
-                        sync = getattr(m, "sync_toggles", False)
-                        results = []
-                        master_new_val = None
-
-                        def run_logic():
-                            nonlocal master_new_val
-                            for i, path in enumerate(paths):
-                                if i == 0:
-                                    master_new_val = do_toggle_path(path)
-                                    if master_new_val is not None:
-                                        results.append(master_new_val)
-                                else:
-                                    if sync and master_new_val is not None:
-                                        res = do_set_path(path, master_new_val)
-                                    else:
-                                        res = do_toggle_path(path)
-                                    if res is not None:
-                                        results.append(res)
-
-                        # Validate context before using it (may be invalid after undo)
                         from ..utils.render import validate_viewport_context
-                        valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-
-                        # Execute with context override if available
-                        if valid_ctx:
-                            try:
-                                with bpy.context.temp_override(**valid_ctx):
-                                    run_logic()
-                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                # Context became invalid, fall back to default context
-                                run_logic()
-                        else:
-                            run_logic()
 
                         # Show fading overlay with multi-status if applicable
                         # Skip fading overlay if modifier is held (modal stays open)
