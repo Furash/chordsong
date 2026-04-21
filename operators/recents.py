@@ -14,6 +14,7 @@ from ..core.engine import (
     get_str_attr,
     tokens_match,
 )
+from ..utils.panels import restore_panel_attr
 from ..utils.render import (
     DrawHandlerManager,
     calculate_scale_factor,
@@ -444,20 +445,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
                         if not space:
                             continue
                         
-                        # Restore Asset Shelf
-                        if 'asset_shelf' in panel_state and hasattr(space, 'show_region_asset_shelf'):
-                            if space.show_region_asset_shelf != panel_state['asset_shelf']:
-                                space.show_region_asset_shelf = panel_state['asset_shelf']
-
-                        # Restore N panel (Sidebar)
-                        if 'n_panel' in panel_state and hasattr(space, 'show_region_ui'):
-                            if space.show_region_ui != panel_state['n_panel']:
-                                space.show_region_ui = panel_state['n_panel']
-
-                        # Restore T panel (Toolbar/Toolshelf)
-                        if 't_panel' in panel_state and hasattr(space, 'show_region_toolbar'):
-                            if space.show_region_toolbar != panel_state['t_panel']:
-                                space.show_region_toolbar = panel_state['t_panel']
+                        restore_panel_attr(space, panel_state, 'asset_shelf', 'show_region_asset_shelf')
+                        restore_panel_attr(space, panel_state, 'hud',         'show_region_hud')
+                        restore_panel_attr(space, panel_state, 'n_panel',     'show_region_ui')
+                        restore_panel_attr(space, panel_state, 't_panel',     'show_region_toolbar')
                     except Exception:
                         continue
             except Exception:

@@ -18,6 +18,7 @@ from ..core.engine import (
 )
 from ..core.history import add_to_history
 from ..ui.overlay import draw_overlay, draw_fading_overlay
+from ..utils.panels import restore_panel_attr
 from ..utils.render import capture_viewport_context
 from .common import prefs
 from .test_overlay import disable_test_overlays
@@ -661,6 +662,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             if space.show_region_asset_shelf:
                                 space.show_region_asset_shelf = False
 
+                        # Always hide Redo/HUD floating region (occludes overlay)
+                        if hasattr(space, 'show_region_hud'):
+                            panel_state['hud'] = space.show_region_hud
+                            if space.show_region_hud:
+                                space.show_region_hud = False
+
                         # Store and hide N panel (Sidebar) - only if toggle enabled
                         if hide_tn and hasattr(space, 'show_region_ui'):
                             panel_state['n_panel'] = space.show_region_ui
@@ -718,20 +725,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         if not space:
                             continue
 
-                        # Restore Asset Shelf
-                        if 'asset_shelf' in panel_state and hasattr(space, 'show_region_asset_shelf'):
-                            if space.show_region_asset_shelf != panel_state['asset_shelf']:
-                                space.show_region_asset_shelf = panel_state['asset_shelf']
-
-                        # Restore N panel (Sidebar)
-                        if 'n_panel' in panel_state and hasattr(space, 'show_region_ui'):
-                            if space.show_region_ui != panel_state['n_panel']:
-                                space.show_region_ui = panel_state['n_panel']
-
-                        # Restore T panel (Toolbar/Toolshelf)
-                        if 't_panel' in panel_state and hasattr(space, 'show_region_toolbar'):
-                            if space.show_region_toolbar != panel_state['t_panel']:
-                                space.show_region_toolbar = panel_state['t_panel']
+                        restore_panel_attr(space, panel_state, 'asset_shelf', 'show_region_asset_shelf')
+                        restore_panel_attr(space, panel_state, 'hud',         'show_region_hud')
+                        restore_panel_attr(space, panel_state, 'n_panel',     'show_region_ui')
+                        restore_panel_attr(space, panel_state, 't_panel',     'show_region_toolbar')
                     except Exception:
                         continue
             except Exception:
