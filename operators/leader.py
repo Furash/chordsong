@@ -118,7 +118,15 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
             with bpy.context.temp_override(**valid_ctx):
                 run_logic()
         except (TypeError, RuntimeError, AttributeError, ReferenceError):
-            run_logic()
+            # Only retry in the default context if nothing was applied yet.
+            # A custom addon property with an `update=` callback that raises
+            # AFTER the setattr succeeds (e.g. tries to re-register a keymap
+            # on value change) would take us here with `results` already
+            # populated — re-running run_logic would read the just-written
+            # value and toggle it BACK to the original state. First click
+            # appears to "roll back" the toggle; only the second click sticks.
+            if not results:
+                run_logic()
     else:
         run_logic()
 
