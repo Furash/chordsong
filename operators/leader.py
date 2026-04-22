@@ -269,23 +269,8 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
 
     # Helper function to tag all relevant areas for redraw
     def tag_all_views():
-        try:
-            for window in bpy.context.window_manager.windows:
-                try:
-                    screen = window.screen
-                    if not screen:
-                        continue
-                    for area in screen.areas:
-                        # Don't access area.type - it can crash on destroyed areas
-                        # Just try to tag_redraw and catch exceptions
-                        try:
-                            area.tag_redraw()
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        from ..utils.redraw import tag_redraw_all_areas
+        tag_redraw_all_areas()
 
     # Immediately tag for redraw
     tag_target_view()
@@ -487,15 +472,8 @@ class CHORDSONG_OT_ResetState(bpy.types.Operator):
         _show_fading_overlay(context, [], "Blender's modal state reset", "󰑓", show_chord=False)
 
         # 4. Force tag all areas for redraw to clear any stale overlays
-        try:
-            for window in context.window_manager.windows:
-                for area in window.screen.areas:
-                    try:
-                        area.tag_redraw()
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        from ..utils.redraw import tag_redraw_all_areas
+        tag_redraw_all_areas(context)
 
         self.report({'INFO'}, f"Chord Song: State reset. Removed {timers_removed} timer(s).")
         print(f"Chord Song: State reset complete. Handlers cleaned, {timers_removed} timer(s) removed.")
@@ -597,31 +575,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
     def _tag_redraw(self):
         """Tag all relevant areas for redraw to ensure overlay is visible."""
-        try:
-            # Tag all relevant areas since we don't store area references anymore
-            # This ensures the overlay shows up regardless of which area is active
-            # But we must be very careful not to access area.type on partially destroyed areas
-            for window in bpy.context.window_manager.windows:
-                try:
-                    screen = window.screen
-                    if not screen:
-                        continue
-                    for area in screen.areas:
-                        # Don't access area.type directly - it can crash on destroyed areas
-                        # Instead, try to tag_redraw and catch exceptions
-                        try:
-                            # Try to tag - if area is valid, this will work
-                            # If area is destroyed, this will raise an exception
-                            area.tag_redraw()
-                        except Exception:
-                            # Area is invalid or destroyed, skip it
-                            pass
-                except Exception:
-                    # Window or screen is invalid, skip it
-                    pass
-        except Exception:
-            # If anything fails, just continue - this is best effort
-            pass
+        from ..utils.redraw import tag_redraw_all_areas
+        tag_redraw_all_areas()
 
     def _draw_callback(self):
         """Draw callback for the overlay."""

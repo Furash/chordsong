@@ -225,22 +225,8 @@ class CHORDSONG_OT_Icon_Select_Apply(bpy.types.Operator):
         # Redraw all areas to update dialogs
         # Use a timer to ensure this happens after the current operator finishes
         def redraw_dialogs():
-            try:
-                wm = bpy.context.window_manager
-                for window in wm.windows:
-                    try:
-                        screen = window.screen
-                        if not screen:
-                            continue
-                        for area in screen.areas:
-                            try:
-                                area.tag_redraw()
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            from ..utils.redraw import tag_redraw_all_areas
+            tag_redraw_all_areas()
             return None  # Timer runs once
         
         # Use a small delay to ensure the operator finishes first

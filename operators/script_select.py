@@ -142,18 +142,8 @@ class CHORDSONG_OT_Script_Select_Apply(bpy.types.Operator):
 
         # Close the dialog and redraw - wrap in try-except for safety
         try:
-            for window in context.window_manager.windows:
-                try:
-                    screen = window.screen
-                    if not screen:
-                        continue
-                    for area in screen.areas:
-                        try:
-                            area.tag_redraw()
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+            from ..utils.redraw import tag_redraw_all_areas
+            tag_redraw_all_areas(context)
         except Exception:
             pass
 
