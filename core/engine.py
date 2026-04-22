@@ -167,24 +167,6 @@ class Candidate:
     groups: tuple[str, ...] = () # Unique groups reachable through this token
     mapping_ref: object = None  # Underlying mapping when this is a final item; None otherwise
 
-def build_match_sets(mappings):
-    """
-    Returns (exact_set, prefix_set) of token tuples.
-    prefix_set contains all proper prefixes of any mapping chord.
-    """
-    exact = set()
-    prefixes = set()
-    for m in mappings:
-        if not getattr(m, "enabled", True):
-            continue
-        chord_tokens = tuple(split_chord(get_str_attr(m, "chord")))
-        if not chord_tokens:
-            continue
-        exact.add(chord_tokens)
-        for i in range(1, len(chord_tokens)):
-            prefixes.add(chord_tokens[:i])
-    return exact, prefixes
-
 def _get_token_parts(token: str) -> tuple[set[str], str]:
     """Split a token into a set of modifiers and a base key."""
     mod_symbols = {'#', '^', '!', '+'}

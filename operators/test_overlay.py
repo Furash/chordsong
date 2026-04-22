@@ -1,12 +1,7 @@
 import bpy
 import time
 from ..ui.overlay.render import draw_fading_overlay, draw_overlay
-from ..utils.addon_package import addon_root_package
-
-def prefs(context):
-    """Get addon preferences for extension workflow."""
-    package_name = addon_root_package(__package__)
-    return context.preferences.addons[package_name].preferences
+from .common import prefs  # single source of truth; was duplicated here
 
 # Global storage for the fading test handler
 _fading_test_handler = None

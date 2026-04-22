@@ -11,7 +11,12 @@ from bpy.props import IntProperty  # type: ignore
 from ..common import prefs
 
 def _ast_value_to_string(node):
-    """Convert an AST value node back to a Python string representation."""
+    """Convert an AST value node back to a Python string representation.
+
+    Targets Python 3.9+ (Blender 5.0 ships 3.11). ast.NameConstant / ast.Str /
+    ast.Num compat branches were removed — they were only relevant on
+    Python <3.8 and are deprecated/removed aliases in 3.12+.
+    """
     if isinstance(node, ast.Constant):
         if isinstance(node.value, str):
             return f'"{node.value}"'
@@ -20,37 +25,18 @@ def _ast_value_to_string(node):
         elif node.value is None:
             return "None"
         return str(node.value)
-    elif isinstance(node, ast.NameConstant):  # Python < 3.8
-        if node.value is None:
-            return "None"
-        return str(node.value)
     elif isinstance(node, ast.Name):
-        if node.id in ("True", "False", "None"):
-            return node.id
         return node.id
-    elif isinstance(node, ast.Str):  # Python < 3.8
-        return f'"{node.s}"'
-    elif isinstance(node, ast.Num):  # Python < 3.8
-        return str(node.n)
     elif isinstance(node, (ast.Tuple, ast.List)):
         items = [_ast_value_to_string(item) for item in node.elts]
         bracket = "(" if isinstance(node, ast.Tuple) else "["
         close_bracket = ")" if isinstance(node, ast.Tuple) else "]"
         return f"{bracket}{', '.join(items)}{close_bracket}"
-    else:
-        # For other types, try to evaluate safely
-        try:
-            # Use ast.literal_eval if possible by converting node to code
-            # This works for literals only
-            import ast as ast_module
-            if hasattr(ast_module, 'unparse'):  # Python 3.9+
-                return ast_module.unparse(node)
-            # For older Python, try to reconstruct manually
-            # This is a best-effort approach
-            return repr(node)
-        except Exception:
-            # Last resort: return a string representation
-            return repr(node)
+    # Fallback: use ast.unparse (Python 3.9+). If that fails, last-ditch repr.
+    try:
+        return ast.unparse(node)
+    except Exception:
+        return repr(node)
 
 def extract_operator_and_kwargs(text: str):
     """
@@ -89,12 +75,9 @@ def extract_operator_and_kwargs(text: str):
                 value_str = _ast_value_to_string(keyword.value)
                 kwargs_parts.append(f"{keyword.arg} = {value_str}")
 
-                # Store raw value for label generation
-                # Try to extract string values without quotes
+                # Store raw value for label generation — only string literals.
                 if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
                     kwargs_dict[keyword.arg] = keyword.value.value
-                elif isinstance(keyword.value, ast.Str):  # Python < 3.8
-                    kwargs_dict[keyword.arg] = keyword.value.s
 
             kwargs_string = ", ".join(kwargs_parts)
             return operator_name, kwargs_string, kwargs_dict
@@ -195,33 +178,6 @@ class CHORDSONG_OT_Mapping_Convert(bpy.types.Operator):
         else:
             self.report({"WARNING"}, "Could not parse function call")
             return {"CANCELLED"}
-
-    def _detect_context_from_operator(self, operator_name: str, kwargs_dict: dict) -> str:
-        """Detect the appropriate editor context based on the operator."""
-        parts = operator_name.split('.')
-
-        # Node operators
-        if len(parts) >= 1 and parts[0] == 'node':
-            # Check if there's a 'type' parameter that indicates shader vs geometry nodes
-            if 'type' in kwargs_dict:
-                node_type = kwargs_dict['type']
-                if node_type.startswith('ShaderNode'):
-                    return "SHADER_EDITOR"
-                elif node_type.startswith('GeometryNode'):
-                    return "GEOMETRY_NODE"
-                elif node_type.startswith('CompositorNode'):
-                    return "SHADER_EDITOR"  # Compositor uses shader editor context
-
-            # Default node operations to Geometry Nodes
-            # (user can change if needed)
-            return "GEOMETRY_NODE"
-
-        # Edit mode operators
-        if len(parts) >= 1 and parts[0] in ('mesh', 'curve', 'armature', 'lattice', 'metaball', 'surface', 'font'):
-            return "VIEW_3D_EDIT"
-
-        # Default to 3D View for all other operators
-        return "VIEW_3D"
 
     def _generate_smart_label(self, operator_name: str, kwargs_dict: dict) -> str:
         """Generate a smart label from operator name and parameters."""
