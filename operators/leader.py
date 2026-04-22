@@ -332,6 +332,17 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
     def _draw_callback(self):
         """Draw callback for the overlay."""
+        try:
+            self._draw_callback_safe()
+        except ReferenceError:
+            # Operator's StructRNA freed (blinker hot-reload window). The
+            # draw handler can outlive the operator instance by a few frames;
+            # bail silently — cleanup_all_handlers tears the handler down.
+            return
+        except Exception:
+            return
+
+    def _draw_callback_safe(self):
         if _is_reloading():
             return
         # Use bpy.context directly - it's more reliable for draw handlers

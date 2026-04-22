@@ -105,6 +105,19 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
     def _draw_callback(self):
         """Draw callback for the scripts overlay."""
+        try:
+            self._draw_callback_safe()
+        except ReferenceError:
+            # Operator's StructRNA has been freed (typical during blinker hot
+            # reload — the draw handler outlives the operator instance for a
+            # few frames). Silently skip; the unregister path tears down
+            # handlers on the next cleanup_all_handlers() call.
+            return
+        except Exception:
+            # Defence in depth: never raise from a draw callback.
+            return
+
+    def _draw_callback_safe(self):
         from .leader import _is_reloading
         if _is_reloading():
             return

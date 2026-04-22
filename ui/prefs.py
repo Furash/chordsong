@@ -152,11 +152,22 @@ def _on_prefs_changed(self, _context):
         # Skip callbacks during bulk operations (config loading, etc.)
         if _SUSPEND_CALLBACKS:
             return
-        
+
         self.ensure_defaults()
         _autosave_now(self)
     except Exception:
         pass
+
+
+def _on_allow_scripts_changed(self, context):
+    # Persist the flag to its sidecar file, then fall through to the
+    # standard prefs-change handler. Must return None (Blender requirement);
+    # a lambda returning a tuple raises "return value must be None".
+    try:
+        save_allow_scripts_persistent(bool(self.allow_custom_user_scripts))
+    except Exception:
+        pass
+    _on_prefs_changed(self, context)
 
 def _on_mapping_changed(_self, context):
     try:
@@ -593,10 +604,7 @@ class CHORDSONG_Preferences(AddonPreferences):
                     "⚠️ Only enable this if you trust the scripts you're executing. "
                     "Scripts have full access to Blender's Python API.",
         default=False,
-        update=lambda self, context: (
-            save_allow_scripts_persistent(self.allow_custom_user_scripts),
-            _on_prefs_changed(self, context),
-        ),
+        update=_on_allow_scripts_changed,
     )
 
     # Scripts Overlay Settings
