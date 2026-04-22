@@ -147,24 +147,21 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
 
 
 def fire_toggle_from_click(mapping, context):
-    """Schedule a deferred toggle for `mapping` as triggered by an overlay click.
-
-    Keeps the modal open, skips the fading confirmation overlay, and does not
-    add a history entry (clicks are meant to feel direct, not logged).
+    """Apply `mapping`'s toggles immediately from inside the modal click
+    handler. No timer delay: setattr is safe to call synchronously (unlike
+    bpy.ops.*) and queuing it behind a timer caused races where a timer
+    from click-1 could fire AFTER click-2's timer, netting back to the
+    original state. Skips the fading overlay and history (clicks feel
+    direct, not logged).
     """
     ctx_viewport = capture_viewport_context(context)
-
-    def delayed():
-        try:
-            _toggle_mapping_paths(mapping, ctx_viewport)
-            from ..ui.overlay.cache import clear_overlay_cache
-            clear_overlay_cache()
-        except Exception:
-            import traceback
-            traceback.print_exc()
-        return None
-
-    bpy.app.timers.register(delayed, first_interval=0.01)
+    try:
+        _toggle_mapping_paths(mapping, ctx_viewport)
+        from ..ui.overlay.cache import clear_overlay_cache
+        clear_overlay_cache()
+    except Exception:  # pylint: disable=broad-exception-caught
+        import traceback
+        traceback.print_exc()
 
 
 def cleanup_all_handlers():
