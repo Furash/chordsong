@@ -257,6 +257,12 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
     if has_buffer:
         footer.append({"kind": "item", "token": "BS", "label": "Back", "icon": ""})
 
+    # Scripts-overlay click hints. Plain click fires + closes; Ctrl+click
+    # fires + keeps the overlay open for chaining multiple scripts.
+    if is_scripts_overlay:
+        footer.append({"kind": "item", "token": "M1", "label": "Run", "icon": ""})
+        footer.append({"kind": "item", "token": "^M1", "label": "Stay open", "icon": ""})
+
     return rows, footer
 
 def wrap_into_columns(rows, max_rows):
