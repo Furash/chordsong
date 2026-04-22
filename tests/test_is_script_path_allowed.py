@@ -1,7 +1,6 @@
 """Tests for is_script_path_allowed — pure disk-path check, no bpy."""
-
-import sys
 import os
+import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -9,91 +8,98 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from utils.context_path import is_script_path_allowed
 
 
-def _run():
-    passed = 0
-    failed = 0
+def test_empty_folder_allows_any_path():
+    allowed, _ = is_script_path_allowed("C:/anywhere/foo.py", "")
+    assert allowed is True
 
-    def check(name, got, want):
-        nonlocal passed, failed
-        if got == want:
-            passed += 1
-        else:
-            failed += 1
-            print(f"FAIL {name}\n  got : {got!r}\n  want: {want!r}")
 
-    # Empty scripts_folder → confinement off, all paths allowed
-    check("no_folder_any_path_ok", is_script_path_allowed("C:/anywhere/foo.py", "")[0], True)
-    check("none_folder_ok", is_script_path_allowed("C:/anywhere/foo.py", None)[0], True)
+def test_none_folder_allows_any_path():
+    allowed, _ = is_script_path_allowed("C:/anywhere/foo.py", None)
+    assert allowed is True
 
-    # Empty filepath with non-empty folder → rejected
+
+def test_empty_filepath_rejected():
     allowed, reason = is_script_path_allowed("", "C:/scripts")
-    check("empty_filepath_rejected", allowed, False)
-    check("empty_filepath_reason", "Empty" in reason, True)
+    assert allowed is False
+    assert "Empty" in reason
 
-    # Use real tmp paths for realpath-based checks
-    with tempfile.TemporaryDirectory() as tmpdir:
-        scripts = os.path.join(tmpdir, "scripts")
-        os.makedirs(scripts, exist_ok=True)
-        outside = os.path.join(tmpdir, "outside")
-        os.makedirs(outside, exist_ok=True)
 
-        # Script inside folder → allowed
-        inside_path = os.path.join(scripts, "foo.py")
-        with open(inside_path, "w") as f:
+def test_script_inside_folder_allowed():
+    with tempfile.TemporaryDirectory() as base:
+        scripts = os.path.join(base, "scripts")
+        os.makedirs(scripts)
+        inside = os.path.join(scripts, "foo.py")
+        with open(inside, "w") as f:
             f.write("")
-        check("inside_folder_allowed", is_script_path_allowed(inside_path, scripts)[0], True)
+        allowed, _ = is_script_path_allowed(inside, scripts)
+        assert allowed is True
 
-        # Script in nested subdir → allowed
+
+def test_nested_subdir_allowed():
+    with tempfile.TemporaryDirectory() as base:
+        scripts = os.path.join(base, "scripts")
         nested_dir = os.path.join(scripts, "sub", "nested")
-        os.makedirs(nested_dir, exist_ok=True)
-        nested_path = os.path.join(nested_dir, "bar.py")
-        with open(nested_path, "w") as f:
+        os.makedirs(nested_dir)
+        nested = os.path.join(nested_dir, "bar.py")
+        with open(nested, "w") as f:
             f.write("")
-        check("nested_subdir_allowed", is_script_path_allowed(nested_path, scripts)[0], True)
+        allowed, _ = is_script_path_allowed(nested, scripts)
+        assert allowed is True
 
-        # Script outside folder → rejected
-        outside_path = os.path.join(outside, "evil.py")
-        with open(outside_path, "w") as f:
+
+def test_script_outside_folder_rejected():
+    with tempfile.TemporaryDirectory() as base:
+        scripts = os.path.join(base, "scripts")
+        outside = os.path.join(base, "outside")
+        os.makedirs(scripts)
+        os.makedirs(outside)
+        evil = os.path.join(outside, "evil.py")
+        with open(evil, "w") as f:
             f.write("")
-        allowed, reason = is_script_path_allowed(outside_path, scripts)
-        check("outside_folder_rejected", allowed, False)
-        check("outside_reason_mentions_path", outside_path in reason or "outside" in reason.lower(), True)
+        allowed, reason = is_script_path_allowed(evil, scripts)
+        assert allowed is False
+        assert "outside" in reason.lower() or evil in reason
 
-        # Parent of folder → rejected (prevents "scripts/../evil.py" trick)
-        parent_path = os.path.join(tmpdir, "parent.py")
+
+def test_parent_dir_rejected():
+    with tempfile.TemporaryDirectory() as base:
+        scripts = os.path.join(base, "scripts")
+        os.makedirs(scripts)
+        parent_path = os.path.join(base, "parent.py")
         with open(parent_path, "w") as f:
             f.write("")
-        check("parent_dir_rejected", is_script_path_allowed(parent_path, scripts)[0], False)
+        allowed, _ = is_script_path_allowed(parent_path, scripts)
+        assert allowed is False
 
-        # Traversal via .. resolves to outside → rejected
+
+def test_dotdot_traversal_rejected():
+    with tempfile.TemporaryDirectory() as base:
+        scripts = os.path.join(base, "scripts")
+        outside = os.path.join(base, "outside")
+        os.makedirs(scripts)
+        os.makedirs(outside)
         traversal = os.path.join(scripts, "..", "outside", "evil.py")
-        check("traversal_rejected", is_script_path_allowed(traversal, scripts)[0], False)
+        allowed, _ = is_script_path_allowed(traversal, scripts)
+        assert allowed is False
 
-        # Folder with trailing slash still works
-        scripts_with_slash = scripts + os.sep
-        check("folder_trailing_sep_allows_inside", is_script_path_allowed(inside_path, scripts_with_slash)[0], True)
 
-    # Case-insensitivity on Windows (os.path.normcase lowers on Win)
-    # On other OSes normcase is a no-op, so this just verifies we don't crash.
-    # Build a folder path and a filepath with different case; behavior depends
-    # on platform — just check the call doesn't raise.
-    try:
-        is_script_path_allowed("C:/Scripts/foo.py", "c:/scripts")
-        passed += 1
-    except Exception as e:
-        failed += 1
-        print(f"FAIL case_normalization_no_crash: {e}")
+def test_trailing_separator_on_folder():
+    with tempfile.TemporaryDirectory() as base:
+        scripts = os.path.join(base, "scripts")
+        os.makedirs(scripts)
+        inside = os.path.join(scripts, "foo.py")
+        with open(inside, "w") as f:
+            f.write("")
+        allowed, _ = is_script_path_allowed(inside, scripts + os.sep)
+        assert allowed is True
 
-    # Non-existent folder → realpath just returns the normalized path; if
-    # filepath doesn't match, reject. Caller is responsible for handling
-    # "folder not found" separately (we reject rather than pass-through).
+
+def test_nonexistent_folder_rejects_unrelated_path():
     allowed, _ = is_script_path_allowed("C:/random/x.py", "C:/nonexistent/folder")
-    check("nonexistent_folder_rejects_unrelated_path", allowed, False)
-
-    print(f"\n{passed} passed, {failed} failed")
-    if failed:
-        sys.exit(1)
+    assert allowed is False
 
 
-if __name__ == "__main__":
-    _run()
+def test_case_normalization_does_not_crash():
+    # On Windows this is a meaningful case-insensitive match; on POSIX it's
+    # a no-op. Just verify the call doesn't raise.
+    is_script_path_allowed("C:/Scripts/foo.py", "c:/scripts")
