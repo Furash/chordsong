@@ -29,6 +29,8 @@ class CHORDSONG_OT_Load_Autosave(bpy.types.Operator):
             with open(ap, "r", encoding="utf-8") as f:
                 data = loads_json(f.read())
             warns = apply_config(p, data)
+            from ...ui.overlay import clear_overlay_cache
+            clear_overlay_cache()
             for w in warns[:5]:
                 self.report({"WARNING"}, w)
             self.report({"INFO"}, "Restored autosave")

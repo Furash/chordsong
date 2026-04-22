@@ -37,12 +37,14 @@ class CHORDSONG_OT_Load_Config(bpy.types.Operator, ImportHelper):
             with open(self.filepath, "r", encoding="utf-8") as f:
                 data = loads_json(f.read())
             warns = apply_config(p, data)
+            from ...ui.overlay import clear_overlay_cache
+            clear_overlay_cache()
             p.config_path = self.filepath
-            
+
             # Persist the config path so it survives addon disable/enable
             from ...ui.prefs import save_config_path_persistent
             save_config_path_persistent(self.filepath)
-            
+
             for w in warns[:5]:
                 self.report({"WARNING"}, w)
             return {"FINISHED"}

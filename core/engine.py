@@ -502,102 +502,20 @@ def filter_mappings_by_context(mappings, context_type: str):
             filtered.append(m)
     return filtered
 
+# Leader-keymap accessors moved to ui.keymap (bpy-dependent, UI-layer
+# concern). These thin re-exports keep `from ..core.engine import
+# get_leader_key_type` working for existing callers; new code should
+# import from `..ui.keymap` directly.
 def get_leader_key_type():
-    """Get the current leader key type from the addon keymap.
+    from ..ui.keymap import get_leader_key_type as _f
+    return _f()
 
-    Returns:
-        The Blender key type string (e.g., "SPACE", "ACCENT_GRAVE")
-    """
-    try:
-        import bpy  # type: ignore
-        wm = bpy.context.window_manager
-
-        # Check user keyconfig first (contains user customizations that persist)
-        # Then fall back to addon keyconfig (default)
-        keyconfigs = [wm.keyconfigs.user, wm.keyconfigs.addon]
-
-        for kc in keyconfigs:
-            if not kc:
-                continue
-
-            km = kc.keymaps.get("3D View")
-            if not km:
-                continue
-
-            # Find the leader keymap item
-            for kmi in km.keymap_items:
-                if kmi.idname == "chordsong.leader":
-                    return kmi.type
-
-        return "SPACE"
-    except Exception:
-        return "SPACE"
 
 def get_leader_key_token() -> str:
-    """Get the current leader key as a display token.
+    from ..ui.keymap import get_leader_key_token as _f
+    return _f()
 
-    Returns:
-        A human-readable token string for display (e.g., "space", "grave")
-    """
-    try:
-        import bpy  # type: ignore
-        wm = bpy.context.window_manager
-
-        # Check user keyconfig first (contains user customizations that persist)
-        # Then fall back to addon keyconfig (default)
-        keyconfigs = [wm.keyconfigs.user, wm.keyconfigs.addon]
-
-        for kc in keyconfigs:
-            if not kc:
-                continue
-
-            km = kc.keymaps.get("3D View")
-            if not km:
-                continue
-
-            # Find the leader keymap item
-            for kmi in km.keymap_items:
-                if kmi.idname == "chordsong.leader":
-                    # Normalize the key type to a display token
-                    shift_state = getattr(kmi, "shift", False)
-                    token = normalize_token(kmi.type, shift=shift_state)
-                    if token:
-                        return token
-                    # Fallback: use key type directly
-                    if kmi.type:
-                        return kmi.type.lower()
-                    return "<Leader>"
-
-        return "<Leader>"
-    except Exception:
-        return "<Leader>"
 
 def set_leader_key_in_keymap(key_type: str):
-    """Set the leader key type in all addon keymaps.
-
-    Args:
-        key_type: Blender key type string (e.g., "SPACE", "ACCENT_GRAVE")
-    """
-    try:
-        import bpy  # type: ignore
-        wm = bpy.context.window_manager
-
-        # Update in both addon and user keyconfigs to ensure persistence
-        # User changes will be stored in keyconfigs.user automatically
-        keyconfigs = [wm.keyconfigs.addon, wm.keyconfigs.user]
-
-        # Update leader key in all registered keymaps
-        keymap_names = ["3D View", "Node Editor", "Image"]
-        for kc in keyconfigs:
-            if not kc:
-                continue
-
-            for km_name in keymap_names:
-                km = kc.keymaps.get(km_name)
-                if km:
-                    for kmi in km.keymap_items:
-                        if kmi.idname == "chordsong.leader":
-                            kmi.type = key_type
-                            break
-    except Exception:
-        pass
+    from ..ui.keymap import set_leader_key_in_keymap as _f
+    return _f(key_type)

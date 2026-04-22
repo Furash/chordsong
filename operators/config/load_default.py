@@ -48,6 +48,8 @@ class CHORDSONG_OT_Load_Default(bpy.types.Operator):
 
             # Apply the default config (mappings, groups, etc.)
             warnings = apply_config(p, data)
+            from ...ui.overlay import clear_overlay_cache
+            clear_overlay_cache()
             for w in warnings[:5]:
                 self.report({"WARNING"}, w)
 
