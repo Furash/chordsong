@@ -75,7 +75,17 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
         if not isinstance(current_value, bool):
             return None
         set_val = not current_value
-        setattr(obj, prop_name, set_val)
+        # Guard the setattr: Blender writes the new value to RNA BEFORE
+        # invoking the property's update= callback. Addon update callbacks
+        # that raise (e.g. they re-register a keymap and something inside
+        # throws) would otherwise propagate — and the outer fallback would
+        # then re-read the just-written value and toggle back to the
+        # original. Swallow here and return the new value so the caller
+        # knows the RNA write already happened.
+        try:
+            setattr(obj, prop_name, set_val)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
         return set_val
 
     def do_set_path(path, value):
@@ -89,7 +99,10 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
         prop_name = parts[-1]
         if not hasattr(obj, prop_name):
             return None
-        setattr(obj, prop_name, value)
+        try:
+            setattr(obj, prop_name, value)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
         return value
 
     sync = getattr(mapping, "sync_toggles", False)
