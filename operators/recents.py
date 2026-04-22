@@ -27,15 +27,8 @@ from ..utils.render import (
 from .common import prefs
 
 def _create_context_wrapper(ctx_viewport):
-    """Create a context wrapper with captured viewport context."""
-    class ContextWrapper:
-        def __init__(self, ctx_viewport):
-            self._ctx_viewport = ctx_viewport
-        def __getattr__(self, name):
-            if name in self._ctx_viewport:
-                return self._ctx_viewport[name]
-            return getattr(bpy.context, name)
-
+    """Return a context-shaped object with keys from ctx_viewport falling back to bpy.context."""
+    from ..utils.render import ContextWrapper
     return ContextWrapper(ctx_viewport) if ctx_viewport else bpy.context
 
 class CHORDSONG_OT_Recents(bpy.types.Operator):
@@ -82,15 +75,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # This prevents crashes when context.region is None or invalid
         context = bpy.context
         if self._draw_manager and self._draw_manager.region:
-            # Create a temporary context wrapper that uses our stored region
-            class ContextWithRegion:
-                def __init__(self, original_ctx, region, area):
-                    self._ctx = original_ctx
-                    self.region = region
-                    self.area = area
-                def __getattr__(self, name):
-                    return getattr(self._ctx, name)
-            
+            from ..utils.render import ContextWithRegion
             context = ContextWithRegion(bpy.context, self._draw_manager.region, self._draw_manager.area)
 
         # Draw the recents overlay

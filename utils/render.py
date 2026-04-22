@@ -19,6 +19,34 @@ class ContextWrapper:
             return self._ctx[name]
         return getattr(bpy.context, name)
 
+
+class OverlayContext:
+    """Minimal context-shaped object with exactly area/region/space_data.
+
+    Use when synthesizing a context for helpers like `_show_fading_overlay`
+    that only read those three attributes. Avoids the four verbatim inline
+    class defs that used to live in operators/leader.py.
+    """
+    def __init__(self, area, region, space_data=None):
+        self.area = area
+        self.region = region
+        self.space_data = space_data
+
+
+class ContextWithRegion:
+    """Proxy that overrides area/region on a wrapped bpy context, delegating
+    everything else to the original. Use when `context.region` might be None
+    or stale (e.g., in a draw handler called with no active region) but you
+    have a known-good region saved from invoke time.
+    """
+    def __init__(self, original_ctx, region, area):
+        self._ctx = original_ctx
+        self.region = region
+        self.area = area
+
+    def __getattr__(self, name):
+        return getattr(self._ctx, name)
+
 def capture_viewport_context(context) -> dict:
     """Capture viewport context for use in deferred operations.
 

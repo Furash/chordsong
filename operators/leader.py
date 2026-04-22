@@ -18,7 +18,7 @@ from ..core.engine import (
 )
 from ..core.history import add_to_history
 from ..ui.overlay import draw_overlay, draw_fading_overlay
-from ..utils.render import capture_viewport_context
+from ..utils.render import capture_viewport_context, OverlayContext, ContextWithRegion
 from .common import prefs
 from .test_overlay import disable_test_overlays
 
@@ -604,15 +604,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Use the stored region from invoke if available to prevent crashes when
         # context.region is None or invalid (e.g., in new files, custom scripts, overlays)
         if self._region:
-            # Create a temporary context wrapper that uses our stored region
-            class ContextWithRegion:
-                def __init__(self, original_ctx, region, area):
-                    self._ctx = original_ctx
-                    self.region = region
-                    self.area = area
-                def __getattr__(self, name):
-                    return getattr(self._ctx, name)
-            
             context = ContextWithRegion(bpy.context, self._region, self._area)
 
         # Filter mappings by context for overlay display
@@ -1093,13 +1084,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                                 # Create a context-like object with the area from overlay_ctx
                                 # This ensures we store the correct area pointer and space type
-                                class ContextWrapper:
-                                    def __init__(self, area, region, space_data):
-                                        self.area = area
-                                        self.region = region
-                                        self.space_data = space_data
-
-                                wrapped_ctx = ContextWrapper(area, region, space_data)
+                                wrapped_ctx = OverlayContext(area, region, space_data)
                                 _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
                             except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                 _show_fading_overlay(bpy.context, chord_tokens, label, icon)
@@ -1204,13 +1189,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                         pass
 
                                     # Create a context-like object with the area from overlay_ctx
-                                    class ContextWrapper:
-                                        def __init__(self, area, region, space_data):
-                                            self.area = area
-                                            self.region = region
-                                            self.space_data = space_data
-
-                                    wrapped_ctx = ContextWrapper(area, region, space_data)
+                                    wrapped_ctx = OverlayContext(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                     _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
@@ -1348,13 +1327,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                         pass
 
                                     # Create a context-like object with the area from overlay_ctx
-                                    class ContextWrapper:
-                                        def __init__(self, area, region, space_data):
-                                            self.area = area
-                                            self.region = region
-                                            self.space_data = space_data
-
-                                    wrapped_ctx = ContextWrapper(area, region, space_data)
+                                    wrapped_ctx = OverlayContext(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                     _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
@@ -1484,13 +1457,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                     except Exception:
                                         pass
 
-                                    class ContextWrapper:
-                                        def __init__(self, area, region, space_data):
-                                            self.area = area
-                                            self.region = region
-                                            self.space_data = space_data
-
-                                    wrapped_ctx = ContextWrapper(area, region, space_data)
+                                    wrapped_ctx = OverlayContext(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                     _show_fading_overlay(bpy.context, chord_tokens, label, icon)
