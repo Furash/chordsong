@@ -18,15 +18,18 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
     bl_label = "Scripts Overlay"
     bl_options = set()
 
-    _draw_handles = {}
+    # Class-level defaults are immutable sentinels. Invoke rebinds these on
+    # `self`; _cancel_requested intentionally stays class-level as a shared
+    # signal for re-invocation to request the active instance to stop.
+    _draw_handles = None
     _buffer = None
-    _text_buffer = ""  # Text input buffer for filtering
-    _all_scripts_list = []  # All scripts before filtering
-    _filtered_scripts_list = []  # Filtered scripts (max 9 for 1-9 chords)
+    _text_buffer = ""
+    _all_scripts_list = None
+    _filtered_scripts_list = None
     _invoke_area_ptr = None
-    _panel_states = {}  # Store original panel visibility states: {area_ptr: {"n_panel": bool, "t_panel": bool}}
-    _cancel_requested = False  # Class-level flag to allow cancellation from re-invocation
-    _hover_script_path = None  # Currently hovered script path, or None
+    _panel_states = None
+    _cancel_requested = False  # Shared across invocations by design
+    _hover_script_path = None
 
     def _ensure_draw_handler(self, context: bpy.types.Context):
         p = prefs(context)

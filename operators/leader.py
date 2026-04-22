@@ -412,25 +412,33 @@ def cleanup_all_handlers():
     """Clean up all draw handlers and timers. Called on addon unregister."""
     _cleanup_fading_overlay()
     disable_test_overlays()
-    # Remove Leader overlay draw handlers (class-level)
+    # Remove Leader overlay draw handlers (class-level).
+    # Note: _draw_handles is per-instance — the class-level sentinel is None
+    # and never populated, so this loop currently does nothing in practice.
+    # Kept for defence against a future refactor that reinstates a class
+    # registry; the None-guard prevents AttributeError.
     try:
-        for st, handle in list(CHORDSONG_OT_Leader._draw_handles.items()):
-            try:
-                st.draw_handler_remove(handle, "WINDOW")
-            except Exception:
-                pass
-        CHORDSONG_OT_Leader._draw_handles.clear()
+        handles = CHORDSONG_OT_Leader._draw_handles
+        if handles:
+            for st, handle in list(handles.items()):
+                try:
+                    st.draw_handler_remove(handle, "WINDOW")
+                except Exception:
+                    pass
+            handles.clear()
     except Exception:
         pass
-    # Remove Scripts overlay draw handlers (class-level)
+    # Remove Scripts overlay draw handlers (class-level) — same caveats as above.
     try:
         from .scripts_overlay import CHORDSONG_OT_ScriptsOverlay
-        for st, handle in list(CHORDSONG_OT_ScriptsOverlay._draw_handles.items()):
-            try:
-                st.draw_handler_remove(handle, "WINDOW")
-            except Exception:
-                pass
-        CHORDSONG_OT_ScriptsOverlay._draw_handles.clear()
+        handles = CHORDSONG_OT_ScriptsOverlay._draw_handles
+        if handles:
+            for st, handle in list(handles.items()):
+                try:
+                    st.draw_handler_remove(handle, "WINDOW")
+                except Exception:
+                    pass
+            handles.clear()
     except Exception:
         pass
     # Clear overlay cache so no stale refs to layout/GPU-related data
@@ -498,16 +506,22 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     bl_label = "Chord Song Leader"
     bl_options = set()
 
-    _draw_handles = {}  # Dictionary of space_type -> handle
+    # Class-level defaults are intentionally immutable sentinels. Invoke
+    # rebinds all of these on `self`, giving each invocation its own state.
+    # Mutable defaults (dict/list) would not leak in practice — rebinding
+    # happens before any mutation — but the explicit None makes "not yet
+    # invoked" states unambiguous and guards against future edits that
+    # read-then-mutate before rebind.
+    _draw_handles = None  # dict of space_type -> handle, populated in _ensure_draw_handler
     _buffer = None
     _region = None
     _area = None
-    _invoke_area_ptr = None  # Store area pointer for comparison
+    _invoke_area_ptr = None
     _scroll_offset = 0
-    _context_type = None  # Store the detected context type
-    _last_mod_type = None  # Store the type of the last modifier key
-    _panel_states = {}  # Store original panel visibility states: {area_ptr: {"n_panel": bool, "t_panel": bool}}
-    _ctrl_held = False  # Track modifier keys for multi-toggle feature
+    _context_type = None
+    _last_mod_type = None
+    _panel_states = None  # dict keyed by area pointer
+    _ctrl_held = False
     _alt_held = False
     _shift_held = False
     _swallow_leftmouse_release = False  # Set when LEFTMOUSE PRESS hit an overlay widget
