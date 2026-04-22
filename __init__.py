@@ -272,6 +272,17 @@ def register():
         except Exception:
             pass
 
+        # Restore the user's allow_custom_user_scripts flag. Blender's
+        # AddonPreferences persistence doesn't survive addon disable/enable
+        # in this setup, so we track it in a sidecar file (same pattern as
+        # config_path.txt above). The flag stays quarantined from imported
+        # configs — only the user's own prefs checkbox writes the sidecar.
+        try:
+            from .ui.prefs import load_allow_scripts_persistent
+            prefs.allow_custom_user_scripts = load_allow_scripts_persistent()
+        except Exception:
+            pass
+
         user_config_exists = user_config_path and os.path.exists(user_config_path)
 
         try:
