@@ -8,7 +8,6 @@ import os
 import bpy  # type: ignore
 from ..ui.overlay import draw_overlay
 from ..utils.fuzzy import fuzzy_match
-from ..utils.panels import restore_panel_attr
 from .common import prefs
 
 
@@ -295,18 +294,15 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         self._override_area = area
         self._override_region = region
 
-        # If panels were hidden by Leader, keep them hidden
-        # Retrieve panel state from global storage if available
-        self._panel_states = {}
-        from ..operators.leader import _panel_states_global
-        if _panel_states_global:
-            # Use panel states from Leader (panels already hidden)
-            self._panel_states = _panel_states_global.copy()
-            # Clear the stored state so it doesn't persist
-            _panel_states_global.clear()
+        # If Leader already hid panels before handing off to this overlay,
+        # pick up the stash so we restore the same state on close. Otherwise
+        # hide them fresh.
+        from ..utils.panels import hide_panels, take_panel_states
+        stashed = take_panel_states()
+        if stashed:
+            self._panel_states = stashed
         else:
-            # No panel states from Leader, hide panels fresh
-            self._hide_panels(context)
+            self._panel_states = hide_panels(context, p.overlay_hide_panels)
 
         # Get scripts folder
         scripts_folder = p.scripts_folder
@@ -612,133 +608,10 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         except Exception:
             return False
 
-    def _hide_panels(self, context: bpy.types.Context):
-        """Hide panels in the editor where Scripts overlay was invoked and all matching editor types.
-
-        Asset shelf is always hidden (prevents overlap with bottom overlay).
-        T and N panels are hidden only if overlay_hide_panels is enabled.
-        """
-        self._panel_states = {}
-        p = prefs(context)
-        hide_tn = p.overlay_hide_panels
-
-        # Get the editor type where Scripts overlay was invoked
-        invoke_space = context.space_data
-        invoke_space_type = invoke_space.type if invoke_space else 'VIEW_3D'
-
-        # Supported editor types that have T and N panels
-        supported_types = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
-
-        # Iterate through all areas in all windows
-        for window in context.window_manager.windows:
-            try:
-                screen = window.screen
-                if not screen:
-                    continue
-                for area in screen.areas:
-                    if not self._is_area_valid(area):
-                        continue
-                    try:
-                        # Only hide panels in areas matching the invoke editor type
-                        if area.type != invoke_space_type:
-                            continue
-
-                        # Skip if this editor type doesn't support panels
-                        if area.type not in supported_types:
-                            continue
-
-                        # Get the space data
-                        space = None
-                        for s in area.spaces:
-                            if s.type == invoke_space_type:
-                                space = s
-                                break
-
-                        if not space:
-                            continue
-
-                        area_ptr = area.as_pointer()
-                        panel_state = {}
-
-                        # Always hide Asset Shelf in 3D View (prevents overlap with bottom overlay)
-                        if area.type == 'VIEW_3D' and hasattr(space, 'show_region_asset_shelf'):
-                            panel_state['asset_shelf'] = space.show_region_asset_shelf
-                            if space.show_region_asset_shelf:
-                                space.show_region_asset_shelf = False
-
-                        # Always hide Redo/HUD floating region (occludes overlay)
-                        if hasattr(space, 'show_region_hud'):
-                            panel_state['hud'] = space.show_region_hud
-                            if space.show_region_hud:
-                                space.show_region_hud = False
-
-                        # Store and hide N panel (Sidebar) - only if toggle enabled
-                        if hide_tn and hasattr(space, 'show_region_ui'):
-                            panel_state['n_panel'] = space.show_region_ui
-                            if space.show_region_ui:
-                                space.show_region_ui = False
-
-                        # Store and hide T panel (Toolbar/Toolshelf) - only if toggle enabled
-                        if hide_tn and hasattr(space, 'show_region_toolbar'):
-                            panel_state['t_panel'] = space.show_region_toolbar
-                            if space.show_region_toolbar:
-                                space.show_region_toolbar = False
-
-                        if panel_state:
-                            # Store space type for restoration
-                            panel_state['space_type'] = invoke_space_type
-                            self._panel_states[area_ptr] = panel_state
-                    except Exception:
-                        continue
-            except Exception:
-                continue
-
     def _restore_panels(self, context: bpy.types.Context):
-        """Restore T and N panels to their original visibility state."""
-        if not self._panel_states:
-            return
-
-        # Iterate through all areas in all windows
-        for window in context.window_manager.windows:
-            try:
-                screen = window.screen
-                if not screen:
-                    continue
-                for area in screen.areas:
-                    if not self._is_area_valid(area):
-                        continue
-                    try:
-                        area_ptr = area.as_pointer()
-                        if area_ptr not in self._panel_states:
-                            continue
-
-                        panel_state = self._panel_states[area_ptr]
-                        space_type = panel_state.get('space_type', 'VIEW_3D')
-                        
-                        # Only restore panels in areas matching the stored space type
-                        if area.type != space_type:
-                            continue
-
-                        # Get the space data
-                        space = None
-                        for s in area.spaces:
-                            if s.type == space_type:
-                                space = s
-                                break
-
-                        if not space:
-                            continue
-
-                        restore_panel_attr(space, panel_state, 'asset_shelf', 'show_region_asset_shelf')
-                        restore_panel_attr(space, panel_state, 'hud',         'show_region_hud')
-                        restore_panel_attr(space, panel_state, 'n_panel',     'show_region_ui')
-                        restore_panel_attr(space, panel_state, 't_panel',     'show_region_toolbar')
-                    except Exception:
-                        continue
-            except Exception:
-                continue
-
-        # Clear stored states
+        """Restore panels captured during invoke, then clear local state."""
+        from ..utils.panels import restore_panels
+        restore_panels(context, self._panel_states)
         self._panel_states = {}
 
 

@@ -18,7 +18,6 @@ from ..core.engine import (
 )
 from ..core.history import add_to_history
 from ..ui.overlay import draw_overlay, draw_fading_overlay
-from ..utils.panels import restore_panel_attr
 from ..utils.render import capture_viewport_context
 from .common import prefs
 from .test_overlay import disable_test_overlays
@@ -42,8 +41,9 @@ _fading_overlay_state = {
     "invoke_area_ptr": None,  # Store area pointer for comparison
 }
 
-# Global state for panel visibility (shared between Leader and Recents)
-_panel_states_global = {}
+# Panel-state handoff moved to utils.panels (stash_panel_states /
+# take_panel_states). Local _panel_states dict on each operator instance
+# still tracks what THIS instance hid for restoration.
 
 
 def _safe_report(op, level, msg):
@@ -725,132 +725,15 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         return "VIEW_3D"
 
     def _hide_panels(self, context: bpy.types.Context):
-        """Hide panels in the editor where Leader was invoked and all matching editor types.
-
-        Asset shelf is always hidden (prevents overlap with bottom overlay).
-        T and N panels are hidden only if overlay_hide_panels is enabled.
-        """
-        self._panel_states = {}
-        p = prefs(context)
-        hide_tn = p.overlay_hide_panels
-
-        # Get the editor type where Leader was invoked
-        invoke_space = context.space_data
-        invoke_space_type = invoke_space.type if invoke_space else 'VIEW_3D'
-
-        # Supported editor types that have T and N panels
-        supported_types = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
-
-        # Iterate through all areas in all windows
-        for window in context.window_manager.windows:
-            try:
-                screen = window.screen
-                if not screen:
-                    continue
-                for area in screen.areas:
-                    if not self._is_area_valid(area):
-                        continue
-                    try:
-                        # Only hide panels in areas matching the invoke editor type
-                        if area.type != invoke_space_type:
-                            continue
-
-                        # Skip if this editor type doesn't support panels
-                        if area.type not in supported_types:
-                            continue
-
-                        # Get the space data
-                        space = None
-                        for s in area.spaces:
-                            if s.type == invoke_space_type:
-                                space = s
-                                break
-
-                        if not space:
-                            continue
-
-                        area_ptr = area.as_pointer()
-                        panel_state = {}
-
-                        # Always hide Asset Shelf in 3D View (prevents overlap with bottom overlay)
-                        if area.type == 'VIEW_3D' and hasattr(space, 'show_region_asset_shelf'):
-                            panel_state['asset_shelf'] = space.show_region_asset_shelf
-                            if space.show_region_asset_shelf:
-                                space.show_region_asset_shelf = False
-
-                        # Always hide Redo/HUD floating region (occludes overlay)
-                        if hasattr(space, 'show_region_hud'):
-                            panel_state['hud'] = space.show_region_hud
-                            if space.show_region_hud:
-                                space.show_region_hud = False
-
-                        # Store and hide N panel (Sidebar) - only if toggle enabled
-                        if hide_tn and hasattr(space, 'show_region_ui'):
-                            panel_state['n_panel'] = space.show_region_ui
-                            if space.show_region_ui:
-                                space.show_region_ui = False
-
-                        # Store and hide T panel (Toolbar/Toolshelf) - only if toggle enabled
-                        if hide_tn and hasattr(space, 'show_region_toolbar'):
-                            panel_state['t_panel'] = space.show_region_toolbar
-                            if space.show_region_toolbar:
-                                space.show_region_toolbar = False
-
-                        if panel_state:
-                            # Store space type for restoration
-                            panel_state['space_type'] = invoke_space_type
-                            self._panel_states[area_ptr] = panel_state
-                    except Exception:
-                        continue
-            except Exception:
-                continue
+        """Hide asset-shelf / HUD / T / N panels via utils.panels.hide_panels
+        and stash the captured state on this instance for later restoration."""
+        from ..utils.panels import hide_panels
+        self._panel_states = hide_panels(context, prefs(context).overlay_hide_panels)
 
     def _restore_panels(self, context: bpy.types.Context):
-        """Restore T and N panels to their original visibility state."""
-        if not self._panel_states:
-            return
-
-        # Iterate through all areas in all windows
-        for window in context.window_manager.windows:
-            try:
-                screen = window.screen
-                if not screen:
-                    continue
-                for area in screen.areas:
-                    if not self._is_area_valid(area):
-                        continue
-                    try:
-                        area_ptr = area.as_pointer()
-                        if area_ptr not in self._panel_states:
-                            continue
-
-                        panel_state = self._panel_states[area_ptr]
-                        space_type = panel_state.get('space_type', 'VIEW_3D')
-
-                        # Only restore panels in areas matching the stored space type
-                        if area.type != space_type:
-                            continue
-
-                        # Get the space data
-                        space = None
-                        for s in area.spaces:
-                            if s.type == space_type:
-                                space = s
-                                break
-
-                        if not space:
-                            continue
-
-                        restore_panel_attr(space, panel_state, 'asset_shelf', 'show_region_asset_shelf')
-                        restore_panel_attr(space, panel_state, 'hud',         'show_region_hud')
-                        restore_panel_attr(space, panel_state, 'n_panel',     'show_region_ui')
-                        restore_panel_attr(space, panel_state, 't_panel',     'show_region_toolbar')
-                    except Exception:
-                        continue
-            except Exception:
-                continue
-
-        # Clear stored states
+        """Restore panels captured by _hide_panels, then clear local state."""
+        from ..utils.panels import restore_panels
+        restore_panels(context, self._panel_states)
         self._panel_states = {}
 
     def _finish(self, context: bpy.types.Context, restore_panels=True):  # pylint: disable=unused-argument
@@ -893,7 +776,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if _is_reloading():
             self._finish(context)
             return {"CANCELLED"}
-        global _panel_states_global
+        from ..utils.panels import stash_panel_states, take_panel_states
         p = prefs(context)
 
         # Cancel key (ESC only - removed RIGHTMOUSE to allow m2 as chord token)
@@ -1071,7 +954,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             if not claimed:
                 # No mapping claims the leader key — open Recents (default behavior)
                 if self._panel_states:
-                    _panel_states_global = self._panel_states.copy()
+                    stash_panel_states(self._panel_states)
                     self._panel_states = {}
                 self._finish(context, restore_panels=False)
                 try:
@@ -1079,10 +962,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 except Exception as e:
                     self.report({'ERROR'}, f"Failed to open recents: {e}")
                     print(f"Chord Song: Failed to open recents: {e}")
-                    if _panel_states_global:
-                        self._panel_states = _panel_states_global.copy()
+                    stashed = take_panel_states()
+                    if stashed:
+                        self._panel_states = stashed
                         self._restore_panels(context)
-                        _panel_states_global = {}
                 return {"FINISHED"}
             # If claimed, fall through to normal chord matching below
 
@@ -1164,7 +1047,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 return {"CANCELLED"}
             if operator_id == "chordsong.recents":
                 if self._panel_states:
-                    _panel_states_global = self._panel_states.copy()
+                    stash_panel_states(self._panel_states)
                     self._panel_states = {}
                 self._finish(context, restore_panels=False)
                 try:
@@ -1173,10 +1056,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 except Exception as e:
                     self.report({'ERROR'}, f"Failed to open recents: {e}")
                     print(f"Chord Song: Failed to open recents: {e}")
-                    if _panel_states_global:
-                        self._panel_states = _panel_states_global.copy()
+                    stashed = take_panel_states()
+                    if stashed:
+                        self._panel_states = stashed
                         self._restore_panels(context)
-                        _panel_states_global = {}
                 return {"FINISHED"}
 
             mapping_type = getattr(m, "mapping_type", "OPERATOR")
@@ -1576,12 +1459,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             primary_operator = operators_to_run[0]["op"] if operators_to_run else None
             should_restore_panels = (primary_operator != "chordsong.scripts_overlay")
 
-            # If executing scripts_overlay, transfer panel states to global storage
+            # If executing scripts_overlay, hand panel state off so Scripts
+            # Overlay can restore panels when IT finishes (prevents flash).
             if not should_restore_panels and self._panel_states:
-                # Transfer panel state to Scripts overlay by storing it globally
-                # Scripts overlay will restore panels when it finishes
-                _panel_states_global = self._panel_states.copy()
-                # Clear our state so _finish doesn't restore
+                stash_panel_states(self._panel_states)
                 self._panel_states = {}
 
             # Finish the modal operator FIRST, then execute via timer.
@@ -1696,7 +1577,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     return {"CANCELLED"}
                 if meta_op == "chordsong.recents":
                     if self._panel_states:
-                        _panel_states_global = self._panel_states.copy()
+                        stash_panel_states(self._panel_states)
                         self._panel_states = {}
                     self._finish(context, restore_panels=False)
                     try:
@@ -1705,10 +1586,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     except Exception as e:
                         self.report({'ERROR'}, f"Failed to open recents: {e}")
                         print(f"Chord Song: Failed to open recents: {e}")
-                        if _panel_states_global:
-                            self._panel_states = _panel_states_global.copy()
+                        stashed = take_panel_states()
+                        if stashed:
+                            self._panel_states = stashed
                             self._restore_panels(context)
-                            _panel_states_global = {}
                     return {"FINISHED"}
 
         # No match - remove only the last token and keep modal running so user can try again
