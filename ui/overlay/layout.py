@@ -257,11 +257,14 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
     if has_buffer:
         footer.append({"kind": "item", "token": "BS", "label": "Back", "icon": ""})
 
-    # Scripts-overlay click hints. Plain click fires + closes; Ctrl+click
-    # fires + keeps the overlay open for chaining multiple scripts.
+    # Click-to-fire hints. Leader overlay: toggles are clickable. Scripts
+    # overlay: plain click runs + closes, Ctrl+click runs + keeps overlay
+    # open for chaining.
     if is_scripts_overlay:
-        footer.append({"kind": "item", "token": "M1", "label": "Run", "icon": ""})
-        footer.append({"kind": "item", "token": "^M1", "label": "Stay open", "icon": ""})
+        footer.append({"kind": "item", "token": "M1", "label": "Run script", "icon": ""})
+        footer.append({"kind": "item", "token": "^M1", "label": "Run + keep overlay open", "icon": ""})
+    else:
+        footer.append({"kind": "item", "token": "M1", "label": "Toggle", "icon": ""})
 
     return rows, footer
 
