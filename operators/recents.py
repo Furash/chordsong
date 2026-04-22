@@ -50,19 +50,24 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
     def _draw_callback(self):
         """Draw callback for the recents overlay."""
         try:
-            from .leader import _is_reloading
-            if _is_reloading():
-                return
-            # Check if self is still valid (operator not removed during addon disable)
-            try:
-                _ = self.bl_idname
-            except ReferenceError:
-                # Operator has been removed, stop drawing
-                return
+            self._draw_callback_safe()
+        except ReferenceError:
+            # Operator's StructRNA freed mid-callback (blinker hot reload,
+            # addon disable). Matches the wrapper pattern used in
+            # leader._draw_callback and scripts_overlay._draw_callback.
+            return
+        except Exception:
+            # Never raise from a draw callback.
+            return
 
+    def _draw_callback_safe(self):
+        from .leader import _is_reloading
+        if _is_reloading():
+            return
+        try:
             p = prefs(bpy.context)
         except (KeyError, AttributeError):
-            # Addon is being disabled/unregistered, preferences no longer available
+            # Addon is being disabled/unregistered.
             return
         if not p.overlay_enabled:
             return

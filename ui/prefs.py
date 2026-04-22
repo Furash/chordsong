@@ -102,16 +102,29 @@ def save_allow_scripts_persistent(enabled: bool):
     """Persist the allow_custom_user_scripts flag so it survives addon
     disable/enable. Intentionally a separate sidecar — the main config JSON
     is shareable and can't be trusted to flip this flag (see
-    core/config_io.apply_config security quarantine)."""
+    core/config_io.apply_config security quarantine).
+
+    Atomic write: tmp file + fsync + os.replace. A crash mid-write would
+    otherwise leave a zero-byte flag which reads as False and silently
+    downgrades the user's permission.
+    """
     path = _allow_scripts_flag_path()
     if not path:
         return
+    tmp_path = path + ".tmp"
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:
             f.write("1" if enabled else "0")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
     except Exception:
-        pass
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
 
 
 def load_allow_scripts_persistent() -> bool:
@@ -163,6 +176,10 @@ def _on_allow_scripts_changed(self, context):
     # Persist the flag to its sidecar file, then fall through to the
     # standard prefs-change handler. Must return None (Blender requirement);
     # a lambda returning a tuple raises "return value must be None".
+    # Respect _SUSPEND_CALLBACKS so register-time writes (__init__.py
+    # seeding the flag from the sidecar) don't echo right back to disk.
+    if _SUSPEND_CALLBACKS:
+        return
     try:
         save_allow_scripts_persistent(bool(self.allow_custom_user_scripts))
     except Exception:
