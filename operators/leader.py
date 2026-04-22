@@ -580,20 +580,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     if valid_paths:
                         fire_toggle_from_click(mapping_ref, context)
                         self._tag_redraw()
-                    # Modifier-held click stays open for chained toggles; plain
-                    # click closes, mirroring the keyboard toggle path and
-                    # scripts_overlay's CTRL-click = stay-open semantics.
-                    # If nothing fired, stay open so the user can retry.
-                    toggle_modifier = getattr(p, "toggle_multi_modifier", "CTRL")
-                    modifier_held = (
-                        (toggle_modifier == "CTRL" and event.ctrl) or
-                        (toggle_modifier == "ALT" and event.alt) or
-                        (toggle_modifier == "SHIFT" and event.shift)
-                    )
-                    if modifier_held or not valid_paths:
-                        return {"RUNNING_MODAL"}
-                    self._finish(context)
-                    return {"FINISHED"}
+                    # Toggle clicks always keep the overlay open so the user
+                    # can flip several toggles in a row without re-opening
+                    # the leader. ESC or click-outside still closes normally.
+                    return {"RUNNING_MODAL"}
 
         # Mouse buttons should trigger on RELEASE to avoid conflicts with Blender's default actions
         # (e.g., M3 triggering rotate view on PRESS, getting stuck if we consume the event)
