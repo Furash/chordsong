@@ -49,30 +49,47 @@ def _safe_report(op, level, msg):
 def _toggle_mapping_paths(mapping, ctx_viewport=None):
     """Execute the toggle logic for `mapping`.
 
-    Returns the list of new values, one per successfully toggled path. Paths
-    that fail validation (empty / missing context / non-bool / wrong type) are
-    silently skipped here — callers are expected to pre-validate via
-    ``collect_toggle_paths`` and surface errors to the user; this function
-    stays best-effort so a partially broken mapping still toggles what it can.
+    Returns (results, errors):
+      - results: list of new values, one per successfully toggled path.
+      - errors: list of human-readable error strings for paths that failed
+        at execution time (attribute missing, non-bool property, etc.).
+        Callers surface these via self.report so typos like
+        `space_data.overlay.showtext` (missing underscore) don't silently
+        no-op — collect_toggle_paths can only static-check "has a dot",
+        actual attribute existence is only knowable at fire time.
     """
     from ..core.engine import collect_toggle_paths
     paths, _errors = collect_toggle_paths(mapping)
     if not paths:
-        return []
+        return [], []
+
+    errors = []
 
     def do_toggle_path(path):
         parts = path.split('.')
         obj = bpy.context
+        walked = []
         for part in parts[:-1]:
+            walked.append(part)
             next_obj = getattr(obj, part, None)
             if next_obj is None:
+                errors.append(
+                    f'Toggle path "{path}": attribute "{".".join(walked)}" does not exist on context'
+                )
                 return None
             obj = next_obj
         prop_name = parts[-1]
         if not hasattr(obj, prop_name):
+            parent = ".".join(parts[:-1]) or "context"
+            errors.append(
+                f'Toggle path "{path}": "{parent}" has no attribute "{prop_name}"'
+            )
             return None
         current_value = getattr(obj, prop_name)
         if not isinstance(current_value, bool):
+            errors.append(
+                f'Toggle path "{path}": "{prop_name}" is {type(current_value).__name__}, not bool'
+            )
             return None
         set_val = not current_value
         # Guard the setattr: Blender writes the new value to RNA BEFORE
@@ -84,25 +101,34 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
         # knows the RNA write already happened.
         try:
             setattr(obj, prop_name, set_val)
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            errors.append(f'Toggle path "{path}" setattr raised: {ex}')
         return set_val
 
     def do_set_path(path, value):
         parts = path.split('.')
         obj = bpy.context
+        walked = []
         for part in parts[:-1]:
+            walked.append(part)
             next_obj = getattr(obj, part, None)
             if next_obj is None:
+                errors.append(
+                    f'Sub-item path "{path}": attribute "{".".join(walked)}" does not exist on context'
+                )
                 return None
             obj = next_obj
         prop_name = parts[-1]
         if not hasattr(obj, prop_name):
+            parent = ".".join(parts[:-1]) or "context"
+            errors.append(
+                f'Sub-item path "{path}": "{parent}" has no attribute "{prop_name}"'
+            )
             return None
         try:
             setattr(obj, prop_name, value)
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            errors.append(f'Sub-item path "{path}" setattr raised: {ex}')
         return value
 
     sync = getattr(mapping, "sync_toggles", False)
@@ -139,16 +165,24 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
             # value and toggle it BACK to the original state. First click
             # appears to "roll back" the toggle; only the second click sticks.
             if not results:
+                # Also clear errors from the failed first attempt — the
+                # retry will regenerate them if the problem persists.
+                errors.clear()
                 run_logic()
     else:
         run_logic()
 
-    return results
+    return results, errors
 
 
 def fire_toggle_from_click(mapping, context):
     """Apply `mapping`'s toggles immediately from inside the modal click
-    handler. No timer delay: setattr is safe to call synchronously (unlike
+    handler. Returns the list of execution-time error strings so the
+    caller can self.report them — e.g. a typo like
+    `space_data.overlay.showtext` (missing underscore) passes the static
+    dot check in collect_toggle_paths but fails at setattr time.
+
+    No timer delay: setattr is safe to call synchronously (unlike
     bpy.ops.*) and queuing it behind a timer caused races where a timer
     from click-1 could fire AFTER click-2's timer, netting back to the
     original state. Skips the fading overlay and history (clicks feel
@@ -156,12 +190,14 @@ def fire_toggle_from_click(mapping, context):
     """
     ctx_viewport = capture_viewport_context(context)
     try:
-        _toggle_mapping_paths(mapping, ctx_viewport)
+        _results, errors = _toggle_mapping_paths(mapping, ctx_viewport)
         from ..ui.overlay.cache import clear_overlay_cache
         clear_overlay_cache()
+        return errors
     except Exception:  # pylint: disable=broad-exception-caught
         import traceback
         traceback.print_exc()
+        return []
 
 
 def cleanup_all_handlers():
@@ -607,7 +643,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     for err in errors:
                         self.report({"WARNING"}, err)
                     if valid_paths:
-                        fire_toggle_from_click(mapping_ref, context)
+                        runtime_errors = fire_toggle_from_click(mapping_ref, context)
+                        for err in runtime_errors:
+                            self.report({"WARNING"}, err)
                         self._tag_redraw()
                     # Toggle clicks always keep the overlay open so the user
                     # can flip several toggles in a row without re-opening
@@ -927,7 +965,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                 def execute_toggle_delayed():
                     try:
-                        results = _toggle_mapping_paths(m, ctx_viewport)
+                        results, runtime_errors = _toggle_mapping_paths(m, ctx_viewport)
+                        for err in runtime_errors:
+                            _safe_report(self, 'WARNING', err)
 
                         from ..utils.render import validate_viewport_context
 
