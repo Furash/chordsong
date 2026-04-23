@@ -1246,6 +1246,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
             if not operators_to_run:
                 self.report({"ERROR"}, f'Chord "{" ".join(self._buffer)}": no valid operators to run')
+                # Fading overlay warning so the user sees something fail in
+                # the viewport too, not just in the Info panel.
+                try:
+                    _show_fading_overlay(context, chord_tokens, "No valid operators", "󰀦")
+                except Exception:  # pylint: disable=broad-exception-caught
+                    pass
                 self._finish(context)
                 return {"CANCELLED"}
 
