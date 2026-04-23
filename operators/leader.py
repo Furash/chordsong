@@ -850,6 +850,27 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 allowed, reason = is_script_path_allowed(python_file, scripts_folder)
                 if not allowed:
                     self.report({"ERROR"}, reason)
+                    try:
+                        _show_fading_overlay(context, chord_tokens, "Script outside folder", "󰀦")
+                    except Exception:  # pylint: disable=broad-exception-caught
+                        pass
+                    self._finish(context)
+                    return {"CANCELLED"}
+
+                # File-existence pre-flight. Same rationale as path confinement:
+                # self.report is reliable while the modal is active, but drops
+                # reports from the post-finish timer. _execute_script_via_text_editor
+                # also checks os.path.exists as defense-in-depth.
+                import os as _os
+                if not _os.path.exists(python_file):
+                    self.report({"ERROR"}, f'Script file not found: {python_file}')
+                    try:
+                        _show_fading_overlay(
+                            context, chord_tokens,
+                            f'Script not found — check path in Preferences', "󰀦",
+                        )
+                    except Exception:  # pylint: disable=broad-exception-caught
+                        pass
                     self._finish(context)
                     return {"CANCELLED"}
 
