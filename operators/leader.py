@@ -1252,7 +1252,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 if rejected_ops:
                     bad = rejected_ops[0]
                     extra = "" if len(rejected_ops) == 1 else f" (+{len(rejected_ops) - 1} more)"
-                    fade_msg = f'Unknown op: {bad}{extra} — fix in Preferences'
+                    fade_msg = f'Unknown op: {bad}{extra} — check syntax/existence'
                 else:
                     fade_msg = 'No operators — assign one in Preferences'
                 try:
