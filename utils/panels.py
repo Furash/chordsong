@@ -79,12 +79,20 @@ def hide_panels(context, hide_tn):
                     if area.type not in _SUPPORTED_TYPES_WITH_PANELS:
                         continue
 
-                    space = None
-                    for s in area.spaces:
-                        if s.type == invoke_space_type:
-                            space = s
-                            break
-                    if not space:
+                    # Active space is always spaces[0] per Blender docs;
+                    # `area.spaces[1:]` is a memory stack of editors the user
+                    # switched AWAY from. The previous for-loop picked the
+                    # first type-matching space — usually the active one, but
+                    # after switching editors back and forth the list order
+                    # could leave a stale same-type space at a non-zero index,
+                    # and writes to it wouldn't affect the visible area. Use
+                    # the active space directly.
+                    space = area.spaces[0] if area.spaces else None
+                    if space is None:
+                        print(
+                            f"Chord Song: hide_panels skipped {area.type} area "
+                            f"{area.as_pointer():#x} — area.spaces was empty."
+                        )
                         continue
 
                     state = {}
@@ -112,6 +120,16 @@ def hide_panels(context, hide_tn):
                     if state:
                         state['space_type'] = invoke_space_type
                         panel_states[area.as_pointer()] = state
+                        # Force a redraw of this area — in rare races the
+                        # show_region_* write doesn't propagate to the visible
+                        # region until an unrelated event fires. Explicit
+                        # tag_redraw eliminates the "panels still visible
+                        # briefly" symptom that users have reported as
+                        # "won't hide until I recreate the workspace".
+                        try:
+                            area.tag_redraw()
+                        except Exception:  # pylint: disable=broad-exception-caught
+                            pass
                 except Exception:  # pylint: disable=broad-exception-caught
                     continue
         except Exception:  # pylint: disable=broad-exception-caught
