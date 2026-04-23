@@ -416,15 +416,16 @@ def apply_config(prefs, data: dict) -> list[str]:
         if isinstance(scripts_folder, str):
             prefs.scripts_folder = scripts_folder.strip()
     
-    # Allow custom user scripts - default to False for security
-    # Only enable if explicitly set to True in config
-    if "allow_custom_user_scripts" in data:
-        allow_scripts = data.get("allow_custom_user_scripts", False)
-        if isinstance(allow_scripts, bool):
-            prefs.allow_custom_user_scripts = allow_scripts
-    else:
-        # Explicitly set to False if not in config (for backward compatibility and security)
-        prefs.allow_custom_user_scripts = False
+    # Script-execution permission is never imported from a config file.
+    # A shared config could otherwise silently flip the flag ON and ship
+    # PYTHON_FILE mappings that run arbitrary code the next time the user
+    # hits the associated chord. The prefs checkbox is the only way to
+    # enable script execution — with its accompanying security warning.
+    if data.get("allow_custom_user_scripts") is True:
+        warnings.append(
+            "Imported config requested script execution; flag NOT changed. "
+            "Enable 'Allow Custom User Scripts' manually in Preferences if intended."
+        )
 
     overlay = data.get("overlay", {})
     if isinstance(overlay, dict):
@@ -597,10 +598,8 @@ def apply_config(prefs, data: dict) -> list[str]:
     # Normalize all order indices to match final array positions
     _normalize_order_indices(prefs.mappings)
 
-    # Clear overlay cache so new mappings/icons appear immediately
-    from ..ui.overlay import clear_overlay_cache
-    clear_overlay_cache()
-
+    # Callers are responsible for invalidating ui/overlay cache after this
+    # returns — keeping core/ from reaching into ui/ preserves layering.
     return warnings
 
 def _add_mapping_from_dict(prefs, item: dict, order_index: int = 0):
@@ -750,10 +749,8 @@ def apply_config_append(prefs, data: dict) -> list[str]:
         for idx, m in enumerate(prefs.mappings):
             m.order_index = idx
 
-    # Clear overlay cache so new mappings/icons appear immediately
-    from ..ui.overlay import clear_overlay_cache
-    clear_overlay_cache()
-
+    # Callers are responsible for invalidating ui/overlay cache after this
+    # returns — keeping core/ from reaching into ui/ preserves layering.
     return warnings
 
 def loads_json(text: str) -> dict:

@@ -1134,7 +1134,11 @@ def draw_fading_overlay(context, p, chord_text, label, icon, start_time, fade_du
         try:
             col_icon = linear_to_srgb(p.overlay_color_icon)
             blf.size(0, icon_size)
-            blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3])
+            # Multiply icon alpha by fade_alpha so the icon fades in lockstep
+            # with the chord/label. Without this the icon stays fully opaque
+            # for the whole fade_duration and then pops out — surfaces as
+            # "icon doesn't fade" on long icons like literal words.
+            blf.color(0, col_icon[0], col_icon[1], col_icon[2], col_icon[3] * fade_alpha)
             blf.position(0, current_x, text_y, 0)
             blf.draw(0, icon)
         except Exception:

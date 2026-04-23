@@ -82,6 +82,63 @@ def save_config_path_persistent(config_path: str):
     except Exception:
         pass
 
+
+def _allow_scripts_flag_path():
+    """Sidecar file tracking allow_custom_user_scripts across addon reloads.
+    Blender's AddonPreferences get wiped on disable/enable in this setup, so
+    we store the bool in the extension user directory next to config_path.txt."""
+    try:
+        if hasattr(bpy.utils, 'extension_path_user'):
+            root_pkg = _addon_root_pkg()
+            extension_dir = bpy.utils.extension_path_user(root_pkg, path="", create=True)
+            if extension_dir:
+                return os.path.join(extension_dir, "allow_custom_user_scripts.flag")
+    except Exception:
+        pass
+    return ""
+
+
+def save_allow_scripts_persistent(enabled: bool):
+    """Persist the allow_custom_user_scripts flag so it survives addon
+    disable/enable. Intentionally a separate sidecar — the main config JSON
+    is shareable and can't be trusted to flip this flag (see
+    core/config_io.apply_config security quarantine).
+
+    Atomic write: tmp file + fsync + os.replace. A crash mid-write would
+    otherwise leave a zero-byte flag which reads as False and silently
+    downgrades the user's permission.
+    """
+    path = _allow_scripts_flag_path()
+    if not path:
+        return
+    tmp_path = path + ".tmp"
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write("1" if enabled else "0")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+def load_allow_scripts_persistent() -> bool:
+    """Read the persisted allow_custom_user_scripts flag. Default False
+    (the safe default — execution remains gated until user opts in)."""
+    path = _allow_scripts_flag_path()
+    if not path or not os.path.exists(path):
+        return False
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip() == "1"
+    except Exception:
+        return False
+
 def _autosave_now(prefs):
     # Best effort debounced autosave, used by property update callbacks.
     try:
@@ -108,11 +165,26 @@ def _on_prefs_changed(self, _context):
         # Skip callbacks during bulk operations (config loading, etc.)
         if _SUSPEND_CALLBACKS:
             return
-        
+
         self.ensure_defaults()
         _autosave_now(self)
     except Exception:
         pass
+
+
+def _on_allow_scripts_changed(self, context):
+    # Persist the flag to its sidecar file, then fall through to the
+    # standard prefs-change handler. Must return None (Blender requirement);
+    # a lambda returning a tuple raises "return value must be None".
+    # Respect _SUSPEND_CALLBACKS so register-time writes (__init__.py
+    # seeding the flag from the sidecar) don't echo right back to disk.
+    if _SUSPEND_CALLBACKS:
+        return
+    try:
+        save_allow_scripts_persistent(bool(self.allow_custom_user_scripts))
+    except Exception:
+        pass
+    _on_prefs_changed(self, context)
 
 def _on_mapping_changed(_self, context):
     try:
@@ -549,7 +621,7 @@ class CHORDSONG_Preferences(AddonPreferences):
                     "⚠️ Only enable this if you trust the scripts you're executing. "
                     "Scripts have full access to Blender's Python API.",
         default=False,
-        update=_on_prefs_changed,
+        update=_on_allow_scripts_changed,
     )
 
     # Scripts Overlay Settings

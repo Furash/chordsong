@@ -17,342 +17,118 @@ from ..core.engine import (
     get_leader_key_type,
 )
 from ..core.history import add_to_history
-from ..ui.overlay import draw_overlay, draw_fading_overlay
-from ..utils.panels import restore_panel_attr
-from ..utils.render import capture_viewport_context
+from ..ui.overlay import draw_overlay
+from ..utils.render import capture_viewport_context, OverlayContext, ContextWithRegion
 from .common import prefs
+from .fading_overlay import (
+    _is_reloading,
+    _fading_overlay_state,
+    _show_fading_overlay,
+    _cleanup_fading_overlay,
+)
 from .test_overlay import disable_test_overlays
 
+# Panel-state handoff moved to utils.panels (stash_panel_states /
+# take_panel_states). Local _panel_states dict on each operator instance
+# still tracks what THIS instance hid for restoration.
 
-def _is_reloading():
-    """Check if blinker hot-reload is in progress."""
-    return bpy.app.driver_namespace.get("_blinker_reloading", False)
 
+def _safe_report(op, level, msg):
+    """Surface `msg` to the Blender INFO panel and stdout.
 
-# Global state for fading overlay
-_fading_overlay_state = {
-    "active": False,
-    "chord_text": "",
-    "label": "",
-    "icon": "",
-    "start_time": 0,
-    "show_chord": True,  # Whether to display the chord text
-    "draw_handles": {},  # Dictionary of space_type -> handle
-    "area": None,
-    "invoke_area_ptr": None,  # Store area pointer for comparison
-}
-
-# Global state for panel visibility (shared between Leader and Recents)
-_panel_states_global = {}
-
-def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
-    """Start showing a fading overlay for the executed chord.
-
-    Args:
-        _context: Blender context
-        chord_tokens: List of chord tokens
-        label: Label text to display
-        icon: Icon to display
-        show_chord: Whether to display the chord text (default True)
+    Wrapped in try/except because operator instance `op` may be freed when
+    called from inside a bpy.app.timer callback — `self.report` raises on a
+    finished operator in some Blender versions. Falls back to print.
     """
-    state = _fading_overlay_state
-
-    # Clean up any existing overlay
-    _cleanup_fading_overlay()
-
-    # Set up new fading overlay
-    state["active"] = True
-    state["chord_text"] = humanize_chord(chord_tokens)
-    state["label"] = label
-    state["icon"] = icon
-    state["show_chord"] = show_chord
-    state["start_time"] = time.time()
-    # Store area pointer for comparison during draw
-    # as_pointer() gives us a stable memory address for the area
     try:
-        state["invoke_area_ptr"] = _context.area.as_pointer() if (_context and _context.area) else None
-    except Exception:
-        state["invoke_area_ptr"] = None
-    state["area"] = None
-
-    # Determine which space type to use based on the context
-    # Only register handler for the specific space type where overlay was invoked
-    space = None
-    space_type_class = None
-
-    try:
-        if _context:
-            space = getattr(_context, 'space_data', None)
-    except Exception:
+        op.report({level}, msg)
+    except Exception:  # pylint: disable=broad-exception-caught
         pass
-
-    if space:
-        try:
-            space_type = getattr(space, 'type', None)
-            if space_type == 'NODE_EDITOR':
-                space_type_class = bpy.types.SpaceNodeEditor
-            elif space_type == 'IMAGE_EDITOR':
-                space_type_class = bpy.types.SpaceImageEditor
-            elif space_type == 'SEQUENCE_EDITOR':
-                space_type_class = bpy.types.SpaceSequenceEditor
-            elif space_type == 'VIEW_3D':
-                space_type_class = bpy.types.SpaceView3D
-            else:
-                # For unsupported space types (like PREFERENCES), fall back to View3D
-                # The area pointer check will prevent drawing in wrong areas
-                space_type_class = bpy.types.SpaceView3D
-        except Exception:
-            # If we can't access space.type, fall back to View3D
-            space_type_class = bpy.types.SpaceView3D
-    else:
-        # If there's no space_data (e.g., preferences window), fall back to View3D
-        # The area pointer check will ensure we only draw in the correct area
-        space_type_class = bpy.types.SpaceView3D
-
-    # If we still don't have a valid space type class, don't register handler
-    if not space_type_class:
-        return
-
-    def draw_callback():
-        try:
-            if _is_reloading():
-                return
-            # Check if fading overlay is still active
-            if not state["active"]:
-                return
-
-            # Find the original area where overlay was invoked
-            # Search through all windows/areas to find the one matching invoke_area_ptr
-            # This is necessary because bpy.context.area might be different (e.g., preferences window)
-            target_area = None
-            if state["invoke_area_ptr"] is not None:
-                try:
-                    for window in bpy.context.window_manager.windows:
-                        try:
-                            screen = window.screen
-                            if not screen:
-                                continue
-                            for area in screen.areas:
-                                try:
-                                    if area.as_pointer() == state["invoke_area_ptr"]:
-                                        target_area = area
-                                        break
-                                except Exception:
-                                    pass
-                            if target_area:
-                                break
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-
-            # If we couldn't find the target area, check if current context area matches
-            if not target_area and state["invoke_area_ptr"] is not None:
-                try:
-                    if bpy.context.area and bpy.context.area.as_pointer() == state["invoke_area_ptr"]:
-                        target_area = bpy.context.area
-                except Exception:
-                    pass
-
-            # If we still don't have a target area, skip drawing
-            # (This prevents showing overlay in wrong areas)
-            if state["invoke_area_ptr"] is not None and not target_area:
-                return
-
-            # Create a context override for the target area if we found it
-            # Otherwise use current context
-            if target_area:
-                try:
-                    # Try to get region from target area (usually the WINDOW region)
-                    # Don't access region.type directly - it can crash
-                    # Instead, find the largest region by area (width * height) which is typically the main viewport
-                    target_region = None
-                    max_area = 0
-                    for region in target_area.regions:
-                        try:
-                            # WINDOW regions have width and height, other regions might not
-                            # Find the largest region to avoid using small toolbars/panels
-                            w = region.width
-                            h = region.height
-                            area = w * h
-                            if area > max_area:
-                                max_area = area
-                                target_region = region
-                        except Exception:
-                            continue
-
-                    if target_region:
-                        # Create context override with target area and region
-                        with bpy.context.temp_override(area=target_area, region=target_region):
-                            try:
-                                p = prefs(bpy.context)
-                            except (KeyError, AttributeError):
-                                # Addon is being disabled/unregistered
-                                return
-                            if not p:
-                                return
-
-                            still_active = draw_fading_overlay(
-                                bpy.context, p,
-                                state["chord_text"],
-                                state["label"],
-                                state["icon"],
-                                state["start_time"],
-                                show_chord=state.get("show_chord", True)
-                            )
-
-                            if not still_active:
-                                _cleanup_fading_overlay()
-                            return
-                except Exception:
-                    # If temp_override fails, fall through to default context
-                    pass
-
-            # Fallback: use current context
-            try:
-                p = prefs(bpy.context)
-            except (KeyError, AttributeError):
-                # Addon is being disabled/unregistered
-                return
-            if not p:
-                return
-
-            still_active = draw_fading_overlay(
-                bpy.context, p,
-                state["chord_text"],
-                state["label"],
-                state["icon"],
-                state["start_time"],
-                show_chord=state.get("show_chord", True)
-            )
-
-            if not still_active:
-                _cleanup_fading_overlay()
-        except Exception:
-            _cleanup_fading_overlay()
-
-    # Only register handler for the specific space type where overlay was invoked
-    state["draw_handles"] = {}
-    if space_type_class:
-        handle = space_type_class.draw_handler_add(draw_callback, (), "WINDOW", "POST_PIXEL")
-        state["draw_handles"][space_type_class] = handle
-
-    # Helper function to tag the target area for redraw
-    def tag_target_view():
-        stored_area = state.get("area")
-        if stored_area:
-            try:
-                # Don't access stored_area.type - it can crash on destroyed areas
-                # Just try to tag_redraw directly and catch any exception
-                stored_area.tag_redraw()
-            except Exception:
-                # Area is invalid, clear it and tag all relevant areas
-                state["area"] = None
-                tag_all_views()
-        else:
-            # No stored area, tag all relevant areas
-            tag_all_views()
-
-    # Helper function to tag all relevant areas for redraw
-    def tag_all_views():
-        try:
-            for window in bpy.context.window_manager.windows:
-                try:
-                    screen = window.screen
-                    if not screen:
-                        continue
-                    for area in screen.areas:
-                        # Don't access area.type - it can crash on destroyed areas
-                        # Just try to tag_redraw and catch exceptions
-                        try:
-                            area.tag_redraw()
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    # Immediately tag for redraw
-    tag_target_view()
-
-    # Set up a timer to periodically redraw while fading
-    def redraw_timer():
-        if state["active"]:
-            tag_target_view()
-            return 0.03  # Redraw every 30ms for smooth fade
-        return None
-
-
-    # Register timer with immediate first redraw
-    bpy.app.timers.register(redraw_timer, first_interval=0.01)
-
-def _cleanup_fading_overlay():
-    """Clean up the fading overlay."""
-    state = _fading_overlay_state
-    state["active"] = False
-    state["invoke_area_ptr"] = None
-
-    if state["draw_handles"]:
-        for st, handle in state["draw_handles"].items():
-            try:
-                st.draw_handler_remove(handle, "WINDOW")
-            except Exception:
-                pass
-        state["draw_handles"] = {}
-
-    # Tag only the target area for redraw to clear the overlay
-    if state["area"]:
-        try:
-            state["area"].tag_redraw()
-        except Exception:
-            pass
-
+    print(f"Chord Song: {msg}")
 
 def _toggle_mapping_paths(mapping, ctx_viewport=None):
     """Execute the toggle logic for `mapping`.
 
-    Returns the list of new values, one per successfully toggled path. Paths
-    that fail validation (empty / missing context / non-bool / wrong type) are
-    silently skipped here — callers are expected to pre-validate via
-    ``collect_toggle_paths`` and surface errors to the user; this function
-    stays best-effort so a partially broken mapping still toggles what it can.
+    Returns (results, errors):
+      - results: list of new values, one per successfully toggled path.
+      - errors: list of human-readable error strings for paths that failed
+        at execution time (attribute missing, non-bool property, etc.).
+        Callers surface these via self.report so typos like
+        `space_data.overlay.showtext` (missing underscore) don't silently
+        no-op — collect_toggle_paths can only static-check "has a dot",
+        actual attribute existence is only knowable at fire time.
     """
     from ..core.engine import collect_toggle_paths
     paths, _errors = collect_toggle_paths(mapping)
     if not paths:
-        return []
+        return [], []
+
+    errors = []
 
     def do_toggle_path(path):
         parts = path.split('.')
         obj = bpy.context
+        walked = []
         for part in parts[:-1]:
+            walked.append(part)
             next_obj = getattr(obj, part, None)
             if next_obj is None:
+                errors.append(
+                    f'Toggle path "{path}": attribute "{".".join(walked)}" does not exist on context'
+                )
                 return None
             obj = next_obj
         prop_name = parts[-1]
         if not hasattr(obj, prop_name):
+            parent = ".".join(parts[:-1]) or "context"
+            errors.append(
+                f'Toggle path "{path}": "{parent}" has no attribute "{prop_name}"'
+            )
             return None
         current_value = getattr(obj, prop_name)
         if not isinstance(current_value, bool):
+            errors.append(
+                f'Toggle path "{path}": "{prop_name}" is {type(current_value).__name__}, not bool'
+            )
             return None
         set_val = not current_value
-        setattr(obj, prop_name, set_val)
+        # Guard the setattr: Blender writes the new value to RNA BEFORE
+        # invoking the property's update= callback. Addon update callbacks
+        # that raise (e.g. they re-register a keymap and something inside
+        # throws) would otherwise propagate — and the outer fallback would
+        # then re-read the just-written value and toggle back to the
+        # original. Swallow here and return the new value so the caller
+        # knows the RNA write already happened.
+        try:
+            setattr(obj, prop_name, set_val)
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            errors.append(f'Toggle path "{path}" setattr raised: {ex}')
         return set_val
 
     def do_set_path(path, value):
         parts = path.split('.')
         obj = bpy.context
+        walked = []
         for part in parts[:-1]:
+            walked.append(part)
             next_obj = getattr(obj, part, None)
             if next_obj is None:
+                errors.append(
+                    f'Sub-item path "{path}": attribute "{".".join(walked)}" does not exist on context'
+                )
                 return None
             obj = next_obj
         prop_name = parts[-1]
         if not hasattr(obj, prop_name):
+            parent = ".".join(parts[:-1]) or "context"
+            errors.append(
+                f'Sub-item path "{path}": "{parent}" has no attribute "{prop_name}"'
+            )
             return None
-        setattr(obj, prop_name, value)
+        try:
+            setattr(obj, prop_name, value)
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            errors.append(f'Sub-item path "{path}" setattr raised: {ex}')
         return value
 
     sync = getattr(mapping, "sync_toggles", False)
@@ -381,57 +157,80 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
             with bpy.context.temp_override(**valid_ctx):
                 run_logic()
         except (TypeError, RuntimeError, AttributeError, ReferenceError):
-            run_logic()
+            # Only retry in the default context if nothing was applied yet.
+            # A custom addon property with an `update=` callback that raises
+            # AFTER the setattr succeeds (e.g. tries to re-register a keymap
+            # on value change) would take us here with `results` already
+            # populated — re-running run_logic would read the just-written
+            # value and toggle it BACK to the original state. First click
+            # appears to "roll back" the toggle; only the second click sticks.
+            if not results:
+                # Also clear errors from the failed first attempt — the
+                # retry will regenerate them if the problem persists.
+                errors.clear()
+                run_logic()
     else:
         run_logic()
 
-    return results
+    return results, errors
 
 
 def fire_toggle_from_click(mapping, context):
-    """Schedule a deferred toggle for `mapping` as triggered by an overlay click.
+    """Apply `mapping`'s toggles immediately from inside the modal click
+    handler. Returns the list of execution-time error strings so the
+    caller can self.report them — e.g. a typo like
+    `space_data.overlay.showtext` (missing underscore) passes the static
+    dot check in collect_toggle_paths but fails at setattr time.
 
-    Keeps the modal open, skips the fading confirmation overlay, and does not
-    add a history entry (clicks are meant to feel direct, not logged).
+    No timer delay: setattr is safe to call synchronously (unlike
+    bpy.ops.*) and queuing it behind a timer caused races where a timer
+    from click-1 could fire AFTER click-2's timer, netting back to the
+    original state. Skips the fading overlay and history (clicks feel
+    direct, not logged).
     """
     ctx_viewport = capture_viewport_context(context)
-
-    def delayed():
-        try:
-            _toggle_mapping_paths(mapping, ctx_viewport)
-            from ..ui.overlay.cache import clear_overlay_cache
-            clear_overlay_cache()
-        except Exception:
-            import traceback
-            traceback.print_exc()
-        return None
-
-    bpy.app.timers.register(delayed, first_interval=0.01)
+    try:
+        _results, errors = _toggle_mapping_paths(mapping, ctx_viewport)
+        from ..ui.overlay.cache import clear_overlay_cache
+        clear_overlay_cache()
+        return errors
+    except Exception:  # pylint: disable=broad-exception-caught
+        import traceback
+        traceback.print_exc()
+        return []
 
 
 def cleanup_all_handlers():
     """Clean up all draw handlers and timers. Called on addon unregister."""
     _cleanup_fading_overlay()
     disable_test_overlays()
-    # Remove Leader overlay draw handlers (class-level)
+    # Remove Leader overlay draw handlers (class-level).
+    # Note: _draw_handles is per-instance — the class-level sentinel is None
+    # and never populated, so this loop currently does nothing in practice.
+    # Kept for defence against a future refactor that reinstates a class
+    # registry; the None-guard prevents AttributeError.
     try:
-        for st, handle in list(CHORDSONG_OT_Leader._draw_handles.items()):
-            try:
-                st.draw_handler_remove(handle, "WINDOW")
-            except Exception:
-                pass
-        CHORDSONG_OT_Leader._draw_handles.clear()
+        handles = CHORDSONG_OT_Leader._draw_handles
+        if handles:
+            for st, handle in list(handles.items()):
+                try:
+                    st.draw_handler_remove(handle, "WINDOW")
+                except Exception:
+                    pass
+            handles.clear()
     except Exception:
         pass
-    # Remove Scripts overlay draw handlers (class-level)
+    # Remove Scripts overlay draw handlers (class-level) — same caveats as above.
     try:
         from .scripts_overlay import CHORDSONG_OT_ScriptsOverlay
-        for st, handle in list(CHORDSONG_OT_ScriptsOverlay._draw_handles.items()):
-            try:
-                st.draw_handler_remove(handle, "WINDOW")
-            except Exception:
-                pass
-        CHORDSONG_OT_ScriptsOverlay._draw_handles.clear()
+        handles = CHORDSONG_OT_ScriptsOverlay._draw_handles
+        if handles:
+            for st, handle in list(handles.items()):
+                try:
+                    st.draw_handler_remove(handle, "WINDOW")
+                except Exception:
+                    pass
+            handles.clear()
     except Exception:
         pass
     # Clear overlay cache so no stale refs to layout/GPU-related data
@@ -473,15 +272,8 @@ class CHORDSONG_OT_ResetState(bpy.types.Operator):
         _show_fading_overlay(context, [], "Blender's modal state reset", "󰑓", show_chord=False)
 
         # 4. Force tag all areas for redraw to clear any stale overlays
-        try:
-            for window in context.window_manager.windows:
-                for area in window.screen.areas:
-                    try:
-                        area.tag_redraw()
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        from ..utils.redraw import tag_redraw_all_areas
+        tag_redraw_all_areas(context)
 
         self.report({'INFO'}, f"Chord Song: State reset. Removed {timers_removed} timer(s).")
         print(f"Chord Song: State reset complete. Handlers cleaned, {timers_removed} timer(s) removed.")
@@ -506,16 +298,22 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     bl_label = "Chord Song Leader"
     bl_options = set()
 
-    _draw_handles = {}  # Dictionary of space_type -> handle
+    # Class-level defaults are intentionally immutable sentinels. Invoke
+    # rebinds all of these on `self`, giving each invocation its own state.
+    # Mutable defaults (dict/list) would not leak in practice — rebinding
+    # happens before any mutation — but the explicit None makes "not yet
+    # invoked" states unambiguous and guards against future edits that
+    # read-then-mutate before rebind.
+    _draw_handles = None  # dict of space_type -> handle, populated in _ensure_draw_handler
     _buffer = None
     _region = None
     _area = None
-    _invoke_area_ptr = None  # Store area pointer for comparison
+    _invoke_area_ptr = None
     _scroll_offset = 0
-    _context_type = None  # Store the detected context type
-    _last_mod_type = None  # Store the type of the last modifier key
-    _panel_states = {}  # Store original panel visibility states: {area_ptr: {"n_panel": bool, "t_panel": bool}}
-    _ctrl_held = False  # Track modifier keys for multi-toggle feature
+    _context_type = None
+    _last_mod_type = None
+    _panel_states = None  # dict keyed by area pointer
+    _ctrl_held = False
     _alt_held = False
     _shift_held = False
     _swallow_leftmouse_release = False  # Set when LEFTMOUSE PRESS hit an overlay widget
@@ -583,34 +381,22 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
     def _tag_redraw(self):
         """Tag all relevant areas for redraw to ensure overlay is visible."""
-        try:
-            # Tag all relevant areas since we don't store area references anymore
-            # This ensures the overlay shows up regardless of which area is active
-            # But we must be very careful not to access area.type on partially destroyed areas
-            for window in bpy.context.window_manager.windows:
-                try:
-                    screen = window.screen
-                    if not screen:
-                        continue
-                    for area in screen.areas:
-                        # Don't access area.type directly - it can crash on destroyed areas
-                        # Instead, try to tag_redraw and catch exceptions
-                        try:
-                            # Try to tag - if area is valid, this will work
-                            # If area is destroyed, this will raise an exception
-                            area.tag_redraw()
-                        except Exception:
-                            # Area is invalid or destroyed, skip it
-                            pass
-                except Exception:
-                    # Window or screen is invalid, skip it
-                    pass
-        except Exception:
-            # If anything fails, just continue - this is best effort
-            pass
+        from ..utils.redraw import tag_redraw_all_areas
+        tag_redraw_all_areas()
 
     def _draw_callback(self):
         """Draw callback for the overlay."""
+        try:
+            self._draw_callback_safe()
+        except ReferenceError:
+            # Operator's StructRNA freed (blinker hot-reload window). The
+            # draw handler can outlive the operator instance by a few frames;
+            # bail silently — cleanup_all_handlers tears the handler down.
+            return
+        except Exception:
+            return
+
+    def _draw_callback_safe(self):
         if _is_reloading():
             return
         # Use bpy.context directly - it's more reliable for draw handlers
@@ -635,15 +421,6 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         # Use the stored region from invoke if available to prevent crashes when
         # context.region is None or invalid (e.g., in new files, custom scripts, overlays)
         if self._region:
-            # Create a temporary context wrapper that uses our stored region
-            class ContextWithRegion:
-                def __init__(self, original_ctx, region, area):
-                    self._ctx = original_ctx
-                    self.region = region
-                    self.area = area
-                def __getattr__(self, name):
-                    return getattr(self._ctx, name)
-            
             context = ContextWithRegion(bpy.context, self._region, self._area)
 
         # Filter mappings by context for overlay display
@@ -711,132 +488,15 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         return "VIEW_3D"
 
     def _hide_panels(self, context: bpy.types.Context):
-        """Hide panels in the editor where Leader was invoked and all matching editor types.
-
-        Asset shelf is always hidden (prevents overlap with bottom overlay).
-        T and N panels are hidden only if overlay_hide_panels is enabled.
-        """
-        self._panel_states = {}
-        p = prefs(context)
-        hide_tn = p.overlay_hide_panels
-
-        # Get the editor type where Leader was invoked
-        invoke_space = context.space_data
-        invoke_space_type = invoke_space.type if invoke_space else 'VIEW_3D'
-
-        # Supported editor types that have T and N panels
-        supported_types = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
-
-        # Iterate through all areas in all windows
-        for window in context.window_manager.windows:
-            try:
-                screen = window.screen
-                if not screen:
-                    continue
-                for area in screen.areas:
-                    if not self._is_area_valid(area):
-                        continue
-                    try:
-                        # Only hide panels in areas matching the invoke editor type
-                        if area.type != invoke_space_type:
-                            continue
-
-                        # Skip if this editor type doesn't support panels
-                        if area.type not in supported_types:
-                            continue
-
-                        # Get the space data
-                        space = None
-                        for s in area.spaces:
-                            if s.type == invoke_space_type:
-                                space = s
-                                break
-
-                        if not space:
-                            continue
-
-                        area_ptr = area.as_pointer()
-                        panel_state = {}
-
-                        # Always hide Asset Shelf in 3D View (prevents overlap with bottom overlay)
-                        if area.type == 'VIEW_3D' and hasattr(space, 'show_region_asset_shelf'):
-                            panel_state['asset_shelf'] = space.show_region_asset_shelf
-                            if space.show_region_asset_shelf:
-                                space.show_region_asset_shelf = False
-
-                        # Always hide Redo/HUD floating region (occludes overlay)
-                        if hasattr(space, 'show_region_hud'):
-                            panel_state['hud'] = space.show_region_hud
-                            if space.show_region_hud:
-                                space.show_region_hud = False
-
-                        # Store and hide N panel (Sidebar) - only if toggle enabled
-                        if hide_tn and hasattr(space, 'show_region_ui'):
-                            panel_state['n_panel'] = space.show_region_ui
-                            if space.show_region_ui:
-                                space.show_region_ui = False
-
-                        # Store and hide T panel (Toolbar/Toolshelf) - only if toggle enabled
-                        if hide_tn and hasattr(space, 'show_region_toolbar'):
-                            panel_state['t_panel'] = space.show_region_toolbar
-                            if space.show_region_toolbar:
-                                space.show_region_toolbar = False
-
-                        if panel_state:
-                            # Store space type for restoration
-                            panel_state['space_type'] = invoke_space_type
-                            self._panel_states[area_ptr] = panel_state
-                    except Exception:
-                        continue
-            except Exception:
-                continue
+        """Hide asset-shelf / HUD / T / N panels via utils.panels.hide_panels
+        and stash the captured state on this instance for later restoration."""
+        from ..utils.panels import hide_panels
+        self._panel_states = hide_panels(context, prefs(context).overlay_hide_panels)
 
     def _restore_panels(self, context: bpy.types.Context):
-        """Restore T and N panels to their original visibility state."""
-        if not self._panel_states:
-            return
-
-        # Iterate through all areas in all windows
-        for window in context.window_manager.windows:
-            try:
-                screen = window.screen
-                if not screen:
-                    continue
-                for area in screen.areas:
-                    if not self._is_area_valid(area):
-                        continue
-                    try:
-                        area_ptr = area.as_pointer()
-                        if area_ptr not in self._panel_states:
-                            continue
-
-                        panel_state = self._panel_states[area_ptr]
-                        space_type = panel_state.get('space_type', 'VIEW_3D')
-
-                        # Only restore panels in areas matching the stored space type
-                        if area.type != space_type:
-                            continue
-
-                        # Get the space data
-                        space = None
-                        for s in area.spaces:
-                            if s.type == space_type:
-                                space = s
-                                break
-
-                        if not space:
-                            continue
-
-                        restore_panel_attr(space, panel_state, 'asset_shelf', 'show_region_asset_shelf')
-                        restore_panel_attr(space, panel_state, 'hud',         'show_region_hud')
-                        restore_panel_attr(space, panel_state, 'n_panel',     'show_region_ui')
-                        restore_panel_attr(space, panel_state, 't_panel',     'show_region_toolbar')
-                    except Exception:
-                        continue
-            except Exception:
-                continue
-
-        # Clear stored states
+        """Restore panels captured by _hide_panels, then clear local state."""
+        from ..utils.panels import restore_panels
+        restore_panels(context, self._panel_states)
         self._panel_states = {}
 
     def _finish(self, context: bpy.types.Context, restore_panels=True):  # pylint: disable=unused-argument
@@ -879,7 +539,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         if _is_reloading():
             self._finish(context)
             return {"CANCELLED"}
-        global _panel_states_global
+        from ..utils.panels import stash_panel_states, take_panel_states
         p = prefs(context)
 
         # Cancel key (ESC only - removed RIGHTMOUSE to allow m2 as chord token)
@@ -983,22 +643,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     for err in errors:
                         self.report({"WARNING"}, err)
                     if valid_paths:
-                        fire_toggle_from_click(mapping_ref, context)
+                        runtime_errors = fire_toggle_from_click(mapping_ref, context)
+                        for err in runtime_errors:
+                            self.report({"WARNING"}, err)
                         self._tag_redraw()
-                    # Modifier-held click stays open for chained toggles; plain
-                    # click closes, mirroring the keyboard toggle path and
-                    # scripts_overlay's CTRL-click = stay-open semantics.
-                    # If nothing fired, stay open so the user can retry.
-                    toggle_modifier = getattr(p, "toggle_multi_modifier", "CTRL")
-                    modifier_held = (
-                        (toggle_modifier == "CTRL" and event.ctrl) or
-                        (toggle_modifier == "ALT" and event.alt) or
-                        (toggle_modifier == "SHIFT" and event.shift)
-                    )
-                    if modifier_held or not valid_paths:
-                        return {"RUNNING_MODAL"}
-                    self._finish(context)
-                    return {"FINISHED"}
+                    # Toggle clicks always keep the overlay open so the user
+                    # can flip several toggles in a row without re-opening
+                    # the leader. ESC or click-outside still closes normally.
+                    return {"RUNNING_MODAL"}
 
         # Mouse buttons should trigger on RELEASE to avoid conflicts with Blender's default actions
         # (e.g., M3 triggering rotate view on PRESS, getting stuck if we consume the event)
@@ -1057,17 +709,18 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             if not claimed:
                 # No mapping claims the leader key — open Recents (default behavior)
                 if self._panel_states:
-                    _panel_states_global = self._panel_states.copy()
+                    stash_panel_states(self._panel_states)
                     self._panel_states = {}
                 self._finish(context, restore_panels=False)
                 try:
                     bpy.ops.chordsong.recents('INVOKE_DEFAULT')
                 except Exception as e:
+                    self.report({'ERROR'}, f"Failed to open recents: {e}")
                     print(f"Chord Song: Failed to open recents: {e}")
-                    if _panel_states_global:
-                        self._panel_states = _panel_states_global.copy()
+                    stashed = take_panel_states()
+                    if stashed:
+                        self._panel_states = stashed
                         self._restore_panels(context)
-                        _panel_states_global = {}
                 return {"FINISHED"}
             # If claimed, fall through to normal chord matching below
 
@@ -1149,18 +802,19 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 return {"CANCELLED"}
             if operator_id == "chordsong.recents":
                 if self._panel_states:
-                    _panel_states_global = self._panel_states.copy()
+                    stash_panel_states(self._panel_states)
                     self._panel_states = {}
                 self._finish(context, restore_panels=False)
                 try:
                     recents_kwargs = parse_kwargs(getattr(m, "kwargs_json", "{}"))
                     bpy.ops.chordsong.recents('INVOKE_DEFAULT', **recents_kwargs)
                 except Exception as e:
+                    self.report({'ERROR'}, f"Failed to open recents: {e}")
                     print(f"Chord Song: Failed to open recents: {e}")
-                    if _panel_states_global:
-                        self._panel_states = _panel_states_global.copy()
+                    stashed = take_panel_states()
+                    if stashed:
+                        self._panel_states = stashed
                         self._restore_panels(context)
-                        _panel_states_global = {}
                 return {"FINISHED"}
 
             mapping_type = getattr(m, "mapping_type", "OPERATOR")
@@ -1174,8 +828,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
             # Handle Python script execution
             if mapping_type == "PYTHON_FILE":
+                p = prefs(context)
                 # Check if custom scripts are enabled
-                if not prefs(context).allow_custom_user_scripts:
+                if not p.allow_custom_user_scripts:
                     self.report({"ERROR"}, "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences.")
                     self._finish(context)
                     return {"CANCELLED"}
@@ -1183,6 +838,39 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 python_file = (getattr(m, "python_file", "") or "").strip()
                 if not python_file:
                     self.report({"WARNING"}, f'Chord "{" ".join(self._buffer)}" has no script file')
+                    self._finish(context)
+                    return {"CANCELLED"}
+
+                # Path confinement: reject scripts outside scripts_folder BEFORE
+                # self._finish() so self.report surfaces to the user (reporting
+                # from the post-finish timer is unreliable). _execute_script_via_text_editor
+                # enforces the same check as a safety net for other call sites.
+                scripts_folder = (getattr(p, "scripts_folder", "") or "").strip()
+                from ..utils.context_path import is_script_path_allowed
+                allowed, reason = is_script_path_allowed(python_file, scripts_folder)
+                if not allowed:
+                    self.report({"ERROR"}, reason)
+                    try:
+                        _show_fading_overlay(context, chord_tokens, "Script outside folder", "󰀦")
+                    except Exception:  # pylint: disable=broad-exception-caught
+                        pass
+                    self._finish(context)
+                    return {"CANCELLED"}
+
+                # File-existence pre-flight. Same rationale as path confinement:
+                # self.report is reliable while the modal is active, but drops
+                # reports from the post-finish timer. _execute_script_via_text_editor
+                # also checks os.path.exists as defense-in-depth.
+                import os as _os
+                if not _os.path.exists(python_file):
+                    self.report({"ERROR"}, f'Script file not found: {python_file}')
+                    try:
+                        _show_fading_overlay(
+                            context, chord_tokens,
+                            'Script not found — check the path', "󰀦",
+                        )
+                    except Exception:  # pylint: disable=broad-exception-caught
+                        pass
                     self._finish(context)
                     return {"CANCELLED"}
 
@@ -1219,7 +907,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         )
 
                         if not success:
-                            print(f"Chord Song: {error_msg}")
+                            _safe_report(self, 'ERROR', error_msg or "Script execution failed")
                             return None
 
                         # Show fading overlay using the original captured context (ctx_viewport)
@@ -1239,13 +927,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                                 # Create a context-like object with the area from overlay_ctx
                                 # This ensures we store the correct area pointer and space type
-                                class ContextWrapper:
-                                    def __init__(self, area, region, space_data):
-                                        self.area = area
-                                        self.region = region
-                                        self.space_data = space_data
-
-                                wrapped_ctx = ContextWrapper(area, region, space_data)
+                                wrapped_ctx = OverlayContext(area, region, space_data)
                                 _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
                             except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                 _show_fading_overlay(bpy.context, chord_tokens, label, icon)
@@ -1266,7 +948,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                     except Exception as e:
                         import traceback
-                        print(f"Chord Song: Failed to execute script {python_file}: {e}")
+                        _safe_report(self, 'ERROR', f"Failed to execute script {python_file}: {e}")
                         traceback.print_exc()
                     return None
 
@@ -1317,7 +999,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                 def execute_toggle_delayed():
                     try:
-                        results = _toggle_mapping_paths(m, ctx_viewport)
+                        results, runtime_errors = _toggle_mapping_paths(m, ctx_viewport)
+                        for err in runtime_errors:
+                            _safe_report(self, 'WARNING', err)
 
                         from ..utils.render import validate_viewport_context
 
@@ -1350,13 +1034,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                         pass
 
                                     # Create a context-like object with the area from overlay_ctx
-                                    class ContextWrapper:
-                                        def __init__(self, area, region, space_data):
-                                            self.area = area
-                                            self.region = region
-                                            self.space_data = space_data
-
-                                    wrapped_ctx = ContextWrapper(area, region, space_data)
+                                    wrapped_ctx = OverlayContext(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                     _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
@@ -1382,7 +1060,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                     except Exception as e:
                         import traceback
-                        print(f"Chord Song: Failed to toggle context '{context_path}': {e}")
+                        _safe_report(self, 'ERROR', f"Failed to toggle context '{context_path}': {e}")
                         traceback.print_exc()
                     return None
 
@@ -1494,13 +1172,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                         pass
 
                                     # Create a context-like object with the area from overlay_ctx
-                                    class ContextWrapper:
-                                        def __init__(self, area, region, space_data):
-                                            self.area = area
-                                            self.region = region
-                                            self.space_data = space_data
-
-                                    wrapped_ctx = ContextWrapper(area, region, space_data)
+                                    wrapped_ctx = OverlayContext(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                     _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
@@ -1520,7 +1192,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                     except Exception as e:
                         import traceback
-                        print(f"Chord Song: Failed to set property '{context_path}': {e}")
+                        _safe_report(self, 'ERROR', f"Failed to set property '{context_path}': {e}")
                         traceback.print_exc()
                     return None
 
@@ -1552,6 +1224,65 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 self._finish(context)
                 return {"CANCELLED"}
 
+            # Pre-flight: statically reject malformed op names while we're
+            # still in the modal (self.report is reliable here but drops
+            # reports from the post-finish timer). Bad items become visible
+            # WARNINGs; the remaining good items still run. Matches the
+            # checklist requirement: "WARNING on the malformed item;
+            # other items in the menu still work."
+            #
+            # Note: `getattr(bpy.ops.<mod>, "<fn>", None)` always returns a
+            # wrapper object (bpy.ops is a dynamic namespace), so that
+            # doesn't detect typos. Probe `.get_rna_type()` — that queries
+            # the real RNA registry and raises for unregistered ops.
+            validated_ops = []
+            rejected_ops = []  # op-strings that failed pre-flight, for the user-visible summary
+            for op_data in operators_to_run:
+                op = op_data["op"]
+                if "." not in op:
+                    self.report({"WARNING"}, f'Skipping malformed operator "{op}" — must be module.name')
+                    rejected_ops.append(op)
+                    continue
+                mod_name, fn_name = op.split(".", 1)
+                opmod = getattr(bpy.ops, mod_name, None)
+                if opmod is None:
+                    self.report({"WARNING"}, f'Skipping unknown operator module "{mod_name}" in "{op}"')
+                    rejected_ops.append(op)
+                    continue
+                opfn = getattr(opmod, fn_name, None)
+                op_exists = False
+                if opfn is not None:
+                    try:
+                        opfn.get_rna_type()
+                        op_exists = True
+                    except (AttributeError, RuntimeError, KeyError, TypeError):
+                        op_exists = False
+                if not op_exists:
+                    self.report({"WARNING"}, f'Skipping unknown operator "{op}"')
+                    rejected_ops.append(op)
+                    continue
+                validated_ops.append(op_data)
+            operators_to_run = validated_ops
+
+            if not operators_to_run:
+                # Each rejected op already produced a WARNING above; skip
+                # the summary ERROR (would be a redundant second Info-panel
+                # entry). Show only the fading overlay with a tip — name the
+                # first bad op so the user doesn't have to scroll the Info
+                # panel to see which one broke.
+                if rejected_ops:
+                    bad = rejected_ops[0]
+                    extra = "" if len(rejected_ops) == 1 else f" (+{len(rejected_ops) - 1} more)"
+                    fade_msg = f'Unknown op: {bad}{extra} — check syntax/existence'
+                else:
+                    fade_msg = 'No operators — assign one in Preferences'
+                try:
+                    _show_fading_overlay(context, chord_tokens, fade_msg, "󰀦")
+                except Exception:  # pylint: disable=broad-exception-caught
+                    pass
+                self._finish(context)
+                return {"CANCELLED"}
+
             # Capture viewport context BEFORE finishing modal
             ctx_viewport = capture_viewport_context(context)
 
@@ -1560,12 +1291,10 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             primary_operator = operators_to_run[0]["op"] if operators_to_run else None
             should_restore_panels = (primary_operator != "chordsong.scripts_overlay")
 
-            # If executing scripts_overlay, transfer panel states to global storage
+            # If executing scripts_overlay, hand panel state off so Scripts
+            # Overlay can restore panels when IT finishes (prevents flash).
             if not should_restore_panels and self._panel_states:
-                # Transfer panel state to Scripts overlay by storing it globally
-                # Scripts overlay will restore panels when it finishes
-                _panel_states_global = self._panel_states.copy()
-                # Clear our state so _finish doesn't restore
+                stash_panel_states(self._panel_states)
                 self._panel_states = {}
 
             # Finish the modal operator FIRST, then execute via timer.
@@ -1581,41 +1310,71 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                     success = False
 
+                    failed_items = []  # [(op_name, error_msg), ...]
                     for op_data in operators_to_run:
                         op = op_data["op"]
                         kwargs = op_data["kwargs"]
                         call_ctx = op_data["call_ctx"]
 
-                        mod_name, fn_name = op.split(".", 1)
-                        opmod = getattr(bpy.ops, mod_name)
-                        opfn = getattr(opmod, fn_name)
+                        # Per-item try/except: a bad kwarg on item 2 must not
+                        # kill items 3..N. _safe_report surfaces what we can;
+                        # post-finish timers have unreliable self.report, so
+                        # static malformed-op cases are already pre-flighted
+                        # above while the modal was still active.
+                        try:
+                            mod_name, fn_name = op.split(".", 1)
+                            opmod = getattr(bpy.ops, mod_name)
+                            opfn = getattr(opmod, fn_name)
 
-                        result_set = set()
-                        # Pass True as second arg to force undo registration,
-                        # which makes the operator appear as "last operator" for F9.
-                        if call_ctx == "INVOKE_DEFAULT":
-                            if valid_ctx:
-                                try:
-                                    with bpy.context.temp_override(**valid_ctx):
+                            result_set = set()
+                            # Pass True as second arg to force undo registration,
+                            # which makes the operator appear as "last operator" for F9.
+                            if call_ctx == "INVOKE_DEFAULT":
+                                if valid_ctx:
+                                    try:
+                                        with bpy.context.temp_override(**valid_ctx):
+                                            result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
+                                    except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                         result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
-                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                else:
                                     result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
                             else:
-                                result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
-                        else:
-                            if valid_ctx:
-                                try:
-                                    with bpy.context.temp_override(**valid_ctx):
+                                if valid_ctx:
+                                    try:
+                                        with bpy.context.temp_override(**valid_ctx):
+                                            result_set = opfn('EXEC_DEFAULT', True, **kwargs)
+                                    except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                         result_set = opfn('EXEC_DEFAULT', True, **kwargs)
-                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                else:
                                     result_set = opfn('EXEC_DEFAULT', True, **kwargs)
-                            else:
-                                result_set = opfn('EXEC_DEFAULT', True, **kwargs)
 
-                        if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-                            success = True
+                            if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                                success = True
+                        except Exception as item_err:
+                            _safe_report(self, 'WARNING', f'Operator "{op}" failed: {item_err}')
+                            failed_items.append((op, str(item_err)))
+                            continue
 
-                    if success:
+                    # Surface failures as a fading overlay warning so the
+                    # user sees them even when not looking at the Info panel.
+                    # Takes precedence over the success fade (they're single-
+                    # slot): if anything failed, show the warning; if every-
+                    # thing succeeded, the success fade below fires normally.
+                    if failed_items:
+                        if len(failed_items) == 1:
+                            warn_label = f'"{failed_items[0][0]}" failed'
+                        else:
+                            warn_label = f'{len(failed_items)} operators failed ("{failed_items[0][0]}", ...)'
+                        # MDI alert-circle nerd-font glyph — matches the
+                        # "󰑓" (refresh) glyph style used by the state-reset
+                        # fade. Literal "CANCEL" rendered as text and took
+                        # more horizontal space than expected.
+                        try:
+                            _show_fading_overlay(bpy.context, chord_tokens, warn_label, "󰀦")
+                        except Exception:  # pylint: disable=broad-exception-caught
+                            pass
+
+                    if success and not failed_items:
                         # Skip fading overlay and history for meta-operators
                         _meta_ops = ("chordsong.scripts_overlay", "chordsong.recents", "chordsong.close_overlay")
                         primary_operator = operators_to_run[0]["op"] if operators_to_run else None
@@ -1632,13 +1391,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                     except Exception:
                                         pass
 
-                                    class ContextWrapper:
-                                        def __init__(self, area, region, space_data):
-                                            self.area = area
-                                            self.region = region
-                                            self.space_data = space_data
-
-                                    wrapped_ctx = ContextWrapper(area, region, space_data)
+                                    wrapped_ctx = OverlayContext(area, region, space_data)
                                     _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
                                 except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                     _show_fading_overlay(bpy.context, chord_tokens, label, icon)
@@ -1656,7 +1409,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                 except Exception as e:
                     import traceback
-                    print(f"Chord Song: Failed to execute operators: {e}")
+                    _safe_report(self, 'ERROR', f"Failed to execute operators: {e}")
                     traceback.print_exc()
                 return None
 
@@ -1680,18 +1433,19 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     return {"CANCELLED"}
                 if meta_op == "chordsong.recents":
                     if self._panel_states:
-                        _panel_states_global = self._panel_states.copy()
+                        stash_panel_states(self._panel_states)
                         self._panel_states = {}
                     self._finish(context, restore_panels=False)
                     try:
                         recents_kwargs = parse_kwargs(getattr(last_token_match, "kwargs_json", "{}"))
                         bpy.ops.chordsong.recents('INVOKE_DEFAULT', **recents_kwargs)
                     except Exception as e:
+                        self.report({'ERROR'}, f"Failed to open recents: {e}")
                         print(f"Chord Song: Failed to open recents: {e}")
-                        if _panel_states_global:
-                            self._panel_states = _panel_states_global.copy()
+                        stashed = take_panel_states()
+                        if stashed:
+                            self._panel_states = stashed
                             self._restore_panels(context)
-                            _panel_states_global = {}
                     return {"FINISHED"}
 
         # No match - remove only the last token and keep modal running so user can try again

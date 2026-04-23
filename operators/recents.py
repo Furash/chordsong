@@ -14,7 +14,6 @@ from ..core.engine import (
     get_str_attr,
     tokens_match,
 )
-from ..utils.panels import restore_panel_attr
 from ..utils.render import (
     DrawHandlerManager,
     calculate_scale_factor,
@@ -28,15 +27,8 @@ from ..utils.render import (
 from .common import prefs
 
 def _create_context_wrapper(ctx_viewport):
-    """Create a context wrapper with captured viewport context."""
-    class ContextWrapper:
-        def __init__(self, ctx_viewport):
-            self._ctx_viewport = ctx_viewport
-        def __getattr__(self, name):
-            if name in self._ctx_viewport:
-                return self._ctx_viewport[name]
-            return getattr(bpy.context, name)
-
+    """Return a context-shaped object with keys from ctx_viewport falling back to bpy.context."""
+    from ..utils.render import ContextWrapper
     return ContextWrapper(ctx_viewport) if ctx_viewport else bpy.context
 
 class CHORDSONG_OT_Recents(bpy.types.Operator):
@@ -58,19 +50,24 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
     def _draw_callback(self):
         """Draw callback for the recents overlay."""
         try:
-            from .leader import _is_reloading
-            if _is_reloading():
-                return
-            # Check if self is still valid (operator not removed during addon disable)
-            try:
-                _ = self.bl_idname
-            except ReferenceError:
-                # Operator has been removed, stop drawing
-                return
+            self._draw_callback_safe()
+        except ReferenceError:
+            # Operator's StructRNA freed mid-callback (blinker hot reload,
+            # addon disable). Matches the wrapper pattern used in
+            # leader._draw_callback and scripts_overlay._draw_callback.
+            return
+        except Exception:
+            # Never raise from a draw callback.
+            return
 
+    def _draw_callback_safe(self):
+        from .leader import _is_reloading
+        if _is_reloading():
+            return
+        try:
             p = prefs(bpy.context)
         except (KeyError, AttributeError):
-            # Addon is being disabled/unregistered, preferences no longer available
+            # Addon is being disabled/unregistered.
             return
         if not p.overlay_enabled:
             return
@@ -83,15 +80,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # This prevents crashes when context.region is None or invalid
         context = bpy.context
         if self._draw_manager and self._draw_manager.region:
-            # Create a temporary context wrapper that uses our stored region
-            class ContextWithRegion:
-                def __init__(self, original_ctx, region, area):
-                    self._ctx = original_ctx
-                    self.region = region
-                    self.area = area
-                def __getattr__(self, name):
-                    return getattr(self._ctx, name)
-            
+            from ..utils.render import ContextWithRegion
             context = ContextWithRegion(bpy.context, self._draw_manager.region, self._draw_manager.area)
 
         # Draw the recents overlay
@@ -385,14 +374,10 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         p = prefs(context)
         p.ensure_defaults()
 
-        # If panels were hidden by Leader, keep them hidden
-        # Retrieve panel state from global storage if available
-        self._panel_states = {}
-        from ..operators.leader import _panel_states_global
-        if _panel_states_global:
-            self._panel_states = _panel_states_global.copy()
-            # Clear the stored state so it doesn't persist
-            _panel_states_global.clear()
+        # If Leader already hid panels before handing off to Recents, pick
+        # up the stash so we restore the same state on close.
+        from ..utils.panels import take_panel_states
+        self._panel_states = take_panel_states()
 
         self._buffer = []
         self._draw_manager = DrawHandlerManager()
@@ -412,49 +397,11 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             self._draw_manager = None
 
     def _restore_panels(self, context: bpy.types.Context):
-        """Restore T and N panels to their original visibility state."""
-        if not hasattr(self, '_panel_states') or not self._panel_states:
+        """Restore panels Leader/Recents hid on invoke, then clear."""
+        from ..utils.panels import restore_panels
+        if not getattr(self, '_panel_states', None):
             return
-        
-        # Iterate through all areas in all windows
-        for window in context.window_manager.windows:
-            try:
-                screen = window.screen
-                if not screen:
-                    continue
-                for area in screen.areas:
-                    try:
-                        area_ptr = area.as_pointer()
-                        if area_ptr not in self._panel_states:
-                            continue
-                        
-                        panel_state = self._panel_states[area_ptr]
-                        space_type = panel_state.get('space_type', 'VIEW_3D')
-                        
-                        # Only restore panels in areas matching the stored space type
-                        if area.type != space_type:
-                            continue
-                        
-                        # Get the space data
-                        space = None
-                        for s in area.spaces:
-                            if s.type == space_type:
-                                space = s
-                                break
-                        
-                        if not space:
-                            continue
-                        
-                        restore_panel_attr(space, panel_state, 'asset_shelf', 'show_region_asset_shelf')
-                        restore_panel_attr(space, panel_state, 'hud',         'show_region_hud')
-                        restore_panel_attr(space, panel_state, 'n_panel',     'show_region_ui')
-                        restore_panel_attr(space, panel_state, 't_panel',     'show_region_toolbar')
-                    except Exception:
-                        continue
-            except Exception:
-                continue
-        
-        # Clear stored states
+        restore_panels(context, self._panel_states)
         self._panel_states = {}
 
     def cancel(self, context: bpy.types.Context):

@@ -35,6 +35,10 @@ def write_autosave(prefs) -> str:
     """
     Write an autosave file next to prefs.config_path.
     Returns the autosave filepath, or "" if skipped.
+
+    Written atomically (tmp file + os.replace) so a crash mid-write can never
+    truncate the autosave file — which is exactly the file the user reaches
+    for when their main config is broken.
     """
     config_path = getattr(prefs, "config_path", "") or ""
     path = autosave_path(config_path)
@@ -47,9 +51,23 @@ def write_autosave(prefs) -> str:
     import json
 
     text = json.dumps(data, indent=2, ensure_ascii=False)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(text)
-        f.write("\n")
+    tmp_path = path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except Exception:
+        # Remove the partial tmp file on failure so it doesn't accumulate.
+        # Re-raise: the caller (timer callback) already swallows exceptions.
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+        raise
 
     return path
 

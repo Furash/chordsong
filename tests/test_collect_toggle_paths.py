@@ -1,7 +1,6 @@
-"""Tests for collect_toggle_paths — pure helper, no bpy dependency."""
-
-import sys
+"""Tests for collect_toggle_paths — pure helper, no bpy."""
 import os
+import sys
 from dataclasses import dataclass, field
 from typing import List
 
@@ -21,92 +20,69 @@ class FakeMapping:
     sub_items: List[FakeSubItem] = field(default_factory=list)
 
 
-def _run():
-    passed = 0
-    failed = 0
-
-    def check(name, got, want):
-        nonlocal passed, failed
-        if got == want:
-            passed += 1
-        else:
-            failed += 1
-            print(f"FAIL {name}\n  got : {got!r}\n  want: {want!r}")
-
-    # Valid single path
+def test_valid_single_path():
     m = FakeMapping(context_path="space_data.overlay.show_stats")
-    check("valid_single_path", collect_toggle_paths(m), (["space_data.overlay.show_stats"], []))
+    assert collect_toggle_paths(m) == (["space_data.overlay.show_stats"], [])
 
-    # Valid path + valid sub-items
+
+def test_valid_path_plus_sub_items():
     m = FakeMapping(
         context_path="space_data.overlay.show_stats",
         sub_items=[FakeSubItem("space_data.overlay.show_wireframes"), FakeSubItem("scene.use_gravity")],
     )
-    check(
-        "valid_path_plus_subitems",
-        collect_toggle_paths(m),
-        (
-            [
-                "space_data.overlay.show_stats",
-                "space_data.overlay.show_wireframes",
-                "scene.use_gravity",
-            ],
-            [],
-        ),
-    )
+    valid, errors = collect_toggle_paths(m)
+    assert valid == [
+        "space_data.overlay.show_stats",
+        "space_data.overlay.show_wireframes",
+        "scene.use_gravity",
+    ]
+    assert errors == []
 
-    # Bare name (no dot) at context_path → error
+
+def test_bare_context_path_rejected():
     m = FakeMapping(context_path="show_stats")
-    valid, errs = collect_toggle_paths(m)
-    check("bare_context_path_rejected_valid", valid, [])
-    check("bare_context_path_rejected_has_error", len(errs), 1)
-    check("bare_context_path_error_mentions_path", "show_stats" in errs[0], True)
+    valid, errors = collect_toggle_paths(m)
+    assert valid == []
+    assert len(errors) == 1
+    assert "show_stats" in errors[0]
 
-    # Bare name in sub-items → error, other valid path kept
+
+def test_mixed_sub_items_keeps_valid_drops_bad():
     m = FakeMapping(
         context_path="scene.use_gravity",
         sub_items=[FakeSubItem("bad_name"), FakeSubItem("space_data.overlay.show_stats")],
     )
-    valid, errs = collect_toggle_paths(m)
-    check("mixed_sub_items_valid", valid, ["scene.use_gravity", "space_data.overlay.show_stats"])
-    check("mixed_sub_items_error_count", len(errs), 1)
-    check("mixed_sub_items_error_mentions", "bad_name" in errs[0], True)
+    valid, errors = collect_toggle_paths(m)
+    assert valid == ["scene.use_gravity", "space_data.overlay.show_stats"]
+    assert len(errors) == 1
+    assert "bad_name" in errors[0]
 
-    # Whitespace-only paths are skipped, no error, no valid
+
+def test_whitespace_only_paths_skipped():
     m = FakeMapping(context_path="   ", sub_items=[FakeSubItem("  ")])
-    valid, errs = collect_toggle_paths(m)
-    check("whitespace_only_no_valid", valid, [])
-    check(
-        "whitespace_only_has_no_content_error",
-        any("no context path" in e for e in errs),
-        True,
-    )
+    valid, errors = collect_toggle_paths(m)
+    assert valid == []
+    assert any("no context path" in e for e in errors)
 
-    # Completely empty mapping returns "no context path" error
+
+def test_empty_mapping_has_error():
     m = FakeMapping()
-    valid, errs = collect_toggle_paths(m)
-    check("empty_mapping_no_valid", valid, [])
-    check("empty_mapping_error", any("no context path" in e for e in errs), True)
+    valid, errors = collect_toggle_paths(m)
+    assert valid == []
+    assert any("no context path" in e for e in errors)
 
-    # Sub-item whitespace stripped before validation
-    m = FakeMapping(context_path="  scene.use_gravity  ", sub_items=[FakeSubItem("  scene.frame_current  ")])
-    check(
-        "whitespace_stripped",
-        collect_toggle_paths(m),
-        (["scene.use_gravity", "scene.frame_current"], []),
+
+def test_whitespace_stripped():
+    m = FakeMapping(
+        context_path="  scene.use_gravity  ",
+        sub_items=[FakeSubItem("  scene.frame_current  ")],
     )
+    assert collect_toggle_paths(m) == (["scene.use_gravity", "scene.frame_current"], [])
 
-    # Missing sub_items attribute (None)
+
+def test_missing_sub_items_attribute():
     @dataclass
     class MappingNoSub:
         context_path: str = "scene.use_gravity"
 
-    check("missing_sub_items_attr", collect_toggle_paths(MappingNoSub()), (["scene.use_gravity"], []))
-
-    print(f"\n{passed} passed, {failed} failed")
-    if failed:
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    _run()
+    assert collect_toggle_paths(MappingNoSub()) == (["scene.use_gravity"], [])

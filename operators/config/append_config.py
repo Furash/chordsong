@@ -87,7 +87,9 @@ class CHORDSONG_OT_Append_Config(bpy.types.Operator, ImportHelper):
             prefs_module._SUSPEND_CALLBACKS = True
             p._chordsong_suspend_autosave = True
             warns = apply_config_append(p, data)
-            
+            from ...ui.overlay import clear_overlay_cache
+            clear_overlay_cache()
+
             # Show warnings
             for w in warns[:5]:
                 self.report({"WARNING"}, w)
