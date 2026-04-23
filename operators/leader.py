@@ -1209,6 +1209,11 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             # WARNINGs; the remaining good items still run. Matches the
             # checklist requirement: "WARNING on the malformed item;
             # other items in the menu still work."
+            #
+            # Note: `getattr(bpy.ops.<mod>, "<fn>", None)` always returns a
+            # wrapper object (bpy.ops is a dynamic namespace), so that
+            # doesn't detect typos. Probe `.idname()` instead — it succeeds
+            # only for registered operators.
             validated_ops = []
             for op_data in operators_to_run:
                 op = op_data["op"]
@@ -1220,7 +1225,15 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 if opmod is None:
                     self.report({"WARNING"}, f'Skipping unknown operator module "{mod_name}" in "{op}"')
                     continue
-                if getattr(opmod, fn_name, None) is None:
+                opfn = getattr(opmod, fn_name, None)
+                op_exists = False
+                if opfn is not None:
+                    try:
+                        opfn.idname()  # raises for unregistered ops
+                        op_exists = True
+                    except (AttributeError, RuntimeError, TypeError):
+                        op_exists = False
+                if not op_exists:
                     self.report({"WARNING"}, f'Skipping unknown operator "{op}"')
                     continue
                 validated_ops.append(op_data)
@@ -1313,8 +1326,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             warn_label = f'"{failed_items[0][0]}" failed'
                         else:
                             warn_label = f'{len(failed_items)} operators failed ("{failed_items[0][0]}", ...)'
+                        # MDI alert-circle nerd-font glyph — matches the
+                        # "󰑓" (refresh) glyph style used by the state-reset
+                        # fade. Literal "CANCEL" rendered as text and took
+                        # more horizontal space than expected.
                         try:
-                            _show_fading_overlay(bpy.context, chord_tokens, warn_label, "CANCEL")
+                            _show_fading_overlay(bpy.context, chord_tokens, warn_label, "󰀦")
                         except Exception:  # pylint: disable=broad-exception-caught
                             pass
 
