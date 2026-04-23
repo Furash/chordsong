@@ -1228,10 +1228,15 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 opfn = getattr(opmod, fn_name, None)
                 op_exists = False
                 if opfn is not None:
+                    # `.idname()` just string-formats mod+fn and returns — it
+                    # does NOT validate the op is registered. `.get_rna_type()`
+                    # actually looks up the operator class in Blender's RNA
+                    # registry and raises when there's no registered class.
+                    # That's the authoritative existence check.
                     try:
-                        opfn.idname()  # raises for unregistered ops
+                        opfn.get_rna_type()
                         op_exists = True
-                    except (AttributeError, RuntimeError, TypeError):
+                    except (AttributeError, RuntimeError, KeyError, TypeError):
                         op_exists = False
                 if not op_exists:
                     self.report({"WARNING"}, f'Skipping unknown operator "{op}"')
