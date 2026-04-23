@@ -1203,6 +1203,34 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 self._finish(context)
                 return {"CANCELLED"}
 
+            # Pre-flight: statically reject malformed op names while we're
+            # still in the modal (self.report is reliable here but drops
+            # reports from the post-finish timer). Bad items become visible
+            # WARNINGs; the remaining good items still run. Matches the
+            # checklist requirement: "WARNING on the malformed item;
+            # other items in the menu still work."
+            validated_ops = []
+            for op_data in operators_to_run:
+                op = op_data["op"]
+                if "." not in op:
+                    self.report({"WARNING"}, f'Skipping malformed operator "{op}" — must be module.name')
+                    continue
+                mod_name, fn_name = op.split(".", 1)
+                opmod = getattr(bpy.ops, mod_name, None)
+                if opmod is None:
+                    self.report({"WARNING"}, f'Skipping unknown operator module "{mod_name}" in "{op}"')
+                    continue
+                if getattr(opmod, fn_name, None) is None:
+                    self.report({"WARNING"}, f'Skipping unknown operator "{op}"')
+                    continue
+                validated_ops.append(op_data)
+            operators_to_run = validated_ops
+
+            if not operators_to_run:
+                self.report({"ERROR"}, f'Chord "{" ".join(self._buffer)}": no valid operators to run')
+                self._finish(context)
+                return {"CANCELLED"}
+
             # Capture viewport context BEFORE finishing modal
             ctx_viewport = capture_viewport_context(context)
 
@@ -1235,34 +1263,43 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         kwargs = op_data["kwargs"]
                         call_ctx = op_data["call_ctx"]
 
-                        mod_name, fn_name = op.split(".", 1)
-                        opmod = getattr(bpy.ops, mod_name)
-                        opfn = getattr(opmod, fn_name)
+                        # Per-item try/except: a bad kwarg on item 2 must not
+                        # kill items 3..N. _safe_report surfaces what we can;
+                        # post-finish timers have unreliable self.report, so
+                        # static malformed-op cases are already pre-flighted
+                        # above while the modal was still active.
+                        try:
+                            mod_name, fn_name = op.split(".", 1)
+                            opmod = getattr(bpy.ops, mod_name)
+                            opfn = getattr(opmod, fn_name)
 
-                        result_set = set()
-                        # Pass True as second arg to force undo registration,
-                        # which makes the operator appear as "last operator" for F9.
-                        if call_ctx == "INVOKE_DEFAULT":
-                            if valid_ctx:
-                                try:
-                                    with bpy.context.temp_override(**valid_ctx):
+                            result_set = set()
+                            # Pass True as second arg to force undo registration,
+                            # which makes the operator appear as "last operator" for F9.
+                            if call_ctx == "INVOKE_DEFAULT":
+                                if valid_ctx:
+                                    try:
+                                        with bpy.context.temp_override(**valid_ctx):
+                                            result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
+                                    except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                         result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
-                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                else:
                                     result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
                             else:
-                                result_set = opfn('INVOKE_DEFAULT', True, **kwargs)
-                        else:
-                            if valid_ctx:
-                                try:
-                                    with bpy.context.temp_override(**valid_ctx):
+                                if valid_ctx:
+                                    try:
+                                        with bpy.context.temp_override(**valid_ctx):
+                                            result_set = opfn('EXEC_DEFAULT', True, **kwargs)
+                                    except (TypeError, RuntimeError, AttributeError, ReferenceError):
                                         result_set = opfn('EXEC_DEFAULT', True, **kwargs)
-                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
+                                else:
                                     result_set = opfn('EXEC_DEFAULT', True, **kwargs)
-                            else:
-                                result_set = opfn('EXEC_DEFAULT', True, **kwargs)
 
-                        if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
-                            success = True
+                            if result_set and ('FINISHED' in result_set or 'CANCELLED' not in result_set):
+                                success = True
+                        except Exception as item_err:
+                            _safe_report(self, 'WARNING', f'Operator "{op}" failed: {item_err}')
+                            continue
 
                     if success:
                         # Skip fading overlay and history for meta-operators
