@@ -1212,27 +1212,25 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             #
             # Note: `getattr(bpy.ops.<mod>, "<fn>", None)` always returns a
             # wrapper object (bpy.ops is a dynamic namespace), so that
-            # doesn't detect typos. Probe `.idname()` instead — it succeeds
-            # only for registered operators.
+            # doesn't detect typos. Probe `.get_rna_type()` — that queries
+            # the real RNA registry and raises for unregistered ops.
             validated_ops = []
+            rejected_ops = []  # op-strings that failed pre-flight, for the user-visible summary
             for op_data in operators_to_run:
                 op = op_data["op"]
                 if "." not in op:
                     self.report({"WARNING"}, f'Skipping malformed operator "{op}" — must be module.name')
+                    rejected_ops.append(op)
                     continue
                 mod_name, fn_name = op.split(".", 1)
                 opmod = getattr(bpy.ops, mod_name, None)
                 if opmod is None:
                     self.report({"WARNING"}, f'Skipping unknown operator module "{mod_name}" in "{op}"')
+                    rejected_ops.append(op)
                     continue
                 opfn = getattr(opmod, fn_name, None)
                 op_exists = False
                 if opfn is not None:
-                    # `.idname()` just string-formats mod+fn and returns — it
-                    # does NOT validate the op is registered. `.get_rna_type()`
-                    # actually looks up the operator class in Blender's RNA
-                    # registry and raises when there's no registered class.
-                    # That's the authoritative existence check.
                     try:
                         opfn.get_rna_type()
                         op_exists = True
@@ -1240,16 +1238,25 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         op_exists = False
                 if not op_exists:
                     self.report({"WARNING"}, f'Skipping unknown operator "{op}"')
+                    rejected_ops.append(op)
                     continue
                 validated_ops.append(op_data)
             operators_to_run = validated_ops
 
             if not operators_to_run:
-                self.report({"ERROR"}, f'Chord "{" ".join(self._buffer)}": no valid operators to run')
-                # Fading overlay warning so the user sees something fail in
-                # the viewport too, not just in the Info panel.
+                # Each rejected op already produced a WARNING above; skip
+                # the summary ERROR (would be a redundant second Info-panel
+                # entry). Show only the fading overlay with a tip — name the
+                # first bad op so the user doesn't have to scroll the Info
+                # panel to see which one broke.
+                if rejected_ops:
+                    bad = rejected_ops[0]
+                    extra = "" if len(rejected_ops) == 1 else f" (+{len(rejected_ops) - 1} more)"
+                    fade_msg = f'Unknown op: {bad}{extra} — fix in Preferences'
+                else:
+                    fade_msg = 'No operators — assign one in Preferences'
                 try:
-                    _show_fading_overlay(context, chord_tokens, "No valid operators", "󰀦")
+                    _show_fading_overlay(context, chord_tokens, fade_msg, "󰀦")
                 except Exception:  # pylint: disable=broad-exception-caught
                     pass
                 self._finish(context)
