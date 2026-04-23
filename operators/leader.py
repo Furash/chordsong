@@ -828,8 +828,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
             # Handle Python script execution
             if mapping_type == "PYTHON_FILE":
+                p = prefs(context)
                 # Check if custom scripts are enabled
-                if not prefs(context).allow_custom_user_scripts:
+                if not p.allow_custom_user_scripts:
                     self.report({"ERROR"}, "Script execution is disabled. Enable 'Allow Custom User Scripts' in Preferences.")
                     self._finish(context)
                     return {"CANCELLED"}
@@ -837,6 +838,18 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                 python_file = (getattr(m, "python_file", "") or "").strip()
                 if not python_file:
                     self.report({"WARNING"}, f'Chord "{" ".join(self._buffer)}" has no script file')
+                    self._finish(context)
+                    return {"CANCELLED"}
+
+                # Path confinement: reject scripts outside scripts_folder BEFORE
+                # self._finish() so self.report surfaces to the user (reporting
+                # from the post-finish timer is unreliable). _execute_script_via_text_editor
+                # enforces the same check as a safety net for other call sites.
+                scripts_folder = (getattr(p, "scripts_folder", "") or "").strip()
+                from ..utils.context_path import is_script_path_allowed
+                allowed, reason = is_script_path_allowed(python_file, scripts_folder)
+                if not allowed:
+                    self.report({"ERROR"}, reason)
                     self._finish(context)
                     return {"CANCELLED"}
 
