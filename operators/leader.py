@@ -1258,6 +1258,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                     success = False
 
+                    failed_items = []  # [(op_name, error_msg), ...]
                     for op_data in operators_to_run:
                         op = op_data["op"]
                         kwargs = op_data["kwargs"]
@@ -1299,9 +1300,25 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                 success = True
                         except Exception as item_err:
                             _safe_report(self, 'WARNING', f'Operator "{op}" failed: {item_err}')
+                            failed_items.append((op, str(item_err)))
                             continue
 
-                    if success:
+                    # Surface failures as a fading overlay warning so the
+                    # user sees them even when not looking at the Info panel.
+                    # Takes precedence over the success fade (they're single-
+                    # slot): if anything failed, show the warning; if every-
+                    # thing succeeded, the success fade below fires normally.
+                    if failed_items:
+                        if len(failed_items) == 1:
+                            warn_label = f'"{failed_items[0][0]}" failed'
+                        else:
+                            warn_label = f'{len(failed_items)} operators failed ("{failed_items[0][0]}", ...)'
+                        try:
+                            _show_fading_overlay(bpy.context, chord_tokens, warn_label, "CANCEL")
+                        except Exception:  # pylint: disable=broad-exception-caught
+                            pass
+
+                    if success and not failed_items:
                         # Skip fading overlay and history for meta-operators
                         _meta_ops = ("chordsong.scripts_overlay", "chordsong.recents", "chordsong.close_overlay")
                         primary_operator = operators_to_run[0]["op"] if operators_to_run else None
