@@ -867,7 +867,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                     try:
                         _show_fading_overlay(
                             context, chord_tokens,
-                            f'Script not found — check path in Preferences', "󰀦",
+                            'Script not found — check the path', "󰀦",
                         )
                     except Exception:  # pylint: disable=broad-exception-caught
                         pass
