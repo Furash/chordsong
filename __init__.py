@@ -17,9 +17,11 @@ from .ui import (
     CHORDSONG_PG_Group,
     CHORDSONG_PG_Mapping,
     CHORDSONG_PG_NerdIcon,
+    CHORDSONG_PG_StatsItem,
     CHORDSONG_PG_SubItem,
     CHORDSONG_PG_SubOperator,
     CHORDSONG_PG_ScriptParam,
+    CHORDSONG_UL_Stats,
 )
 from .operators import (
     CHORDSONG_OT_Append_Config,
@@ -76,6 +78,12 @@ from .operators import (
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
     CHORDSONG_OT_ScriptsOverlay,
+    CHORDSONG_OT_Stats_Blacklist,
+    CHORDSONG_OT_Stats_Convert_To_Chord,
+    CHORDSONG_OT_Stats_Export,
+    CHORDSONG_OT_Stats_Refresh,
+    CHORDSONG_OT_Stats_Reload,
+    CHORDSONG_OT_Stats_Reset,
     CHORDSONG_OT_SubItem_Add,
     CHORDSONG_OT_SubItem_Remove,
     CHORDSONG_OT_TestFadingOverlay,
@@ -88,6 +96,7 @@ from .operators import (
 
 _classes = (
     CHORDSONG_PG_NerdIcon,
+    CHORDSONG_PG_StatsItem,
     CHORDSONG_PG_SubItem,
     CHORDSONG_PG_SubOperator,
     CHORDSONG_PG_ScriptParam,
@@ -95,6 +104,7 @@ _classes = (
     CHORDSONG_PG_Mapping,
     CHORDSONG_PG_GroupSelection,
     CHORDSONG_Preferences,
+    CHORDSONG_UL_Stats,
     CHORDSONG_OT_Append_Config,
     CHORDSONG_OT_ApplyConflictFix,
     CHORDSONG_OT_Clear_Search,
@@ -149,6 +159,12 @@ _classes = (
     CHORDSONG_OT_Script_Select,
     CHORDSONG_OT_Script_Select_Apply,
     CHORDSONG_OT_ScriptsOverlay,
+    CHORDSONG_OT_Stats_Blacklist,
+    CHORDSONG_OT_Stats_Convert_To_Chord,
+    CHORDSONG_OT_Stats_Export,
+    CHORDSONG_OT_Stats_Refresh,
+    CHORDSONG_OT_Stats_Reload,
+    CHORDSONG_OT_Stats_Reset,
     CHORDSONG_OT_SubItem_Add,
     CHORDSONG_OT_SubItem_Remove,
     CHORDSONG_OT_TestFadingOverlay,
@@ -344,6 +360,18 @@ def register():
     except Exception:
         pass
 
+    # Start statistics tracking (loads persisted counts + blacklist, then
+    # polls wm.reports / autosaves on a timer; idles cheaply while disabled).
+    # Requires Blender 5.2+; on older versions the module stays inert.
+    try:
+        from .core import stats_manager
+        if stats_manager.stats_supported():
+            stats_manager.load_from_file()
+            stats_manager.load_blacklist_from_path(stats_manager.get_stats_file_path())
+            stats_manager.register_timer()
+    except Exception:
+        pass
+
 def blinker_pre_reload():
     """Called by blinker before addon disable during hot-reload.
 
@@ -362,6 +390,12 @@ def blinker_pre_reload():
             bpy.app.timers.unregister(_timer_cb)
     except Exception:
         pass
+    # Stop stats timer (flushes unsaved counts)
+    try:
+        from .core import stats_manager
+        stats_manager.unregister_timer()
+    except Exception:
+        pass
 
 
 def unregister():
@@ -378,6 +412,13 @@ def unregister():
         import bpy
         if bpy.app.timers.is_registered(_timer_cb):
             bpy.app.timers.unregister(_timer_cb)
+    except Exception:
+        pass
+
+    # Stop stats timer (flushes unsaved counts)
+    try:
+        from .core import stats_manager
+        stats_manager.unregister_timer()
     except Exception:
         pass
 

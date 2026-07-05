@@ -356,6 +356,51 @@ class CHORDSONG_PG_NerdIcon(PropertyGroup):
         default="",
     )
 
+# Module-level tuples: dynamic enum item strings must stay referenced from
+# Python or Blender reads freed memory (known dynamic-enum gotcha).
+_PREFS_TABS_BASE = (
+    ("MAPPINGS", "Mappings", "Chord mappings"),
+    ("UI", "UI", "Overlay/UI customization"),
+)
+_PREFS_TABS_WITH_STATS = _PREFS_TABS_BASE + (
+    ("STATS", "Statistics", "Usage statistics"),
+)
+
+def _prefs_tab_items(_self, _context):
+    """Statistics tab only on Blender 5.2+ (needs the wm.reports API)."""
+    if bpy.app.version >= (5, 2, 0):
+        return _PREFS_TABS_WITH_STATS
+    return _PREFS_TABS_BASE
+
+class CHORDSONG_PG_StatsItem(PropertyGroup):
+    """A single row in the statistics list (rebuilt from stats data on draw)."""
+    name: StringProperty(
+        name="Name",
+        description="Operator idname or chord token string",
+        default="",
+    )
+    category: StringProperty(
+        name="Category",
+        description="'operators' or 'chords'",
+        default="",
+    )
+    count: IntProperty(
+        name="Count",
+        description="Usage count",
+        default=0,
+        min=0,
+    )
+    group: StringProperty(
+        name="Group",
+        description="Mapping group (chords only)",
+        default="",
+    )
+    label: StringProperty(
+        name="Label",
+        description="Mapping label (chords only)",
+        default="",
+    )
+
 class CHORDSONG_PG_Group(PropertyGroup):
     """Group property for organizing chord mappings."""
     name: StringProperty(
@@ -573,11 +618,51 @@ class CHORDSONG_Preferences(AddonPreferences):
 
     prefs_tab: EnumProperty(
         name="Tab",
-        items=(
-            ("MAPPINGS", "Mappings", "Chord mappings"),
-            ("UI", "UI", "Overlay/UI customization"),
-        ),
-        default="MAPPINGS",
+        items=_prefs_tab_items,
+    )
+
+    enable_stats: BoolProperty(
+        name="Enable Statistics",
+        description="Track operator and chord usage. Data is stored locally and never shared.",
+        default=False,
+        update=_on_prefs_changed,
+    )
+
+    stats_collection: CollectionProperty(type=CHORDSONG_PG_StatsItem)
+
+    stats_collection_index: IntProperty(
+        name="Stats Collection Index",
+        description="Active index in statistics collection",
+        default=0,
+        min=0,
+    )
+
+    stats_sort_by_usage: BoolProperty(
+        name="Sort by Usage",
+        description="Sort statistics by usage count (descending). If disabled, sorts alphabetically.",
+        default=True,
+        update=_on_prefs_changed,
+    )
+
+    stats_export_path: StringProperty(
+        name="Export Path",
+        description="Statistics JSON file path (leave empty to use the internal extension directory)",
+        subtype="FILE_PATH",
+        default="",
+    )
+
+    stats_auto_export_interval: IntProperty(
+        name="Auto Export Interval",
+        description="Interval in seconds for automatically saving statistics to disk (0 = disabled)",
+        default=180,
+        min=0,
+        soft_max=3600,
+    )
+
+    stats_blacklist: StringProperty(
+        name="Statistics Blacklist",
+        description="JSON array of hidden items in format: [\"category:name\", ...]",
+        default="[]",
     )
 
     mapping_context_tab: EnumProperty(

@@ -826,6 +826,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             # Capture the buffer before finishing
             chord_tokens = list(self._buffer)
 
+            try:
+                from ..core.stats_manager import record_chord
+                record_chord(chord_tokens)
+            except Exception:
+                pass
+
             # Handle Python script execution
             if mapping_type == "PYTHON_FILE":
                 p = prefs(context)
@@ -1325,6 +1331,14 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             mod_name, fn_name = op.split(".", 1)
                             opmod = getattr(bpy.ops, mod_name)
                             opfn = getattr(opmod, fn_name)
+
+                            # This run is counted as chord usage — keep it out
+                            # of the raw operator stats
+                            try:
+                                from ..core.stats_manager import expect_operator_report
+                                expect_operator_report(op)
+                            except Exception:
+                                pass
 
                             result_set = set()
                             # Pass True as second arg to force undo registration,
