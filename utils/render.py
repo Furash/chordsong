@@ -334,6 +334,12 @@ def execute_history_entry_operator(context, entry):
             op_id = op_data["op"]
             mod_name, fn_name = op_id.split(".", 1)
             opfn = getattr(getattr(bpy.ops, mod_name), fn_name)
+            # Replay is chordsong-triggered — keep it out of raw operator stats
+            try:
+                from ..core.stats_manager import expect_operator_report
+                expect_operator_report(op_id)
+            except Exception:
+                pass
             result_set = _run_single_operator(
                 opfn, op_data["call_ctx"], op_data["kwargs"], valid_ctx
             )
@@ -432,7 +438,13 @@ def _execute_script_via_text_editor(filepath, script_args=None, valid_ctx=None, 
         
         # Clean up temporary text block
         bpy.data.texts.remove(text_block)
-        
+
+        try:
+            from ..core.stats_manager import record_script
+            record_script(filepath)
+        except Exception:
+            pass
+
         return True, None
         
     except Exception as e:
