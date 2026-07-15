@@ -10,7 +10,31 @@ __all__ = [
     "get_str_attr",
     "event_in_invoke_region",
     "collect_toggle_paths",
+    "detect_editor_context",
 ]
+
+
+def detect_editor_context(context: bpy.types.Context) -> str:
+    """Detect the current editor context as a mapping-context token."""
+    space = context.space_data
+    if space:
+        space_type = space.type
+        if space_type == 'VIEW_3D':
+            if context.mode and context.mode.startswith('EDIT'):
+                return "VIEW_3D_EDIT"
+            return "VIEW_3D"
+        elif space_type == 'IMAGE_EDITOR':
+            return "IMAGE_EDITOR"
+        elif space_type == 'NODE_EDITOR':
+            if hasattr(space, 'tree_type'):
+                if space.tree_type == 'GeometryNodeTree':
+                    return "GEOMETRY_NODE"
+                elif space.tree_type == 'ShaderNodeTree':
+                    return "SHADER_EDITOR"
+            # Default to shader editor for other node editors
+            return "SHADER_EDITOR"
+    # Default to 3D View if we can't detect
+    return "VIEW_3D"
 
 def prefs(context: bpy.types.Context):
     """Get addon preferences for extension workflow."""

@@ -30,7 +30,7 @@ def _get_preset_formats(style):
     }
     return presets.get(style, presets["DEFAULT"])
 
-def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buffer_tokens=None):
+def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buffer_tokens=None, run_labels=None):
     """Build display rows from candidates, footer returned separately.
 
     Args:
@@ -38,6 +38,8 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
         has_buffer: Whether there's a buffer (affects footer display)
         p: Preferences object (optional)
         buffer_tokens: Current chord buffer; used to compute click-target chord_tokens on final rows
+        run_labels: Optional (plain_click, ctrl_click) footer labels for
+            scripts-style overlays (defaults to the script wording)
     """
     buffer_tokens = list(buffer_tokens) if buffer_tokens else []
     rows = []
@@ -269,8 +271,9 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
     # overlay: plain click runs + closes, Ctrl+click runs + keeps overlay
     # open for chaining.
     if is_scripts_overlay:
-        footer.append({"kind": "item", "token": "M1", "label": "Run script", "icon": ""})
-        footer.append({"kind": "item", "token": "^M1", "label": "Run + keep overlay open", "icon": ""})
+        plain_label, ctrl_label = run_labels or ("Run script", "Run + keep overlay open")
+        footer.append({"kind": "item", "token": "M1", "label": plain_label, "icon": ""})
+        footer.append({"kind": "item", "token": "^M1", "label": ctrl_label, "icon": ""})
     else:
         footer.append({"kind": "item", "token": "M1", "label": "Toggle", "icon": ""})
 

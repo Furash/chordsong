@@ -57,6 +57,7 @@ from .recents import CHORDSONG_OT_Recents
 from .config.save_config import CHORDSONG_OT_Save_Config
 from .script_select import CHORDSONG_OT_Script_Select, CHORDSONG_OT_Script_Select_Apply
 from .scripts_overlay import CHORDSONG_OT_ScriptsOverlay
+from .search_overlay import CHORDSONG_OT_SearchOverlay
 from .stats_operators import (
     CHORDSONG_OT_Stats_Blacklist,
     CHORDSONG_OT_Stats_Convert_To_Chord,
@@ -122,6 +123,7 @@ __all__ = [
     "CHORDSONG_OT_Script_Select",
     "CHORDSONG_OT_Script_Select_Apply",
     "CHORDSONG_OT_ScriptsOverlay",
+    "CHORDSONG_OT_SearchOverlay",
     "CHORDSONG_OT_Stats_Blacklist",
     "CHORDSONG_OT_Stats_Convert_To_Chord",
     "CHORDSONG_OT_Stats_Export",

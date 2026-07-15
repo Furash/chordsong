@@ -466,26 +466,8 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
     def _detect_context(self, context: bpy.types.Context) -> str:
         """Detect the current editor context."""
-        space = context.space_data
-        if space:
-            space_type = space.type
-            if space_type == 'VIEW_3D':
-                if context.mode and context.mode.startswith('EDIT'):
-                    return "VIEW_3D_EDIT"
-                return "VIEW_3D"
-            elif space_type == 'IMAGE_EDITOR':
-                return "IMAGE_EDITOR"
-            elif space_type == 'NODE_EDITOR':
-                # Check if it's Geometry Nodes or Shader Editor
-                if hasattr(space, 'tree_type'):
-                    if space.tree_type == 'GeometryNodeTree':
-                        return "GEOMETRY_NODE"
-                    elif space.tree_type == 'ShaderNodeTree':
-                        return "SHADER_EDITOR"
-                # Default to shader editor for other node editors
-                return "SHADER_EDITOR"
-        # Default to 3D View if we can't detect
-        return "VIEW_3D"
+        from .common import detect_editor_context
+        return detect_editor_context(context)
 
     def _hide_panels(self, context: bpy.types.Context):
         """Hide asset-shelf / HUD / T / N panels via utils.panels.hide_panels
@@ -1292,10 +1274,11 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             # Capture viewport context BEFORE finishing modal
             ctx_viewport = capture_viewport_context(context)
 
-            # Check if we're executing scripts_overlay - if so, transfer panel states
-            # (scripts_overlay will handle panel hiding/restoration)
+            # Check if we're handing off to another overlay (scripts/search) -
+            # if so, transfer panel states so it handles panel restoration.
+            _overlay_handoff_ops = ("chordsong.scripts_overlay", "chordsong.search")
             primary_operator = operators_to_run[0]["op"] if operators_to_run else None
-            should_restore_panels = (primary_operator != "chordsong.scripts_overlay")
+            should_restore_panels = (primary_operator not in _overlay_handoff_ops)
 
             # If executing scripts_overlay, hand panel state off so Scripts
             # Overlay can restore panels when IT finishes (prevents flash).
@@ -1390,7 +1373,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                     if success and not failed_items:
                         # Skip fading overlay and history for meta-operators
-                        _meta_ops = ("chordsong.scripts_overlay", "chordsong.recents", "chordsong.close_overlay")
+                        _meta_ops = ("chordsong.scripts_overlay", "chordsong.search", "chordsong.recents", "chordsong.close_overlay")
                         primary_operator = operators_to_run[0]["op"] if operators_to_run else None
                         if primary_operator not in _meta_ops:
                             overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
