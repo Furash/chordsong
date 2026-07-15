@@ -31,6 +31,50 @@ The fuzzy matching algorithm:
 - Requires the first character of each word to match for fuzzy matches
 - Sorts results by relevance (exact matches appear first)
 
+### Context Folders
+
+Subfolders scope scripts to editor contexts and organize them into groups:
+
+```
+scripts/
+├─ a.py                  → every context
+├─ _my_tools/            → every context, group "My Tools"
+│   └─ b.py
+├─ edit_mesh/            → Mesh Edit mode only
+│   ├─ c.py
+│   └─ my_bevels/        → Mesh Edit mode, group "My Bevels"
+│       └─ d.py
+├─ geonodes/             → Geometry Node editor only
+└─ shader/               → Shader editor only
+```
+
+**Recognized folder names:** `view3d`, `edit` (any edit mode), `object`,
+`edit_mesh`, `edit_curve`, `edit_surface`, `edit_text`, `edit_armature`,
+`edit_metaball`, `edit_lattice`, `edit_greasepencil`, `pose`, `sculpt`,
+`vertex_paint`, `weight_paint`, `texture_paint`, `particle`, `geonodes`,
+`shader`, `image`. Matching is a union — in Mesh Edit mode you see root +
+`view3d/` + `edit/` + `edit_mesh/` scripts together.
+
+**Groups:** a folder one level inside a context folder becomes a display
+group (`my_bevels` → "My Bevels"). A root folder starting with `_` is an
+all-contexts group. Anything deeper is ignored.
+
+**Unrecognized folders** are never hidden: their scripts show in every
+context with the folder name in red, sorted first, and the overlay header
+warns "Unrecognized folders detected" — so typos get noticed.
+
+**Custom folder names:** an optional `.chordsong` JSON file at the scripts
+root remaps spellings per context token:
+
+```json
+{ "edit_mesh": "mesh", "geonodes": ["geo", "gn"] }
+```
+
+An entry replaces that token's default name; unlisted tokens keep defaults.
+
+**Folders First** (Scripts Overlay settings): when enabled (default),
+grouped scripts sort before ungrouped ones; disable for a flat A-Z list.
+
 ### Script Execution
 
 When you execute a script:
