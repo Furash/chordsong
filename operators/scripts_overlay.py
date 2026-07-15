@@ -332,7 +332,10 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             print(f"Chord Song Scripts Overlay: {w}")
 
         if not self._all_scripts_list:
-            self.report({'INFO'}, "No scripts found in scripts folder")
+            if entries:
+                self.report({'INFO'}, "No scripts for this editor context")
+            else:
+                self.report({'INFO'}, "No scripts found in scripts folder")
             return {'CANCELLED'}
 
         self._buffer = []

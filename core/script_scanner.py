@@ -183,7 +183,7 @@ def scan_scripts_folder(root):
 
     for name in root_names:
         dirpath = os.path.join(root, name)
-        if not os.path.isdir(dirpath) or name.startswith("__"):
+        if not os.path.isdir(dirpath) or name.startswith("__") or name.startswith("."):
             continue
         if name.startswith("_"):
             # explicit all-contexts group

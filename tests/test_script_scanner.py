@@ -95,6 +95,14 @@ def test_scan_full_tree():
         assert any("deeper" in w for w in warnings)
 
 
+def test_scan_ignores_dot_directories():
+    with tempfile.TemporaryDirectory() as root:
+        _touch(root, ".git", "hooks", "pre-commit.py")
+        entries, warnings = scan_scripts_folder(root)
+        assert entries == []
+        assert warnings == []
+
+
 def test_scan_group_inside_context_has_no_special_prefixes():
     with tempfile.TemporaryDirectory() as root:
         _touch(root, "edit_mesh", "_foo", "a.py")

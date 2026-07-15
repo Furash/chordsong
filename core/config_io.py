@@ -276,6 +276,7 @@ def dump_prefs_filtered(prefs, filter_options: dict) -> dict:
                 "gap": float(getattr(prefs, "scripts_overlay_gap", 5.0)),
                 "column_gap": float(getattr(prefs, "scripts_overlay_column_gap", 25.0)),
                 "max_label_length": int(getattr(prefs, "scripts_overlay_max_label_length", 0)),
+                "folders_first": bool(getattr(prefs, "scripts_overlay_folders_first", True)),
             },
         }
     
