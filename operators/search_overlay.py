@@ -10,6 +10,7 @@ from ..core.engine import (
     filter_mappings_by_context,
     get_str_attr,
     humanize_chord,
+    mapping_matches_search,
     parse_kwargs,
     split_chord,
 )
@@ -151,9 +152,23 @@ class CHORDSONG_OT_SearchOverlay(bpy.types.Operator):
             pass
 
     def _filter_mappings(self):
-        """Filter mappings against the text buffer using fuzzy matching."""
-        if not self._text_buffer:
+        """Filter mappings against the text buffer.
+
+        Supports the same prefix syntax as the Preferences Chord Search
+        field (c:/l:/o:/p:/t:/s: field-scoped substring matching); plain
+        queries fall back to fuzzy matching on label and group.
+        """
+        query = self._text_buffer.lower()
+        if not query:
             self._filtered_mappings = list(self._all_mappings)
+            return
+
+        # Prefixed query: same semantics as the Chord Search field,
+        # keeping the mappings' original order like the prefs list does.
+        if len(query) >= 2 and query[1] == ':' and query[0] in ('c', 'l', 'o', 'p', 't', 's'):
+            self._filtered_mappings = [
+                m for m in self._all_mappings if mapping_matches_search(m, query)
+            ]
             return
 
         scored = []
@@ -161,7 +176,7 @@ class CHORDSONG_OT_SearchOverlay(bpy.types.Operator):
             label = get_str_attr(m, "label")
             group = get_str_attr(m, "group")
             haystack = f"{label} {group}" if group else label
-            matched, score = fuzzy_match(self._text_buffer, haystack)
+            matched, score = fuzzy_match(query, haystack)
             if matched:
                 scored.append((score, m))
 
@@ -464,6 +479,25 @@ class CHORDSONG_OT_SearchOverlay(bpy.types.Operator):
 
         elif event.type in {chr(i) for i in range(ord('A'), ord('Z') + 1)}:
             self._text_buffer += event.type.lower()
+            self._invalidate_hit_boxes()
+            self._tag_redraw()
+            return {"RUNNING_MODAL"}
+
+        # Punctuation needed for Chord Search prefix syntax (o:mesh.select_all)
+        elif event.type == "SEMI_COLON":
+            self._text_buffer += ":"
+            self._invalidate_hit_boxes()
+            self._tag_redraw()
+            return {"RUNNING_MODAL"}
+
+        elif event.type == "PERIOD":
+            self._text_buffer += "."
+            self._invalidate_hit_boxes()
+            self._tag_redraw()
+            return {"RUNNING_MODAL"}
+
+        elif event.type == "MINUS":
+            self._text_buffer += "_" if event.shift else "-"
             self._invalidate_hit_boxes()
             self._tag_redraw()
             return {"RUNNING_MODAL"}
