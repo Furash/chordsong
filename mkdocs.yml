@@ -72,7 +72,9 @@ nav:
     - Context Menu: features/context_menu.md
     - Info Panel: features/info.md
     - Recents: features/recents.md
+    - Chord Search: features/search.md
     - Scripts Overlay: features/scripts_overlay.md
+    - Usage Statistics: features/statistics.md
     - Conflict Detection: features/conflicts.md
     - Chords Sorting: features/sorting.md
   - Customization:

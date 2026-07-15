@@ -57,6 +57,8 @@ You can use prefix filters to search within specific fields:
 
 When using a filter, groups and individual mappings containing matching results are automatically expanded for easy visibility.
 
+The same prefix syntax works in the [Chord Search overlay](../features/search.md), so one set of habits covers both.
+
 ## Collapsible Items
 
 - **Fold All**: Collapse all groups to show headers only

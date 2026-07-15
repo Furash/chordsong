@@ -19,7 +19,9 @@ Traditional hotkey systems suffer from "keybind exhaustion," where users must me
 - **Leader Key System**: Initiate actions with a `<Leader>` key *(default: `Space`).*
 - **Context Awareness**: Mappings dynamically filter based on your active editor (e.g., 3D View, UV, Shader Editor).
 - **Smart Recents**: Double-tap the leader key to access your most recent actions.
+- **Chord Search**: Fuzzy-search your whole chord library in an overlay, run results with one key, and see each chord's real sequence to learn it (`chordsong.search`).
 - **Scripts Overlay**: Quick access to custom Python scripts with fuzzy search and numbered execution (default: `<Leader> x`).
+- **Usage Statistics**: Opt-in local tracking of operator/chord usage (Blender 5.2+) with one-click conversion of frequent operators into chords.
 - **Mapping System**: Bind chords to Operators, Properties, Toggles, or external Python files.
 - **Manual Sorting**: Organize chords with move up/down buttons or alphabetically sort entire groups. The overlay respects your custom order.
 - **Copy & Paste Sharing**: Share chord snippets with others via clipboard using compact JSON format.

@@ -121,9 +121,12 @@ When **Custom** style is selected, you can define your own format strings using 
 - `n` = Compact Count (e.g., "+5")
 - `S` = Separator A (default: `→`)
 - `s` = Separator B (default: `::`)
+- `T` = Toggle State (on/off glyph for toggle mappings)
 
 - **Folder Format**: Controls how folders (prefixes with multiple mappings) are displayed
 - **Item Format**: Controls how individual chord items are displayed
+
+Each format field has a reset button (↩) next to it that restores that field's default recipe — hover it to see the recipe.
 
 **Example Custom Formats:**
 

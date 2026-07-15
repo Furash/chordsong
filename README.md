@@ -16,6 +16,8 @@ Instead of memorizing awkward `Ctrl+Alt+Shift+F5` combinations, use intuitive se
 - **Context Menu Integration** — Right-click any UI element to add mappings instantly
 - **Context Awareness** — Mappings filter by active editor (3D View, UV, Shader Editor, etc.)
 - **Four Mapping Types** — Operators, Properties, Toggles, and Custom Python Scripts
+- **Chord Search** — Fuzzy-search your chord library in an overlay; results show the real chord so you learn as you go
+- **Usage Statistics** — Opt-in local tracking (Blender 5.2+) that surfaces frequent operators worth converting to chords
 - **Conflict Detection** — Built-in checker to identify and resolve mapping conflicts
 - **Visual Overlay** — Dynamic overlay shows available chords as you type
 - **Groups & Organization** — Organize mappings into groups for better overlay structure
