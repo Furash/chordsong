@@ -30,7 +30,7 @@ def _get_preset_formats(style):
     }
     return presets.get(style, presets["DEFAULT"])
 
-def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buffer_tokens=None):
+def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buffer_tokens=None, run_labels=None):
     """Build display rows from candidates, footer returned separately.
 
     Args:
@@ -38,6 +38,8 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
         has_buffer: Whether there's a buffer (affects footer display)
         p: Preferences object (optional)
         buffer_tokens: Current chord buffer; used to compute click-target chord_tokens on final rows
+        run_labels: Optional (plain_click, ctrl_click) footer labels for
+            scripts-style overlays (defaults to the script wording)
     """
     buffer_tokens = list(buffer_tokens) if buffer_tokens else []
     rows = []
@@ -183,6 +185,14 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 mapping_type=c.mapping_type,
                 group_icons=group_icons,
             )
+
+            # The Scripts overlay launcher is a container like a group folder,
+            # so its label gets the group color rather than the item color.
+            if c.mapping_ref is not None and \
+                    get_str_attr(c.mapping_ref, "operator") == "chordsong.scripts_overlay":
+                for tok in tokens:
+                    if tok.type == 'L':
+                        tok.color_key = 'overlay_color_group'
             
             # Compute the full chord path for click-dispatch. Empty token means
             # "no chord" (scripts overlay items beyond the first 9) — leave None.
@@ -261,8 +271,9 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
     # overlay: plain click runs + closes, Ctrl+click runs + keeps overlay
     # open for chaining.
     if is_scripts_overlay:
-        footer.append({"kind": "item", "token": "M1", "label": "Run script", "icon": ""})
-        footer.append({"kind": "item", "token": "^M1", "label": "Run + keep overlay open", "icon": ""})
+        plain_label, ctrl_label = run_labels or ("Run script", "Run + keep overlay open")
+        footer.append({"kind": "item", "token": "M1", "label": plain_label, "icon": ""})
+        footer.append({"kind": "item", "token": "^M1", "label": ctrl_label, "icon": ""})
     else:
         footer.append({"kind": "item", "token": "M1", "label": "Toggle", "icon": ""})
 
@@ -310,7 +321,8 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
     for col in columns:
         # Dynamic sub-columns: track max width for each token type
         token_widths = {}  # token_type -> max_width
-        
+        extra_w = 0.0  # widest label_extra (drawn after the token columns)
+
         # Legacy fields
         col_max_header_w = 0.0
         has_any_icon = False
@@ -347,9 +359,14 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
                         
                         # Measure width
                         w, _ = blf.dimensions(0, content)
-                        
+
                         # Track maximum width for this token type
                         token_widths[tok.type] = max(token_widths.get(tok.type, 0.0), w)
+
+                    if r.get("label_extra"):
+                        blf.size(0, body_size)
+                        ew, _ = blf.dimensions(0, r["label_extra"])
+                        extra_w = max(extra_w, ew)
                 else:
                     # Legacy rendering: use standard 3-column approach
                     # Chord column
@@ -397,6 +414,7 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
         # Build metrics dict with dynamic token widths
         metrics = {
             "token_widths": token_widths,  # Dict of token_type -> max_width
+            "extra_w": extra_w,
             "header": col_max_header_w,
             "has_icons": has_any_icon,
             # Legacy compatibility

@@ -518,6 +518,20 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                     if col_width > 0:
                         current_x += col_width + gap
 
+                # Extra label (e.g. ":: value" for properties, ":: chord" in
+                # the search overlay) — drawn after the token columns, which
+                # start at the same x in every row so extras align vertically.
+                if r.get("label_extra"):
+                    if current_size != body_size:
+                        blf.size(0, body_size)
+                        current_size = body_size
+                    col = linear_to_srgb(getattr(p, "overlay_color_counter", (1.0, 1.0, 1.0, 1.0)))
+                    blf.color(0, col[0], col[1], col[2], col[3])
+                    blf.position(0, current_x, cy, 0)
+                    blf.draw(0, r["label_extra"])
+                    ew, _ = blf.dimensions(0, r["label_extra"])
+                    current_x += ew + gap
+
                 if row_hit_kind:
                     # Right edge = wherever the final token landed (current_x). Trim
                     # the trailing gap we may have appended after the last token.
@@ -919,7 +933,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         line_h = int(body_size * p.overlay_line_height)
 
         # Build rows and footer (sorted by group display_order, then chord order_index)
-        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, is_scripts_overlay=bool(scripts_overlay_settings), buffer_tokens=buffer_tokens)
+        run_labels = scripts_overlay_settings.get("run_labels") if scripts_overlay_settings else None
+        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, is_scripts_overlay=bool(scripts_overlay_settings), buffer_tokens=buffer_tokens, run_labels=run_labels)
         max_rows = max(int(max_rows_setting), 1)
         columns = wrap_into_columns(rows, max_rows)
 
@@ -942,6 +957,8 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         for m in col_metrics:
             col_icon_w = (m["icon_w"] + gap) if m["has_icons"] else 0
             content_w = col_icon_w + m["token"] + gap + m["label"]
+            if m.get("extra_w"):
+                content_w += gap + m["extra_w"]
             width = max(content_w, m["header"])
             if column_width_override is not None:
                 width = max(width, column_width_override * scale_factor)

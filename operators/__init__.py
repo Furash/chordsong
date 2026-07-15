@@ -45,6 +45,7 @@ from .mapping.mapping_select import (
 from .mapping.property_convert import CHORDSONG_OT_Property_Mapping_Convert
 from .mapping.subitem_ops import CHORDSONG_OT_SubItem_Add, CHORDSONG_OT_SubItem_Remove
 from .config.open_keymap import CHORDSONG_OT_Open_Keymap
+from .config.reset_format import CHORDSONG_OT_Reset_Format
 from .config.open_prefs import CHORDSONG_OT_Open_Prefs
 from .config.overlay_theme import (
     CHORDSONG_OT_ExportOverlayTheme,
@@ -56,6 +57,7 @@ from .recents import CHORDSONG_OT_Recents
 from .config.save_config import CHORDSONG_OT_Save_Config
 from .script_select import CHORDSONG_OT_Script_Select, CHORDSONG_OT_Script_Select_Apply
 from .scripts_overlay import CHORDSONG_OT_ScriptsOverlay
+from .search_overlay import CHORDSONG_OT_SearchOverlay
 from .stats_operators import (
     CHORDSONG_OT_Stats_Blacklist,
     CHORDSONG_OT_Stats_Convert_To_Chord,
@@ -116,10 +118,12 @@ __all__ = [
     "CHORDSONG_OT_Open_Keymap",
     "CHORDSONG_OT_Open_Prefs",
     "CHORDSONG_OT_Recents",
+    "CHORDSONG_OT_Reset_Format",
     "CHORDSONG_OT_Save_Config",
     "CHORDSONG_OT_Script_Select",
     "CHORDSONG_OT_Script_Select_Apply",
     "CHORDSONG_OT_ScriptsOverlay",
+    "CHORDSONG_OT_SearchOverlay",
     "CHORDSONG_OT_Stats_Blacklist",
     "CHORDSONG_OT_Stats_Convert_To_Chord",
     "CHORDSONG_OT_Stats_Export",

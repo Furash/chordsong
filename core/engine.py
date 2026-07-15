@@ -467,6 +467,132 @@ def parse_kwargs(kwargs_json: str) -> dict:
     except Exception:
         return {}
 
+def mapping_matches_search(m, query):
+    """Check if a mapping matches a search query.
+
+    Shared by the Preferences "Chord Search" field and the search overlay.
+
+    Supports prefix filters:
+    - c: - search only in chords
+    - l: - search only in labels
+    - o: - search only in operators
+    - p: - search only in properties
+    - t: - search only in toggles
+    - s: - search only in scripts
+    """
+    if not query:
+        return True
+
+    # Parse prefix filter
+    search_filter = None
+    search_term = query
+
+    if len(query) >= 2 and query[1] == ':':
+        prefix = query[0]
+        if prefix in ('c', 'l', 'o', 'p', 't', 's'):
+            search_filter = prefix
+            search_term = query[2:].strip()
+            if not search_term:
+                # If only prefix with no term, show all items of that type
+                search_term = ""
+
+    # Get mapping type for type-specific filtering
+    mapping_type = getattr(m, "mapping_type", "OPERATOR")
+
+    # Search in chord
+    if search_filter is None or search_filter == 'c':
+        chord_str = get_str_attr(m, "chord") or ""
+        if not search_term or search_term in chord_str.lower():
+            if search_filter == 'c':
+                return True
+            elif search_term in chord_str.lower():
+                return True
+
+    # Search in label
+    if search_filter is None or search_filter == 'l':
+        label_str = get_str_attr(m, "label") or ""
+        if not search_term or search_term in label_str.lower():
+            if search_filter == 'l':
+                return True
+            elif search_term in label_str.lower():
+                return True
+
+    # Search based on mapping type
+    if mapping_type == "OPERATOR":
+        if search_filter is None or search_filter == 'o':
+            # Search in operator ID
+            operator_str = get_str_attr(m, "operator") or ""
+            if not search_term or search_term in operator_str.lower():
+                if search_filter == 'o':
+                    return True
+                elif search_term in operator_str.lower():
+                    return True
+            # Search in sub-operators
+            for sub_op in getattr(m, "sub_operators", []):
+                sub_op_str = get_str_attr(sub_op, "operator") or ""
+                if not search_term or search_term in sub_op_str.lower():
+                    if search_filter == 'o':
+                        return True
+                    elif search_term in sub_op_str.lower():
+                        return True
+
+    elif mapping_type == "CONTEXT_PROPERTY":
+        if search_filter is None or search_filter == 'p':
+            # Search in property path
+            prop_path = get_str_attr(m, "context_path") or ""
+            if not search_term or search_term in prop_path.lower():
+                if search_filter == 'p':
+                    return True
+                elif search_term in prop_path.lower():
+                    return True
+            # Search in property value
+            prop_val = get_str_attr(m, "property_value") or ""
+            if not search_term or search_term in prop_val.lower():
+                if search_filter == 'p':
+                    return True
+                elif search_term in prop_val.lower():
+                    return True
+            # Search in sub-items
+            for sub_item in getattr(m, "sub_items", []):
+                sub_path = get_str_attr(sub_item, "path") or ""
+                sub_val = get_str_attr(sub_item, "value") or ""
+                if not search_term or search_term in sub_path.lower() or search_term in sub_val.lower():
+                    if search_filter == 'p':
+                        return True
+                    elif search_term in sub_path.lower() or search_term in sub_val.lower():
+                        return True
+
+    elif mapping_type == "CONTEXT_TOGGLE":
+        if search_filter is None or search_filter == 't':
+            # Search in toggle path
+            toggle_path = get_str_attr(m, "context_path") or ""
+            if not search_term or search_term in toggle_path.lower():
+                if search_filter == 't':
+                    return True
+                elif search_term in toggle_path.lower():
+                    return True
+            # Search in sub-items
+            for sub_item in getattr(m, "sub_items", []):
+                sub_path = get_str_attr(sub_item, "path") or ""
+                if not search_term or search_term in sub_path.lower():
+                    if search_filter == 't':
+                        return True
+                    elif search_term in sub_path.lower():
+                        return True
+
+    elif mapping_type == "PYTHON_FILE":
+        if search_filter is None or search_filter == 's':
+            # Search in script file path
+            script_file = get_str_attr(m, "python_file") or ""
+            if not search_term or search_term in script_file.lower():
+                if search_filter == 's':
+                    return True
+                elif search_term in script_file.lower():
+                    return True
+
+    return False
+
+
 def filter_mappings_by_context(mappings, context_type: str):
     """
     Filter mappings by editor context.
