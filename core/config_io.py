@@ -182,6 +182,7 @@ def dump_prefs(prefs) -> dict:
                 "gap": float(getattr(prefs, "scripts_overlay_gap", 5.0)),
                 "column_gap": float(getattr(prefs, "scripts_overlay_column_gap", 25.0)),
                 "max_label_length": int(getattr(prefs, "scripts_overlay_max_label_length", 0)),
+                "folders_first": bool(getattr(prefs, "scripts_overlay_folders_first", True)),
             },
         },
         # Stats settings live here (not in dump_prefs_filtered): the shared
@@ -571,6 +572,9 @@ def apply_config(prefs, data: dict) -> list[str]:
                 if key in scripts_overlay:
                     try: setattr(prefs, attr, float(scripts_overlay[key]))
                     except: pass
+            if "folders_first" in scripts_overlay:
+                try: prefs.scripts_overlay_folders_first = bool(scripts_overlay["folders_first"])
+                except: pass
 
     stats = data.get("stats", {})
     if isinstance(stats, dict):
