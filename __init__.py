@@ -349,6 +349,17 @@ def register():
                 if hasattr(prefs, "ensure_defaults"):
                     prefs.ensure_defaults()
             
+            # Restore the Folders First toggle from its sidecar AFTER the
+            # config apply, so the user's latest toggle (which may only have
+            # reached the autosave, not the main config) wins on startup.
+            try:
+                from .ui.prefs import load_folders_first_persistent
+                _folders_first = load_folders_first_persistent()
+                if _folders_first is not None:
+                    prefs.scripts_overlay_folders_first = _folders_first
+            except Exception:
+                pass
+
             # Normalize order indices (for existing blend files with old data)
             # This ensures no gaps in the sequence even if loading old configs
             from .core.config_io import _normalize_order_indices

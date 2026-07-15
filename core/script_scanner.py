@@ -76,8 +76,10 @@ class ScriptEntry:
 
 
 def humanize_folder(name):
-    """'_my_tools' -> 'My Tools' (strip leading underscores, _ -> space)."""
-    return name.lstrip("_").replace("_", " ").strip().title()
+    """Group display name: the folder name as typed, minus the leading
+    underscore marker of root-level all-context groups ('_my_tools' ->
+    'my_tools'). No case or separator rewriting."""
+    return name.lstrip("_").strip()
 
 
 def _load_aliases(root):
@@ -129,8 +131,16 @@ def _list_dir(dirpath, warnings):
         return []
 
 
+def _ignored(name):
+    """Names starting with '__' or '.' are invisible to the scan entirely
+    (files and directories, at every level): __pycache__, .git, .DS_Store,
+    hidden editor droppings. The .chordsong config file is unaffected —
+    it is read directly by path, not via directory enumeration."""
+    return name.startswith(("__", "."))
+
+
 def _is_script(dirpath, name):
-    return (name.endswith(".py") and not name.startswith("__")
+    return (name.endswith(".py") and not _ignored(name)
             and os.path.isfile(os.path.join(dirpath, name)))
 
 
@@ -154,13 +164,13 @@ def _scan_group_level(dirpath, context_token, warnings):
     entries.extend(_script_entries(dirpath, names, context_token, "", False))
     for name in names:
         sub = os.path.join(dirpath, name)
-        if not os.path.isdir(sub) or name.startswith("__"):
+        if not os.path.isdir(sub) or _ignored(name):
             continue
         group = humanize_folder(name)
         sub_names = _list_dir(sub, warnings)
         entries.extend(_script_entries(sub, sub_names, context_token, group, False))
         for deep in sub_names:
-            if os.path.isdir(os.path.join(sub, deep)) and not deep.startswith("__"):
+            if os.path.isdir(os.path.join(sub, deep)) and not _ignored(deep):
                 warnings.append(f"'{name}/{deep}' is too deep — ignored")
     return entries
 
@@ -183,7 +193,7 @@ def scan_scripts_folder(root):
 
     for name in root_names:
         dirpath = os.path.join(root, name)
-        if not os.path.isdir(dirpath) or name.startswith("__") or name.startswith("."):
+        if not os.path.isdir(dirpath) or _ignored(name):
             continue
         if name.startswith("_"):
             # explicit all-contexts group
@@ -191,7 +201,7 @@ def scan_scripts_folder(root):
             sub_names = _list_dir(dirpath, warnings)
             entries.extend(_script_entries(dirpath, sub_names, None, group, False))
             for deep in sub_names:
-                if os.path.isdir(os.path.join(dirpath, deep)) and not deep.startswith("__"):
+                if os.path.isdir(os.path.join(dirpath, deep)) and not _ignored(deep):
                     warnings.append(f"'{name}/{deep}' is too deep — ignored")
             continue
         token = folder_to_token.get(name.lower())
@@ -204,6 +214,24 @@ def scan_scripts_folder(root):
         entries.extend(_script_entries(dirpath, sub_names, None, name, True))
 
     return entries, warnings
+
+
+def group_summaries(entries):
+    """Distinct groups as (name, count, flagged) — flagged first, then A-Z.
+
+    Feeds the scripts overlay's folders-first root view, where each group
+    renders as an enterable folder row."""
+    counts = {}
+    flagged = {}
+    for e in entries:
+        if not e.group:
+            continue
+        counts[e.group] = counts.get(e.group, 0) + 1
+        flagged[e.group] = flagged.get(e.group, False) or e.flagged
+    return sorted(
+        ((g, counts[g], flagged[g]) for g in counts),
+        key=lambda t: (0 if t[2] else 1, t[0].lower()),
+    )
 
 
 def sort_entries(entries, folders_first=True):

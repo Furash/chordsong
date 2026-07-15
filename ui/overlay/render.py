@@ -468,6 +468,10 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                         elif row_hovered and tok.type in ('L', 'l'):
                             # Hover feedback for scripts overlay: recolor the label.
                             col = linear_to_srgb(p.overlay_color_chord)
+                        elif tok.type == 'L' and getattr(row_mapping_ref, "flagged", False) \
+                                and getattr(row_mapping_ref, "is_folder_entry", False):
+                            # Unrecognized folder row — fixed warning red
+                            col = (0.95, 0.35, 0.35, 1.0)
                         else:
                             col = linear_to_srgb(getattr(p, color_key, (1.0, 1.0, 1.0, 1.0)))
                         

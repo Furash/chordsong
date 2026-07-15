@@ -38,11 +38,11 @@ Subfolders scope scripts to editor contexts and organize them into groups:
 ```
 scripts/
 ├─ a.py                  → every context
-├─ _my_tools/            → every context, group "My Tools"
+├─ _my_tools/            → every context, group "my_tools"
 │   └─ b.py
 ├─ edit_mesh/            → Mesh Edit mode only
 │   ├─ c.py
-│   └─ my_bevels/        → Mesh Edit mode, group "My Bevels"
+│   └─ my_bevels/        → Mesh Edit mode, group "my_bevels"
 │       └─ d.py
 ├─ geonodes/             → Geometry Node editor only
 └─ shader/               → Shader editor only
@@ -56,7 +56,7 @@ scripts/
 `view3d/` + `edit/` + `edit_mesh/` scripts together.
 
 **Groups:** a folder one level inside a context folder becomes a display
-group (`my_bevels` → "My Bevels"). A root folder starting with `_` is an
+group shown with its folder name as typed (`my_bevels`). A root folder starting with `_` is an
 all-contexts group. Anything deeper is ignored.
 
 **Unrecognized folders** are never hidden: their scripts show in every
@@ -72,8 +72,12 @@ root remaps spellings per context token:
 
 An entry replaces that token's default name; unlisted tokens keep defaults.
 
-**Folders First** (Scripts Overlay settings): when enabled (default),
-grouped scripts sort before ungrouped ones; disable for a flat A-Z list.
+**Folders First** (Scripts Overlay settings): when enabled (default), the
+root view shows folders as enterable entries at the top — labeled in the
+group color with a `+N` count (red for unrecognized folders) — followed by
+loose scripts. Press the folder's number (or click it) to drill in;
+**Backspace** steps back out. Typing filters the whole tree at root, or
+just the folder's contents while inside one. Disable for a flat A-Z list.
 
 ### Script Execution
 
@@ -142,9 +146,9 @@ These settings are independent from the main overlay settings, allowing you to c
 
 | Key | Action |
 | :--- | :--- |
-| **1-9** | Execute script at that position |
+| **1-9** | Execute script — or enter the folder — at that position |
 | **A-Z** | Add letter to search filter |
-| **Backspace** | Remove last filter character |
+| **Backspace** | Remove last filter character; then step out of a folder; then close |
 | **Ctrl/Alt/Shift + Number** | Add number to filter |
 | **ESC / Right-Click** | Close overlay |
 

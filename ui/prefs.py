@@ -139,6 +139,58 @@ def load_allow_scripts_persistent() -> bool:
     except Exception:
         return False
 
+def _folders_first_flag_path():
+    """Sidecar file tracking scripts_overlay_folders_first across restarts.
+    Startup restores prefs from the main config JSON, but toggles between
+    manual Save Config runs only reach the autosave — this sidecar keeps
+    the user's latest choice authoritative (same pattern as
+    allow_custom_user_scripts.flag)."""
+    try:
+        if hasattr(bpy.utils, 'extension_path_user'):
+            root_pkg = _addon_root_pkg()
+            extension_dir = bpy.utils.extension_path_user(root_pkg, path="", create=True)
+            if extension_dir:
+                return os.path.join(extension_dir, "scripts_overlay_folders_first.flag")
+    except Exception:
+        pass
+    return ""
+
+
+def save_folders_first_persistent(enabled: bool):
+    """Persist the Folders First toggle (atomic write, see
+    save_allow_scripts_persistent for rationale)."""
+    path = _folders_first_flag_path()
+    if not path:
+        return
+    tmp_path = path + ".tmp"
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write("1" if enabled else "0")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+def load_folders_first_persistent():
+    """Read the persisted Folders First toggle. Returns None when no sidecar
+    exists yet, so callers can leave the config/default value untouched."""
+    path = _folders_first_flag_path()
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip() == "1"
+    except Exception:
+        return None
+
+
 def _autosave_now(prefs):
     # Best effort debounced autosave, used by property update callbacks.
     try:
@@ -185,6 +237,18 @@ def _on_allow_scripts_changed(self, context):
     except Exception:
         pass
     _on_prefs_changed(self, context)
+
+def _on_folders_first_changed(self, context):
+    # Persist to the sidecar, then fall through to the standard handler.
+    # Respect _SUSPEND_CALLBACKS so register-time seeding doesn't echo back.
+    if _SUSPEND_CALLBACKS:
+        return
+    try:
+        save_folders_first_persistent(bool(self.scripts_overlay_folders_first))
+    except Exception:
+        pass
+    _on_prefs_changed(self, context)
+
 
 def _on_mapping_changed(_self, context):
     try:
@@ -756,7 +820,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Folders First",
         description="Sort grouped (foldered) scripts before ungrouped scripts in the scripts overlay",
         default=True,
-        update=_on_prefs_changed,
+        update=_on_folders_first_changed,
     )
 
     overlay_enabled: BoolProperty(

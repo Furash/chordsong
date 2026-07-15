@@ -26,11 +26,13 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
     _text_buffer = ""
     _all_scripts_list = None
     _scan_warnings = None
-    _filtered_scripts_list = None
+    _display_items = None
     _invoke_area_ptr = None
     _panel_states = None
     _cancel_requested = False  # Shared across invocations by design
     _hover_script_path = None
+    _current_group = None   # Folder the user drilled into (folders-first view)
+    _folders_first = True   # Snapshot of the pref at invoke
 
     def _ensure_draw_handler(self, context: bpy.types.Context):
         p = prefs(context)
@@ -87,20 +89,46 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             pass
 
     def _filter_scripts(self):
-        """Filter script entries against the text buffer using fuzzy matching."""
-        if not self._text_buffer:
-            self._filtered_scripts_list = self._all_scripts_list
+        """Build the display list for the current view.
+
+        Items are ("script", entry) or ("group", name, count, flagged)
+        tuples. With Folders First enabled and no filter text, the root
+        view shows group folders (enterable via digits) followed by loose
+        scripts; inside a folder only its scripts show. Typing filters
+        the current scope (whole tree at root, folder contents inside).
+        """
+        if self._text_buffer:
+            scope = [
+                e for e in self._all_scripts_list
+                if self._current_group is None or e.group == self._current_group
+            ]
+            scored = []
+            for entry in scope:
+                haystack = f"{entry.name} {entry.group}" if entry.group else entry.name
+                matched, score = fuzzy_match(self._text_buffer, haystack)
+                if matched:
+                    scored.append((score, entry))
+            scored.sort(key=lambda x: x[0])
+            self._display_items = [("script", entry) for _, entry in scored]
             return
 
-        scored = []
-        for entry in self._all_scripts_list:
-            haystack = f"{entry.name} {entry.group}" if entry.group else entry.name
-            matched, score = fuzzy_match(self._text_buffer, haystack)
-            if matched:
-                scored.append((score, entry))
+        if self._current_group is not None:
+            self._display_items = [
+                ("script", e) for e in self._all_scripts_list
+                if e.group == self._current_group
+            ]
+            return
 
-        scored.sort(key=lambda x: x[0])
-        self._filtered_scripts_list = [entry for _, entry in scored]
+        if self._folders_first:
+            from ..core.script_scanner import group_summaries
+            self._display_items = (
+                [("group", name, count, flagged)
+                 for name, count, flagged in group_summaries(self._all_scripts_list)]
+                + [("script", e) for e in self._all_scripts_list if not e.group]
+            )
+            return
+
+        self._display_items = [("script", e) for e in self._all_scripts_list]
 
     def _draw_callback(self):
         """Draw callback for the scripts overlay."""
@@ -187,11 +215,11 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         # Create chords that match the buffer prefix so candidates_for_prefix doesn't filter them out
         # The chord format is: text_buffer + " " + number
         # Numbering: 1, 2, 3, ..., 9 (so index 0->1, index 1->2, ..., index 8->9)
-        # Only assign chords to first 9 items, but show all filtered scripts up to max_items
-        # Python nerd icon (󰌠) is used for scripts beyond the first 9
+        # Only assign chords to first 9 items, but show all filtered items up to max_items
         python_icon = "󰌠"  # Python nerd icon
+        folder_icon = "󰉋"  # Folder nerd icon
 
-        for i, entry in enumerate(self._filtered_scripts_list):
+        for i, item in enumerate(self._display_items):
             if i >= max_items:
                 break
 
@@ -205,19 +233,33 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                 # Beyond first 9: displayed but not chord-executable
                 chord = ""
 
-            # Group shown as secondary text (":: Group") — splits into
-            # label_extra in build_overlay_rows, red when flagged (render).
-            label = entry.name
-            if entry.group:
-                label = f"{entry.name} :: {entry.group}"
-            fake_mappings.append(FakeMapping(
-                chord, label, entry.path, python_icon,
-                group=entry.group or "Scripts", flagged=entry.flagged,
-            ))
+            if item[0] == "group":
+                # Enterable folder row: "+N" count as secondary text, label
+                # rendered in group color (red when flagged) — see layout/render.
+                _, gname, count, gflagged = item
+                fm = FakeMapping(
+                    chord, f"{gname} :: +{count}", f"folder://{gname}",
+                    folder_icon, group=gname, flagged=gflagged,
+                )
+                fm.is_folder_entry = True
+                fm.folder_name = gname
+                fake_mappings.append(fm)
+            else:
+                entry = item[1]
+                fake_mappings.append(FakeMapping(
+                    chord, entry.name, entry.path, python_icon,
+                    group=entry.group or "Scripts", flagged=entry.flagged,
+                ))
 
-        # Calculate total scripts count for header display
-        total_scripts = len(self._filtered_scripts_list)
-        script_count_text = f"{total_scripts} Script{'s' if total_scripts != 1 else ''}"
+        # Header: script count for the current scope (folder rows aside)
+        if self._current_group is not None and not self._text_buffer:
+            total_scripts = len(self._display_items)
+            script_count_text = f"{self._current_group} — {total_scripts} Script{'s' if total_scripts != 1 else ''}"
+        else:
+            total_scripts = sum(1 for it in self._display_items if it[0] == "script")
+            if not self._text_buffer and self._folders_first:
+                total_scripts = len(self._all_scripts_list)
+            script_count_text = f"{total_scripts} Script{'s' if total_scripts != 1 else ''}"
         if self._scan_warnings:
             script_count_text += "  —  󰀪 Unrecognized folders detected"
 
@@ -340,9 +382,11 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
         self._buffer = []
         self._text_buffer = ""
-        self._filtered_scripts_list = []
+        self._display_items = []
         self._hover_script_path = None
-        self._filter_scripts()  # Initial filter (shows all scripts)
+        self._current_group = None
+        self._folders_first = bool(getattr(p, "scripts_overlay_folders_first", True))
+        self._filter_scripts()  # Initial view (folders + loose scripts)
         self._ensure_draw_handler(context)
         context.window_manager.modal_handler_add(self)
         self._tag_redraw()
@@ -430,6 +474,11 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                     hit = None
                 if hit and hit["kind"] == "script":
                     ref = hit["payload"].get("mapping_ref")
+                    folder_name = getattr(ref, "folder_name", None) if ref is not None else None
+                    if folder_name is not None:
+                        # Folder row: enter it (click or Ctrl+click alike)
+                        self._enter_group(folder_name)
+                        return {"RUNNING_MODAL"}
                     script_path = getattr(ref, "python_file", None) if ref is not None else None
                     script_label = getattr(ref, "label", "") if ref is not None else ""
                     if script_path:
@@ -445,10 +494,15 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                             return {"FINISHED"}
             return {"RUNNING_MODAL"}
 
-        # Backspace to remove last character
+        # Backspace: trim filter text, then step out of a folder, then cancel
         if event.type == "BACK_SPACE" and event.value == "PRESS":
             if self._text_buffer:
                 self._text_buffer = self._text_buffer[:-1]
+                self._invalidate_hit_boxes()
+                self._tag_redraw()
+                return {"RUNNING_MODAL"}
+            elif self._current_group is not None:
+                self._current_group = None
                 self._invalidate_hit_boxes()
                 self._tag_redraw()
                 return {"RUNNING_MODAL"}
@@ -484,8 +538,13 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                     return {"RUNNING_MODAL"}  # 0 is not a valid chord
                 idx = chord_num - 1
 
-                if idx < len(self._filtered_scripts_list) and idx < 9:
-                    entry = self._filtered_scripts_list[idx]
+                if idx < len(self._display_items) and idx < 9:
+                    item = self._display_items[idx]
+                    if item[0] == "group":
+                        # Digit on a folder row: drill into it
+                        self._enter_group(item[1])
+                        return {"RUNNING_MODAL"}
+                    entry = item[1]
                     script_name, script_path = entry.name, entry.path
                     # Build chord text for fading overlay
                     chord_num = str(idx + 1)
@@ -515,6 +574,14 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             return {"RUNNING_MODAL"}
 
         return {"RUNNING_MODAL"}
+
+    def _enter_group(self, group_name):
+        """Drill into a folder row (digit or click on a group entry)."""
+        self._current_group = group_name
+        self._text_buffer = ""
+        self._hover_script_path = None
+        self._invalidate_hit_boxes()
+        self._tag_redraw()
 
     def _invalidate_hit_boxes(self):
         # Drop stale hit-boxes synchronously so a click arriving before the

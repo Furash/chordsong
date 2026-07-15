@@ -64,9 +64,10 @@ def _entry_map(entries):
 
 
 def test_humanize_folder():
-    assert humanize_folder("_my_tools") == "My Tools"
-    assert humanize_folder("my_bevel_scripts") == "My Bevel Scripts"
-    assert humanize_folder("edit_meshh") == "Edit Meshh"
+    # Folder names are shown as typed; only the root-group '_' marker is stripped.
+    assert humanize_folder("_my_tools") == "my_tools"
+    assert humanize_folder("my_bevel_scripts") == "my_bevel_scripts"
+    assert humanize_folder("Edit_Meshh") == "Edit_Meshh"
 
 
 def test_scan_full_tree():
@@ -85,9 +86,9 @@ def test_scan_full_tree():
 
         assert set(m) == {"a", "b", "c", "d", "e"}
         assert m["a"].context_token is None and m["a"].group == "" and not m["a"].flagged
-        assert m["b"].context_token is None and m["b"].group == "My Tools" and not m["b"].flagged
+        assert m["b"].context_token is None and m["b"].group == "my_tools" and not m["b"].flagged
         assert m["c"].context_token == "edit_mesh" and m["c"].group == "" and not m["c"].flagged
-        assert m["d"].context_token == "edit_mesh" and m["d"].group == "My Bevels" and not m["d"].flagged
+        assert m["d"].context_token == "edit_mesh" and m["d"].group == "my_bevels" and not m["d"].flagged
         # unrecognized root folder: shown everywhere, raw folder name, flagged
         assert m["e"].context_token is None and m["e"].group == "edit_meshh" and m["e"].flagged
         # warnings: unrecognized root folder + too-deep dir
@@ -103,14 +104,29 @@ def test_scan_ignores_dot_directories():
         assert warnings == []
 
 
+def test_scan_ignores_dot_names_at_every_level():
+    with tempfile.TemporaryDirectory() as root:
+        _touch(root, ".hidden.py")                          # dot file at root
+        _touch(root, ".claude", "notes.py")                 # dot dir at root
+        _touch(root, "edit_mesh", ".cache", "x.py")         # dot dir in context folder
+        _touch(root, "edit_mesh", ".hidden.py")             # dot file in context folder
+        _touch(root, "edit_mesh", "grp", ".deep", "y.py")   # dot dir at group level
+        _touch(root, "edit_mesh", "grp", ".hidden.py")      # dot file in group folder
+        _touch(root, "_tools", ".vscode", "z.py")           # dot dir in _group folder
+        _touch(root, "edit_mesh", "a.py")
+        entries, warnings = scan_scripts_folder(root)
+        assert [e.name for e in entries] == ["a"]
+        assert warnings == []  # no "too deep" or "unrecognized" noise from dot names
+
+
 def test_scan_group_inside_context_has_no_special_prefixes():
     with tempfile.TemporaryDirectory() as root:
         _touch(root, "edit_mesh", "_foo", "a.py")
         _touch(root, "edit_mesh", "geonodes", "b.py")
         entries, warnings = scan_scripts_folder(root)
         m = _entry_map(entries)
-        assert m["a"].context_token == "edit_mesh" and m["a"].group == "Foo"
-        assert m["b"].context_token == "edit_mesh" and m["b"].group == "Geonodes"
+        assert m["a"].context_token == "edit_mesh" and m["a"].group == "foo"
+        assert m["b"].context_token == "edit_mesh" and m["b"].group == "geonodes"
         assert warnings == []
 
 
@@ -181,6 +197,17 @@ def test_sort_folders_first():
     ordered = [e.name for e in sort_entries(entries, folders_first=True)]
     # flagged first, then grouped (groups A-Z, names A-Z), then ungrouped A-Z
     assert ordered == ["bad", "gamma", "beta", "alpha", "zeta"]
+
+
+def test_group_summaries():
+    from core.script_scanner import group_summaries
+    entries = [_e("a"), _e("b", group="tools"), _e("c", group="tools"),
+               _e("d", group="bevels"), _e("e", group="typo_dir", flagged=True)]
+    assert group_summaries(entries) == [
+        ("typo_dir", 1, True),   # flagged first
+        ("bevels", 1, False),
+        ("tools", 2, False),
+    ]
 
 
 def test_sort_flat_when_folders_first_off():

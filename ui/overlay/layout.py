@@ -188,10 +188,12 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 group_icons=group_icons,
             )
 
-            # The Scripts overlay launcher is a container like a group folder,
-            # so its label gets the group color rather than the item color.
-            if c.mapping_ref is not None and \
-                    get_str_attr(c.mapping_ref, "operator") == "chordsong.scripts_overlay":
+            # Containers get the group color rather than the item color:
+            # the Scripts overlay launcher in the main overlay, and folder
+            # rows inside the scripts overlay's folders-first view.
+            if c.mapping_ref is not None and (
+                    get_str_attr(c.mapping_ref, "operator") == "chordsong.scripts_overlay"
+                    or getattr(c.mapping_ref, "is_folder_entry", False)):
                 for tok in tokens:
                     if tok.type == 'L':
                         tok.color_key = 'overlay_color_group'
