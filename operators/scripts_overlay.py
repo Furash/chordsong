@@ -25,6 +25,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
     _buffer = None
     _text_buffer = ""
     _all_scripts_list = None
+    _scan_warnings = None
     _filtered_scripts_list = None
     _invoke_area_ptr = None
     _panel_states = None
@@ -86,22 +87,20 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             pass
 
     def _filter_scripts(self):
-        """Filter scripts based on text buffer using fuzzy matching."""
+        """Filter script entries against the text buffer using fuzzy matching."""
         if not self._text_buffer:
-            # No filter, show all scripts
             self._filtered_scripts_list = self._all_scripts_list
             return
 
-        # Filter scripts using fuzzy matching
-        scored_scripts = []
-        for script_name, script_path in self._all_scripts_list:
-            matched, score = fuzzy_match(self._text_buffer, script_name)
+        scored = []
+        for entry in self._all_scripts_list:
+            haystack = f"{entry.name} {entry.group}" if entry.group else entry.name
+            matched, score = fuzzy_match(self._text_buffer, haystack)
             if matched:
-                scored_scripts.append((score, script_name, script_path))
+                scored.append((score, entry))
 
-        # Sort by score (lower is better) and show all matches
-        scored_scripts.sort(key=lambda x: x[0])
-        self._filtered_scripts_list = [(name, path) for _, name, path in scored_scripts]
+        scored.sort(key=lambda x: x[0])
+        self._filtered_scripts_list = [entry for _, entry in scored]
 
     def _draw_callback(self):
         """Draw callback for the scripts overlay."""
@@ -161,11 +160,12 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
         # Create a simple object to mimic a mapping
         class FakeMapping:
-            def __init__(self, chord, label, script_path, icon=""):
+            def __init__(self, chord, label, script_path, icon="", group="", flagged=False):
                 self.chord = chord
                 self.label = label
                 self.icon = icon
-                self.group = "Scripts"
+                self.group = group
+                self.flagged = flagged
                 self.context = "ALL"
                 self.mapping_type = "PYTHON_FILE"
                 self.python_file = script_path
@@ -191,40 +191,35 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         # Python nerd icon (󰌠) is used for scripts beyond the first 9
         python_icon = "󰌠"  # Python nerd icon
 
-        for i, (script_name, script_path) in enumerate(self._filtered_scripts_list):
+        for i, entry in enumerate(self._filtered_scripts_list):
             if i >= max_items:
-                # Don't create mappings beyond max_items
                 break
 
             if i < 9:
-                # Assign chord: 1-9
-                # Map index 0->1, 1->2, ..., 8->9
                 chord_num = str(i + 1)
-
-                # Create chord that starts with text buffer, then space, then number
                 if self._text_buffer:
-                    chord = f"{self._text_buffer} {chord_num}"  # e.g., "abc 1", "abc 2", ..., "abc 0"
+                    chord = f"{self._text_buffer} {chord_num}"
                 else:
-                    chord = chord_num  # 1, 2, ..., 9, 0 when no buffer
-
-                # First 9 items: use Python icon after chord
-                icon = python_icon
-                label = script_name
-                fake_mappings.append(FakeMapping(chord, label, script_path, icon))
+                    chord = chord_num
             else:
-                # Items beyond first 9: display but don't assign executable chords
-                # Use a non-executable chord that won't be displayed (empty or special marker)
-                # These scripts can only be accessed by filtering to bring them into positions 1-9
-                chord = ""  # Empty chord - won't be displayed and can't be executed
+                # Beyond first 9: displayed but not chord-executable
+                chord = ""
 
-                # Items beyond first 9: use Python nerd icon
-                icon = python_icon
-                label = script_name
-                fake_mappings.append(FakeMapping(chord, label, script_path, icon))
+            # Group shown as secondary text (":: Group") — splits into
+            # label_extra in build_overlay_rows, red when flagged (render).
+            label = entry.name
+            if entry.group:
+                label = f"{entry.name} :: {entry.group}"
+            fake_mappings.append(FakeMapping(
+                chord, label, entry.path, python_icon,
+                group=entry.group or "Scripts", flagged=entry.flagged,
+            ))
 
         # Calculate total scripts count for header display
         total_scripts = len(self._filtered_scripts_list)
         script_count_text = f"{total_scripts} Script{'s' if total_scripts != 1 else ''}"
+        if self._scan_warnings:
+            script_count_text += "  —  󰀪 Unrecognized folders detected"
 
         # Prepare scripts overlay specific settings
         scripts_overlay_settings = {
@@ -318,17 +313,23 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
             self.report({'WARNING'}, "Scripts folder not set or doesn't exist. Set it in preferences.")
             return {'CANCELLED'}
 
-        # Scan scripts folder for .py files
-        self._all_scripts_list = []
+        # Scan scripts folder (context folders, groups, .chordsong aliases)
+        from ..core.script_scanner import scan_scripts_folder, sort_entries
+        from .common import current_script_contexts
         try:
-            for filename in sorted(os.listdir(scripts_folder)):
-                if filename.endswith('.py') and not filename.startswith('__'):
-                    script_path = os.path.join(scripts_folder, filename)
-                    script_name = filename[:-3]  # Remove .py extension
-                    self._all_scripts_list.append((script_name, script_path))
+            entries, scan_warnings = scan_scripts_folder(scripts_folder)
         except Exception as e:
             self.report({'ERROR'}, f"Failed to scan scripts folder: {e}")
             return {'CANCELLED'}
+
+        current = current_script_contexts(context)
+        visible = [e for e in entries
+                   if e.context_token is None or e.context_token in current]
+        self._all_scripts_list = sort_entries(
+            visible, getattr(p, "scripts_overlay_folders_first", True))
+        self._scan_warnings = scan_warnings
+        for w in scan_warnings:
+            print(f"Chord Song Scripts Overlay: {w}")
 
         if not self._all_scripts_list:
             self.report({'INFO'}, "No scripts found in scripts folder")
@@ -481,7 +482,8 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                 idx = chord_num - 1
 
                 if idx < len(self._filtered_scripts_list) and idx < 9:
-                    script_name, script_path = self._filtered_scripts_list[idx]
+                    entry = self._filtered_scripts_list[idx]
+                    script_name, script_path = entry.name, entry.path
                     # Build chord text for fading overlay
                     chord_num = str(idx + 1)
                     if self._text_buffer:
