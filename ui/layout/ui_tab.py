@@ -123,8 +123,12 @@ def draw_ui_tab(prefs, layout):
         custom_box.label(text="Custom Format Strings:", icon='TEXT')
         
         col = custom_box.column(align=True)
-        col.prop(prefs, "overlay_format_folder", text="Folder Format")
-        col.prop(prefs, "overlay_format_item", text="Item Format")
+        r = col.row(align=True)
+        r.prop(prefs, "overlay_format_folder", text="Folder Format")
+        r.operator("chordsong.reset_format", text="", icon='LOOP_BACK').target = "FOLDER"
+        r = col.row(align=True)
+        r.prop(prefs, "overlay_format_item", text="Item Format")
+        r.operator("chordsong.reset_format", text="", icon='LOOP_BACK').target = "ITEM"
         
         custom_box.separator()
         custom_box.label(text="Available Tokens:")

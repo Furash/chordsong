@@ -45,6 +45,7 @@ from .mapping.mapping_select import (
 from .mapping.property_convert import CHORDSONG_OT_Property_Mapping_Convert
 from .mapping.subitem_ops import CHORDSONG_OT_SubItem_Add, CHORDSONG_OT_SubItem_Remove
 from .config.open_keymap import CHORDSONG_OT_Open_Keymap
+from .config.reset_format import CHORDSONG_OT_Reset_Format
 from .config.open_prefs import CHORDSONG_OT_Open_Prefs
 from .config.overlay_theme import (
     CHORDSONG_OT_ExportOverlayTheme,
@@ -116,6 +117,7 @@ __all__ = [
     "CHORDSONG_OT_Open_Keymap",
     "CHORDSONG_OT_Open_Prefs",
     "CHORDSONG_OT_Recents",
+    "CHORDSONG_OT_Reset_Format",
     "CHORDSONG_OT_Save_Config",
     "CHORDSONG_OT_Script_Select",
     "CHORDSONG_OT_Script_Select_Apply",
