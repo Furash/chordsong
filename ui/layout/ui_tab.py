@@ -143,6 +143,7 @@ def draw_ui_tab(prefs, layout):
         col2.label(text="N = Verbose Count")
         col2.label(text="n = Compact Count")
         col2.label(text="S/s = Separators")
+        col2.label(text="T = Toggle State")
         
         custom_box.separator()
         sep_row = custom_box.row(align=True)
