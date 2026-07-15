@@ -321,7 +321,8 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
     for col in columns:
         # Dynamic sub-columns: track max width for each token type
         token_widths = {}  # token_type -> max_width
-        
+        extra_w = 0.0  # widest label_extra (drawn after the token columns)
+
         # Legacy fields
         col_max_header_w = 0.0
         has_any_icon = False
@@ -358,9 +359,14 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
                         
                         # Measure width
                         w, _ = blf.dimensions(0, content)
-                        
+
                         # Track maximum width for this token type
                         token_widths[tok.type] = max(token_widths.get(tok.type, 0.0), w)
+
+                    if r.get("label_extra"):
+                        blf.size(0, body_size)
+                        ew, _ = blf.dimensions(0, r["label_extra"])
+                        extra_w = max(extra_w, ew)
                 else:
                     # Legacy rendering: use standard 3-column approach
                     # Chord column
@@ -408,6 +414,7 @@ def calculate_column_widths(columns, footer, chord_size, body_size, p=None):
         # Build metrics dict with dynamic token widths
         metrics = {
             "token_widths": token_widths,  # Dict of token_type -> max_width
+            "extra_w": extra_w,
             "header": col_max_header_w,
             "has_icons": has_any_icon,
             # Legacy compatibility
