@@ -752,6 +752,12 @@ class CHORDSONG_Preferences(AddonPreferences):
         max=100,
         update=_on_prefs_changed,
     )
+    scripts_overlay_folders_first: BoolProperty(
+        name="Folders First",
+        description="Sort grouped (foldered) scripts before ungrouped scripts in the scripts overlay",
+        default=True,
+        update=_on_prefs_changed,
+    )
 
     overlay_enabled: BoolProperty(
         name="Overlay",

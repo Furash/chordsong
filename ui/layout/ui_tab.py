@@ -61,6 +61,7 @@ def draw_ui_tab(prefs, layout):
     
     r = box.row(align=True)
     r.prop(prefs, "scripts_overlay_max_label_length", text="Max Label Length (0 = no limit)")
+    r.prop(prefs, "scripts_overlay_folders_first", text="Folders First", toggle=True)
 
     # Section: Typography
     box = layout.box()

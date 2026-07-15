@@ -131,8 +131,10 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 key.append(-c.count)
         return tuple(key)
 
-    sorted_cands = sorted(cands, key=_sort_key)
-    
+    # Scripts/search overlays pass pre-ordered candidates (fuzzy relevance,
+    # flagged-first, Folders First) — the leader sort string must not reorder them.
+    sorted_cands = cands if is_scripts_overlay else sorted(cands, key=_sort_key)
+
     for c in sorted_cands:
         token = c.next_token
         icon = c.icon if c.icon else ""

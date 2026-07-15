@@ -11,6 +11,7 @@ __all__ = [
     "event_in_invoke_region",
     "collect_toggle_paths",
     "detect_editor_context",
+    "current_script_contexts",
 ]
 
 
@@ -35,6 +36,17 @@ def detect_editor_context(context: bpy.types.Context) -> str:
             return "SHADER_EDITOR"
     # Default to 3D View if we can't detect
     return "VIEW_3D"
+
+
+def current_script_contexts(context: bpy.types.Context) -> set:
+    """Context tokens matching the live editor, for scripts-folder scoping."""
+    from ..core.script_scanner import script_contexts_for
+    space = context.space_data
+    space_type = getattr(space, "type", "") if space else ""
+    tree_type = getattr(space, "tree_type", None) if space else None
+    mode = getattr(context, "mode", "") or ""
+    return script_contexts_for(space_type, tree_type, mode)
+
 
 def prefs(context: bpy.types.Context):
     """Get addon preferences for extension workflow."""

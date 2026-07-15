@@ -525,7 +525,11 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                     if current_size != body_size:
                         blf.size(0, body_size)
                         current_size = body_size
-                    col = linear_to_srgb(getattr(p, "overlay_color_counter", (1.0, 1.0, 1.0, 1.0)))
+                    if getattr(row_mapping_ref, "flagged", False):
+                        # Unrecognized scripts folder — fixed warning red
+                        col = (0.95, 0.35, 0.35, 1.0)
+                    else:
+                        col = linear_to_srgb(getattr(p, "overlay_color_counter", (1.0, 1.0, 1.0, 1.0)))
                     blf.color(0, col[0], col[1], col[2], col[3])
                     blf.position(0, current_x, cy, 0)
                     blf.draw(0, r["label_extra"])
