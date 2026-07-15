@@ -33,6 +33,8 @@ The fuzzy matching algorithm:
 
 ### Context Folders
 
+![Script Context Folders](/chordsong/scr/scripts_folders.png){ width="640" }
+
 Subfolders scope scripts to editor contexts and organize them into groups.
 Context folders nest in a strict **editor → object type → mode** hierarchy;
 levels can be skipped (a bare `object/` at root means "3D viewport, any
