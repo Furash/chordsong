@@ -184,6 +184,14 @@ def dump_prefs(prefs) -> dict:
                 "max_label_length": int(getattr(prefs, "scripts_overlay_max_label_length", 0)),
             },
         },
+        # Stats settings live here (not in dump_prefs_filtered): the shared
+        # export shouldn't carry machine-local paths or tracking opt-ins.
+        "stats": {
+            "enabled": bool(getattr(prefs, "enable_stats", False)),
+            "export_path": get_str_attr(prefs, "stats_export_path"),
+            "auto_export_interval": int(getattr(prefs, "stats_auto_export_interval", 180)),
+            "sort_by_usage": bool(getattr(prefs, "stats_sort_by_usage", True)),
+        },
         "groups": groups,
         "mappings": mappings,
     }
@@ -563,6 +571,21 @@ def apply_config(prefs, data: dict) -> list[str]:
                 if key in scripts_overlay:
                     try: setattr(prefs, attr, float(scripts_overlay[key]))
                     except: pass
+
+    stats = data.get("stats", {})
+    if isinstance(stats, dict):
+        if "enabled" in stats:
+            try: prefs.enable_stats = bool(stats["enabled"])
+            except: pass
+        if "export_path" in stats:
+            try: prefs.stats_export_path = str(stats["export_path"]).strip()
+            except: pass
+        if "auto_export_interval" in stats:
+            try: prefs.stats_auto_export_interval = int(stats["auto_export_interval"])
+            except: pass
+        if "sort_by_usage" in stats:
+            try: prefs.stats_sort_by_usage = bool(stats["sort_by_usage"])
+            except: pass
 
     groups_data = data.get("groups", None)
     if isinstance(groups_data, list):
