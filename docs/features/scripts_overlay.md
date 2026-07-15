@@ -33,41 +33,55 @@ The fuzzy matching algorithm:
 
 ### Context Folders
 
-Subfolders scope scripts to editor contexts and organize them into groups:
+Subfolders scope scripts to editor contexts and organize them into groups.
+Context folders nest in a strict **editor → object type → mode** hierarchy;
+levels can be skipped (a bare `object/` at root means "3D viewport, any
+type, Object Mode"):
 
 ```
 scripts/
-├─ a.py                  → every context
-├─ _my_tools/            → every context, group "my_tools"
+├─ a.py                       → every context
+├─ _my_tools/                 → every context, group "my_tools"
 │   └─ b.py
-├─ edit_mesh/            → Mesh Edit mode only
-│   ├─ c.py
-│   └─ my_bevels/        → Mesh Edit mode, group "my_bevels"
-│       └─ d.py
-├─ geonodes/             → Geometry Node editor only
-└─ shader/               → Shader editor only
+├─ view3d/
+│   ├─ mesh/
+│   │   ├─ object/            → Object Mode with a mesh active
+│   │   └─ edit/              → Mesh Edit mode
+│   │       └─ my_bevels/     → Mesh Edit mode, group "my_bevels"
+├─ edit_mesh/                 → shorthand for view3d/mesh/edit
+├─ sculpt/                    → any sculpt mode (view3d implied)
+├─ geonodes/                  → Geometry Node editor only
+└─ shader/                    → Shader editor only
 ```
 
-**Recognized folder names:** `view3d`, `edit` (any edit mode), `object`,
-`edit_mesh`, `edit_curve`, `edit_surface`, `edit_text`, `edit_armature`,
-`edit_metaball`, `edit_lattice`, `edit_greasepencil`, `pose`, `sculpt`,
-`vertex_paint`, `weight_paint`, `texture_paint`, `particle`, `geonodes`,
-`shader`, `image`. Matching is a union — in Mesh Edit mode you see root +
-`view3d/` + `edit/` + `edit_mesh/` scripts together.
+**Recognized folder names by level:**
 
-**Groups:** a folder one level inside a context folder becomes a display
-group shown with its folder name as typed (`my_bevels`). A root folder starting with `_` is an
-all-contexts group. Anything deeper is ignored.
+| Level | Tokens |
+| :--- | :--- |
+| Editor | `view3d`, `geonodes`, `shader`, `image` |
+| Object type | `mesh`, `curve`, `curves`, `surface`, `metaball`, `text`, `armature`, `lattice`, `empty`, `greasepencil`, `camera`, `light`, `speaker`, `lightprobe`, `volume`, `pointcloud` |
+| Mode | `object`, `edit`, `pose`, `sculpt`, `vertex_paint`, `weight_paint`, `texture_paint`, `particle` |
+| Shorthands | `edit_mesh`, `edit_curve`, `edit_surface`, `edit_text`, `edit_armature`, `edit_metaball`, `edit_lattice`, `edit_greasepencil` (type + edit fused) |
 
-**Unrecognized folders** are never hidden: their scripts show in every
-context with the folder name in red, sorted first, and the overlay header
-warns "Unrecognized folders detected" — so typos get noticed.
+A script is visible when **all** its path's tokens match the current state
+— editor, the active object's type, and the mode. Editing a mesh you see
+root + `view3d/` + `view3d/mesh/` + `view3d/edit/` + `view3d/mesh/edit/`
+scripts together. Type segments test the **active object**.
+
+**Groups:** the first folder that isn't a context token becomes a display
+group shown with its folder name as typed (`my_bevels`). A root folder
+starting with `_` is an all-contexts group. Anything deeper is ignored.
+
+**Unrecognized or misordered folders** are never hidden: their scripts
+stay visible with the folder name in red, sorted first, and the overlay
+header warns "Unrecognized folders detected" — so typos and wrong nesting
+(e.g. `object/mesh/` instead of `mesh/object/`) get noticed.
 
 **Custom folder names:** an optional `.chordsong` JSON file at the scripts
 root remaps spellings per context token:
 
 ```json
-{ "edit_mesh": "mesh", "geonodes": ["geo", "gn"] }
+{ "edit_mesh": "meshedit", "geonodes": ["geo", "gn"] }
 ```
 
 An entry replaces that token's default name; unlisted tokens keep defaults.

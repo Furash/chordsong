@@ -366,7 +366,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
         current = current_script_contexts(context)
         visible = [e for e in entries
-                   if e.context_token is None or e.context_token in current]
+                   if set(e.context_tokens) <= current]
         self._all_scripts_list = sort_entries(
             visible, getattr(p, "scripts_overlay_folders_first", True))
         self._scan_warnings = scan_warnings

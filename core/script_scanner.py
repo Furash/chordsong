@@ -9,54 +9,101 @@ from typing import Optional
 import json
 import os
 
-# Canonical context tokens. Order matters: alias collisions resolve to the
-# earliest token in this tuple.
-CONTEXT_TOKENS = (
-    "view3d", "edit", "object",
-    "edit_mesh", "edit_curve", "edit_surface", "edit_text",
-    "edit_armature", "edit_metaball", "edit_lattice", "edit_greasepencil",
-    "pose", "sculpt", "vertex_paint", "weight_paint", "texture_paint",
-    "particle",
-    "geonodes", "shader", "image",
+# Context tokens are organized in strict nesting levels:
+#   1. editor:      view3d, geonodes, shader, image
+#   2. object type: mesh, curve, ... (active object's type)
+#   3. mode:        object, edit, sculpt, ...
+# Folders nest editor > type > mode; levels may be skipped downward
+# (a bare `object/` at root means "view3d, any type, object mode").
+EDITOR_TOKENS = ("view3d", "geonodes", "shader", "image")
+TYPE_TOKENS = (
+    "mesh", "curve", "curves", "surface", "metaball", "text",
+    "armature", "lattice", "empty", "greasepencil",
+    "camera", "light", "speaker", "lightprobe", "volume", "pointcloud",
 )
+MODE_TOKENS = (
+    "object", "edit", "pose", "sculpt",
+    "vertex_paint", "weight_paint", "texture_paint", "particle",
+)
+# Fused type+mode shorthands, usable as a single folder anywhere a type
+# segment would be valid (kept for backward compatibility with the flat
+# layout): edit_mesh/ is exactly view3d + mesh + edit.
+FUSED_TOKENS = {
+    "edit_mesh": ("mesh", "edit"),
+    "edit_curve": ("curve", "edit"),
+    "edit_surface": ("surface", "edit"),
+    "edit_text": ("text", "edit"),
+    "edit_armature": ("armature", "edit"),
+    "edit_metaball": ("metaball", "edit"),
+    "edit_lattice": ("lattice", "edit"),
+    "edit_greasepencil": ("greasepencil", "edit"),
+}
+
+# Canonical folder-name tokens. Order matters: alias collisions resolve
+# to the earliest token in this tuple.
+CONTEXT_TOKENS = EDITOR_TOKENS + TYPE_TOKENS + MODE_TOKENS + tuple(FUSED_TOKENS)
+
+# Nesting span per token: (entry_level, exit_level). A segment is valid
+# when its entry_level is deeper than the previous segment's exit_level.
+_TOKEN_SPANS = {}
+_TOKEN_SPANS.update({t: (1, 1) for t in EDITOR_TOKENS})
+_TOKEN_SPANS.update({t: (2, 2) for t in TYPE_TOKENS})
+_TOKEN_SPANS.update({t: (3, 3) for t in MODE_TOKENS})
+_TOKEN_SPANS.update({t: (2, 3) for t in FUSED_TOKENS})
 
 CHORDSONG_FILE = ".chordsong"
 
-# bpy context.mode -> mode-level token (3D viewport only)
-_MODE_TOKENS = {
-    "OBJECT": "object",
-    "EDIT_MESH": "edit_mesh",
-    "EDIT_CURVE": "edit_curve",
-    "EDIT_CURVES": "edit_curve",
-    "EDIT_SURFACE": "edit_surface",
-    "EDIT_TEXT": "edit_text",
-    "EDIT_ARMATURE": "edit_armature",
-    "EDIT_METABALL": "edit_metaball",
-    "EDIT_LATTICE": "edit_lattice",
-    "EDIT_GPENCIL": "edit_greasepencil",
-    "EDIT_GREASE_PENCIL": "edit_greasepencil",
-    "POSE": "pose",
-    "SCULPT": "sculpt",
-    "SCULPT_CURVES": "sculpt",
-    "SCULPT_GPENCIL": "sculpt",
-    "SCULPT_GREASE_PENCIL": "sculpt",
-    "PAINT_VERTEX": "vertex_paint",
-    "PAINT_WEIGHT": "weight_paint",
-    "PAINT_TEXTURE": "texture_paint",
-    "PARTICLE": "particle",
+# bpy context.mode -> (mode token, implied object-type token or None)
+_MODE_TOKENS_MAP = {
+    "OBJECT": ("object", None),
+    "EDIT_MESH": ("edit", "mesh"),
+    "EDIT_CURVE": ("edit", "curve"),
+    "EDIT_CURVES": ("edit", "curves"),
+    "EDIT_SURFACE": ("edit", "surface"),
+    "EDIT_TEXT": ("edit", "text"),
+    "EDIT_ARMATURE": ("edit", "armature"),
+    "EDIT_METABALL": ("edit", "metaball"),
+    "EDIT_LATTICE": ("edit", "lattice"),
+    "EDIT_GPENCIL": ("edit", "greasepencil"),
+    "EDIT_GREASE_PENCIL": ("edit", "greasepencil"),
+    "POSE": ("pose", "armature"),
+    "SCULPT": ("sculpt", None),
+    "SCULPT_CURVES": ("sculpt", "curves"),
+    "SCULPT_GPENCIL": ("sculpt", "greasepencil"),
+    "SCULPT_GREASE_PENCIL": ("sculpt", "greasepencil"),
+    "PAINT_VERTEX": ("vertex_paint", "mesh"),
+    "PAINT_WEIGHT": ("weight_paint", "mesh"),
+    "PAINT_TEXTURE": ("texture_paint", "mesh"),
+    "PARTICLE": ("particle", "mesh"),
+}
+
+# bpy Object.type -> object-type token
+_OBJECT_TYPE_TOKENS = {
+    "MESH": "mesh", "CURVE": "curve", "CURVES": "curves",
+    "SURFACE": "surface", "META": "metaball", "FONT": "text",
+    "ARMATURE": "armature", "LATTICE": "lattice", "EMPTY": "empty",
+    "GPENCIL": "greasepencil", "GREASEPENCIL": "greasepencil",
+    "CAMERA": "camera", "LIGHT": "light", "SPEAKER": "speaker",
+    "LIGHT_PROBE": "lightprobe", "VOLUME": "volume",
+    "POINTCLOUD": "pointcloud",
 }
 
 
-def script_contexts_for(space_type, tree_type=None, mode=None):
-    """Token set matching an editor state. Union semantics: a mesh-edit
-    viewport matches view3d, edit and edit_mesh folders at once."""
+def script_contexts_for(space_type, tree_type=None, mode=None, active_object_type=None):
+    """Token set matching an editor state. A script is visible when its
+    folder path's tokens are a SUBSET of this set — so mesh edit mode
+    ({view3d, mesh, edit}) matches view3d/, view3d/mesh/, view3d/edit/
+    and view3d/mesh/edit/ folders at once."""
     if space_type == "VIEW_3D":
         tokens = {"view3d"}
-        mode_token = _MODE_TOKENS.get(mode or "")
+        mode_token, implied_type = _MODE_TOKENS_MAP.get(mode or "", (None, None))
         if mode_token:
             tokens.add(mode_token)
-            if mode_token.startswith("edit_"):
-                tokens.add("edit")
+        if implied_type:
+            tokens.add(implied_type)
+        type_token = _OBJECT_TYPE_TOKENS.get(active_object_type or "")
+        if type_token:
+            tokens.add(type_token)
         return tokens
     if space_type == "NODE_EDITOR":
         return {"geonodes"} if tree_type == "GeometryNodeTree" else {"shader"}
@@ -70,9 +117,9 @@ class ScriptEntry:
     """One runnable script found in the scripts folder."""
     name: str                    # filename without .py
     path: str                    # absolute path
-    context_token: Optional[str]  # None = visible in all contexts
+    context_tokens: tuple        # () = visible in all contexts
     group: str                   # display group ("" = ungrouped)
-    flagged: bool                # True = unrecognized root folder (warn red)
+    flagged: bool                # True = unrecognized/misordered folder (warn red)
 
 
 def humanize_folder(name):
@@ -144,12 +191,12 @@ def _is_script(dirpath, name):
             and os.path.isfile(os.path.join(dirpath, name)))
 
 
-def _script_entries(dirpath, names, context_token, group, flagged):
+def _script_entries(dirpath, names, context_tokens, group, flagged):
     return [
         ScriptEntry(
             name=n[:-3],
             path=os.path.join(dirpath, n),
-            context_token=context_token,
+            context_tokens=tuple(context_tokens),
             group=group,
             flagged=flagged,
         )
@@ -157,21 +204,48 @@ def _script_entries(dirpath, names, context_token, group, flagged):
     ]
 
 
-def _scan_group_level(dirpath, context_token, warnings):
-    """Scripts directly in a context folder, plus one group-folder level."""
+def _scan_group_folder(dirpath, rel, context_tokens, group, flagged, warnings):
+    """One group folder: its scripts, warning for anything deeper."""
+    names = _list_dir(dirpath, warnings)
+    entries = _script_entries(dirpath, names, context_tokens, group, flagged)
+    for deep in names:
+        if os.path.isdir(os.path.join(dirpath, deep)) and not _ignored(deep):
+            warnings.append(f"'{rel}/{deep}' is too deep — ignored")
+    return entries
+
+
+def _scan_context_dir(dirpath, rel, tokens, last_level, folder_to_token, warnings):
+    """A context directory: scripts, deeper context segments (strict
+    editor > type > mode order, levels skippable), and group folders."""
     entries = []
     names = _list_dir(dirpath, warnings)
-    entries.extend(_script_entries(dirpath, names, context_token, "", False))
+    entries.extend(_script_entries(dirpath, names, tokens, "", False))
     for name in names:
         sub = os.path.join(dirpath, name)
         if not os.path.isdir(sub) or _ignored(name):
             continue
-        group = humanize_folder(name)
-        sub_names = _list_dir(sub, warnings)
-        entries.extend(_script_entries(sub, sub_names, context_token, group, False))
-        for deep in sub_names:
-            if os.path.isdir(os.path.join(sub, deep)) and not _ignored(deep):
-                warnings.append(f"'{name}/{deep}' is too deep — ignored")
+        sub_rel = f"{rel}/{name}" if rel else name
+        token = folder_to_token.get(name.lower())
+        if token is not None:
+            entry_level, exit_level = _TOKEN_SPANS[token]
+            if entry_level > last_level:
+                # deeper context segment — descend
+                entries.extend(_scan_context_dir(
+                    sub, sub_rel, tokens + FUSED_TOKENS.get(token, (token,)),
+                    exit_level, folder_to_token, warnings,
+                ))
+                continue
+            # recognized token in the wrong position (e.g. object/mesh/):
+            # flag loudly, keep scripts visible under the parent context
+            warnings.append(
+                f"'{sub_rel}' is out of order — nest editor > type > mode"
+            )
+            entries.extend(_scan_group_folder(
+                sub, sub_rel, tokens, name, True, warnings))
+            continue
+        # plain group folder
+        entries.extend(_scan_group_folder(
+            sub, sub_rel, tokens, humanize_folder(name), False, warnings))
     return entries
 
 
@@ -179,8 +253,8 @@ def scan_scripts_folder(root):
     """Scan the scripts folder tree.
 
     Returns (entries, warnings). Never raises for malformed content —
-    problems become warnings and, for unrecognized root folders, flagged
-    entries that stay visible everywhere.
+    problems become warnings and, for unrecognized/misordered folders,
+    flagged entries that stay visible.
     """
     entries = []
     warnings = []
@@ -189,7 +263,7 @@ def scan_scripts_folder(root):
     folder_to_token = _folder_token_map(aliases, warnings)
 
     root_names = _list_dir(root, warnings)
-    entries.extend(_script_entries(root, root_names, None, "", False))
+    entries.extend(_script_entries(root, root_names, (), "", False))
 
     for name in root_names:
         dirpath = os.path.join(root, name)
@@ -197,21 +271,23 @@ def scan_scripts_folder(root):
             continue
         if name.startswith("_"):
             # explicit all-contexts group
-            group = humanize_folder(name)
-            sub_names = _list_dir(dirpath, warnings)
-            entries.extend(_script_entries(dirpath, sub_names, None, group, False))
-            for deep in sub_names:
-                if os.path.isdir(os.path.join(dirpath, deep)) and not _ignored(deep):
-                    warnings.append(f"'{name}/{deep}' is too deep — ignored")
+            entries.extend(_scan_group_folder(
+                dirpath, name, (), humanize_folder(name), False, warnings))
             continue
         token = folder_to_token.get(name.lower())
         if token is not None:
-            entries.extend(_scan_group_level(dirpath, token, warnings))
+            _entry_level, exit_level = _TOKEN_SPANS[token]
+            # A bare type/mode token at root implies the 3D viewport
+            tokens = FUSED_TOKENS.get(token, (token,))
+            if token not in EDITOR_TOKENS and "view3d" not in tokens:
+                tokens = ("view3d",) + tokens
+            entries.extend(_scan_context_dir(
+                dirpath, name, tokens, exit_level, folder_to_token, warnings))
             continue
         # unrecognized root folder: flag loudly, keep scripts visible
         warnings.append(f"unrecognized folder '{name}'")
-        sub_names = _list_dir(dirpath, warnings)
-        entries.extend(_script_entries(dirpath, sub_names, None, name, True))
+        entries.extend(_scan_group_folder(
+            dirpath, name, (), name, True, warnings))
 
     return entries, warnings
 

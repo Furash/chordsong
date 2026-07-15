@@ -45,7 +45,9 @@ def current_script_contexts(context: bpy.types.Context) -> set:
     space_type = getattr(space, "type", "") if space else ""
     tree_type = getattr(space, "tree_type", None) if space else None
     mode = getattr(context, "mode", "") or ""
-    return script_contexts_for(space_type, tree_type, mode)
+    active = getattr(context, "active_object", None)
+    active_type = getattr(active, "type", None) if active else None
+    return script_contexts_for(space_type, tree_type, mode, active_type)
 
 
 def prefs(context: bpy.types.Context):
