@@ -183,6 +183,14 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 mapping_type=c.mapping_type,
                 group_icons=group_icons,
             )
+
+            # The Scripts overlay launcher is a container like a group folder,
+            # so its label gets the group color rather than the item color.
+            if c.mapping_ref is not None and \
+                    get_str_attr(c.mapping_ref, "operator") == "chordsong.scripts_overlay":
+                for tok in tokens:
+                    if tok.type == 'L':
+                        tok.color_key = 'overlay_color_group'
             
             # Compute the full chord path for click-dispatch. Empty token means
             # "no chord" (scripts overlay items beyond the first 9) — leave None.
