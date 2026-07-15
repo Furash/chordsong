@@ -204,3 +204,18 @@ def scan_scripts_folder(root):
         entries.extend(_script_entries(dirpath, sub_names, None, name, True))
 
     return entries, warnings
+
+
+def sort_entries(entries, folders_first=True):
+    """Display order: flagged first (always), then grouped-before-ungrouped
+    (groups A-Z, names A-Z) when folders_first, else flat name A-Z."""
+    if folders_first:
+        def key(e):
+            return (0 if e.flagged else 1,
+                    0 if e.group else 1,
+                    e.group.lower(),
+                    e.name.lower())
+    else:
+        def key(e):
+            return (0 if e.flagged else 1, e.name.lower())
+    return sorted(entries, key=key)

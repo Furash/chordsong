@@ -157,3 +157,27 @@ def test_scan_folder_names_case_insensitive():
         entries, warnings = scan_scripts_folder(root)
         assert _entry_map(entries)["a"].context_token == "edit_mesh"
         assert warnings == []
+
+
+from core.script_scanner import ScriptEntry, sort_entries
+
+
+def _e(name, group="", flagged=False):
+    return ScriptEntry(name=name, path=f"/x/{name}.py", context_token=None,
+                       group=group, flagged=flagged)
+
+
+def test_sort_folders_first():
+    entries = [_e("zeta"), _e("beta", group="Tools"), _e("alpha"),
+               _e("gamma", group="Bevels"), _e("bad", group="typo_dir", flagged=True)]
+    ordered = [e.name for e in sort_entries(entries, folders_first=True)]
+    # flagged first, then grouped (groups A-Z, names A-Z), then ungrouped A-Z
+    assert ordered == ["bad", "gamma", "beta", "alpha", "zeta"]
+
+
+def test_sort_flat_when_folders_first_off():
+    entries = [_e("zeta"), _e("beta", group="Tools"), _e("alpha"),
+               _e("bad", group="typo_dir", flagged=True)]
+    ordered = [e.name for e in sort_entries(entries, folders_first=False)]
+    # flagged still first, rest flat name A-Z regardless of group
+    assert ordered == ["bad", "alpha", "beta", "zeta"]
