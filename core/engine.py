@@ -191,6 +191,9 @@ def _get_token_parts(token: str) -> tuple[set[str], str]:
     if len(base) == 1 and base.isupper():
         found_mods.add('+')
         base = base.lower()
+    # Accept literal backtick as alias for the named `grave` token
+    if base == '`':
+        base = 'grave'
 
     return found_mods, base
 

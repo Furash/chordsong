@@ -53,7 +53,7 @@ For special keys that aren't letters or numbers, use these aliases:
 | `space` | Spacebar |
 | `enter` | Enter / Return |
 | `esc` | Escape |
-| `grave` | Grave (`` ` ``) / Tilde key |
+| `grave` (or `` ` ``) | Grave (`` ` ``) / Tilde key |
 | `up`, `down`, `left`, `right` | Arrow keys |
 | `home`, `end`, `insert`, `delete` | Navigation keys |
 | `pageup`, `pagedown` | Page scrolling keys |
