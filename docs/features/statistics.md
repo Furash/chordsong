@@ -27,11 +27,11 @@ Replays triggered by Chord Song itself (Recents, Search) are excluded from raw o
 
 ## The Statistics List
 
-The list shows each tracked item with its type, name, an existing hotkey (if Blender has one bound), and the usage count. Items can be sorted by usage or alphabetically (**Sort by Usage** toggle).
+Every row leads with a type icon — operator (gear), property (RNA), chord (socket), script (file) — followed by the name, an existing hotkey (if Blender has one bound), and the usage count. Property rows show the last value you set (`space_data.clip_end = 996.7`). Sort by usage, or turn **Sort by Usage** off for an alphabetical list clustered by type.
 
 ### Convert to Chord
 
-The main payoff: items in the list can be converted directly into a chord mapping. Frequently-used operators without a convenient hotkey are ideal candidates — one click pre-fills a new mapping using the same conversion mechanism as the context menu. Tracked **properties** convert too: the dialog pre-fills a Property mapping with the path and the last value you set it to.
+The main payoff: operators and properties carry a convert button (`C`) that turns them into a chord mapping in one click. Frequently-used operators without a convenient hotkey are ideal candidates — the dialog pre-fills using the same conversion mechanism as the context menu. For **properties** it pre-fills a Property mapping with the path and the last value you set it to.
 
 ### Blacklist
 
