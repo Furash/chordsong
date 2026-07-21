@@ -1,7 +1,6 @@
 {
     "version": 1,
     "scripts_folder": "",
-    "leader_key": "SPACE",
     "overlay": {
         "enabled": true,
         "fading_enabled": true,

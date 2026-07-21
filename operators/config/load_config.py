@@ -36,7 +36,7 @@ class CHORDSONG_OT_Load_Config(bpy.types.Operator, ImportHelper):
             p._chordsong_suspend_autosave = True
             with open(self.filepath, "r", encoding="utf-8") as f:
                 data = loads_json(f.read())
-            warns = apply_config(p, data)
+            warns = apply_config(p, data, apply_leader_key=True)
             from ...ui.overlay import clear_overlay_cache
             clear_overlay_cache()
             p.config_path = self.filepath

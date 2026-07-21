@@ -61,10 +61,12 @@ def get_leader_key_token() -> str:
         return "<Leader>"
 
 
-def set_leader_key_in_keymap(key_type: str):
+def set_leader_key_in_keymap(key_type: str) -> bool:
     """Set the leader key type across all registered addon keymaps
     (3D View / Node Editor / Image). Updates both user and addon keyconfigs
-    so the change persists across addon disable/enable cycles."""
+    so the change persists across addon disable/enable cycles.
+    Returns True if at least one keymap item was updated."""
+    updated = False
     try:
         import bpy  # type: ignore
         wm = bpy.context.window_manager
@@ -80,6 +82,8 @@ def set_leader_key_in_keymap(key_type: str):
                 for kmi in km.keymap_items:
                     if kmi.idname == "chordsong.leader":
                         kmi.type = key_type
+                        updated = True
                         break
     except Exception:  # pylint: disable=broad-exception-caught
         pass
+    return updated

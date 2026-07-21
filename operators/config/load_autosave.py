@@ -28,7 +28,7 @@ class CHORDSONG_OT_Load_Autosave(bpy.types.Operator):
             p._chordsong_suspend_autosave = True
             with open(ap, "r", encoding="utf-8") as f:
                 data = loads_json(f.read())
-            warns = apply_config(p, data)
+            warns = apply_config(p, data, apply_leader_key=True)
             from ...ui.overlay import clear_overlay_cache
             clear_overlay_cache()
             for w in warns[:5]:

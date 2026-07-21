@@ -9,10 +9,10 @@ Configuration operations for chord mappings.
 
 ## Operations
 
-- **Save Config**: Overwrites the current Config file with the current configuration.
+- **Save Config**: Overwrites the current Config file with the current configuration (includes the leader key).
 - **Export Config**: Exports selected groups only (leader key excluded)
-- **Load Config**: Imports configuration from the current Config Path.
-- **Append Config**: Merges configuration (preserves existing, runs conflict checker)
+- **Load Config**: Imports configuration from the current Config Path (applies the leader key if present).
+- **Append Config**: Merges configuration (preserves existing settings and leader key, runs conflict checker)
 - **Load Default Config**: Loads default configuration.
 - **Restore Autosave**: Restores from `.autosave.json` (see [Autosave](autosave.md))
 
@@ -53,6 +53,21 @@ The default configuration file is stored in the extension's user directory, whic
 - Save Config saves directly (no browser)
 - Load Config loads directly (if file exists)
 - Autosave creates `.autosave.json` in same directory
+
+### Leader Key
+
+Save Config and Autosave store the current leader key as a top-level entry:
+
+```json
+"leader_key": "SPACE"
+```
+
+It is applied only by the explicit restore operations (**Load Config**,
+**Restore Autosave**) — so restoring your config on a fresh machine also
+restores your leader key. It is deliberately *excluded* from **Export Config**
+and ignored by **Append Config**: importing a shared config can never rebind
+your leader key. The automatic config re-apply on Blender startup also leaves
+the leader key alone, so changes made in the keymap editor stick.
 
 ### Manual Editing
 

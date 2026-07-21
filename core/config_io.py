@@ -2,7 +2,12 @@ import json
 
 # pylint: disable=broad-exception-caught
 
-from .engine import parse_kwargs, get_str_attr
+from .engine import (
+    parse_kwargs,
+    get_str_attr,
+    get_leader_key_type,
+    set_leader_key_in_keymap,
+)
 
 CHORDSONG_CONFIG_VERSION = 1
 
@@ -124,8 +129,18 @@ def dump_prefs(prefs) -> dict:
             "expanded": bool(getattr(grp, "expanded", False)),
         })
 
+    # Leader key rides along only in the full (personal) dump — never in
+    # dump_prefs_filtered: a shared config must not rebind the recipient's
+    # leader key. Read from the keymap via the engine wrapper; omit if the
+    # keymap can't be reached (e.g. headless).
+    try:
+        leader_key = get_leader_key_type()
+    except Exception:
+        leader_key = None
+
     return {
         "version": CHORDSONG_CONFIG_VERSION,
+        **({"leader_key": leader_key} if leader_key else {}),
         "scripts_folder": get_str_attr(prefs, "scripts_folder"),
         "allow_custom_user_scripts": bool(getattr(prefs, "allow_custom_user_scripts", False)),
         "overlay": {
@@ -407,10 +422,15 @@ def _kwargs_dict_to_str(kwargs_dict: dict) -> str:
             parts.append(f"{key} = {value}")
     return ", ".join(parts)
 
-def apply_config(prefs, data: dict) -> list[str]:
+def apply_config(prefs, data: dict, *, apply_leader_key: bool = False) -> list[str]:
     """
     Apply config dict to preferences.
     Returns a list of warnings that the caller may show to the user.
+
+    apply_leader_key stays False for automatic paths (startup auto-load,
+    Load Default) so a config re-apply never reverts a leader key the user
+    changed in Blender's keymap editor. Only the explicit restore operators
+    (Load Config / Load Autosave) opt in.
     """
     warnings = []
     if not isinstance(data, dict):
@@ -419,6 +439,19 @@ def apply_config(prefs, data: dict) -> list[str]:
     config_version = data.get("version", None)
     if config_version not in (None, 1):
         warnings.append(f"Unsupported config version: {config_version} (current {CHORDSONG_CONFIG_VERSION})")
+
+    if apply_leader_key:
+        leader_key = data.get("leader_key")
+        if isinstance(leader_key, str) and leader_key.strip():
+            key_type = leader_key.strip().upper()
+            try:
+                ok = set_leader_key_in_keymap(key_type)
+            except Exception:
+                ok = False
+            if ok:
+                warnings.append(f"Leader key set to {key_type}")
+            else:
+                warnings.append(f"Could not set leader key to {key_type}")
 
     # Scripts folder
     if "scripts_folder" in data:

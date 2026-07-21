@@ -7,6 +7,8 @@
 
 - [ ] Create a SUB_OPERATOR entry inside a CONTEXT_MENU with a deliberately malformed op string. Trigger the context menu. **Expected:** WARNING on the malformed item; other items in the menu still work.
 
+- [ ] Leader key round-trip: set leader to `TAB` in prefs, **Save Config**, set leader back to `Space`, **Load Config**. **Expected:** leader is `TAB` again; Info panel shows "Leader key set to TAB". Then restart Blender (or disable/enable the addon). **Expected:** startup auto-load does NOT change the leader key. **Export Config** the same setup and inspect the JSON. **Expected:** no `leader_key` entry.
+
 
 - [ ] All items above checked.
 - [ ] Info panel reviewed for unexpected errors/warnings during the run.
