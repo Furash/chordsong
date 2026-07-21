@@ -10,10 +10,18 @@ from ..core import stats_store
 from ..utils.addon_package import addon_root_package
 
 COL_ICON_WIDTH = 2.0
+COL_CONVERT_WIDTH = 2.0
 COL_INFO_WIDTH = 18.0
 COL_HOTKEY_WIDTH = 4.0
 COL_COUNT_WIDTH = 3.0
 COL_BLACKLIST_WIDTH = 2.0
+
+TYPE_ICONS = {
+    'chords': 'NODE_SOCKET_SHADER',
+    'scripts': 'FILE_SCRIPT',
+    'operators': 'SETTINGS',
+    'properties': 'RNA',
+}
 
 
 class CHORDSONG_UL_Stats(UIList):
@@ -82,16 +90,20 @@ class CHORDSONG_UL_Stats(UIList):
 
         row = layout.row(align=True)
 
-        # Type indicator / convert-to-chord button
+        # Type indicator (RNA = property, SETTINGS = operator, ...)
         col = row.row(align=True)
         col.ui_units_x = COL_ICON_WIDTH
-        if item.category == 'chords':
-            col.label(text="", icon='NODE_SOCKET_GEOMETRY')
-        elif item.category == 'scripts':
-            col.label(text="", icon='FILE_SCRIPT')
-        else:
+        col.label(text="", icon=TYPE_ICONS.get(item.category, 'BLANK1'))
+
+        # Convert-to-chord button (operators and properties)
+        col = row.row(align=True)
+        col.ui_units_x = COL_CONVERT_WIDTH
+        if item.category in ('operators', 'properties'):
             op = col.operator("chordsong.stats_convert_to_chord", text="", icon='EVENT_C')
             op.stats_name = item.name
+            op.stats_category = item.category
+        else:
+            col.label(text="")
 
         # Info
         col = row.row(align=True)
@@ -104,6 +116,10 @@ class CHORDSONG_UL_Stats(UIList):
         elif item.category == 'scripts':
             label = item.label or ""
             col.label(text=f"{item.name}     {label}" if label else item.name)
+        elif item.category == 'properties':
+            from ..core import stats_manager
+            value = stats_manager.get_last_property_value(item.name)
+            col.label(text=f"{item.name} = {value}" if value else item.name)
         else:
             col.label(text=item.name)
 

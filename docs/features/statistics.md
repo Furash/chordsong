@@ -21,6 +21,7 @@ All data stays local — nothing is ever shared or uploaded.
 - **Operators**: every operator invocation reported by Blender, with a usage count
 - **Chords**: each chord you fire through the leader key
 - **Scripts**: custom scripts executed via chord or the Scripts Overlay
+- **Properties**: UI property changes (`space_data.clip_end = 996.7` in the Info log), counted by path with the last value remembered
 
 Replays triggered by Chord Song itself (Recents, Search) are excluded from raw operator counts so they don't inflate the numbers.
 
@@ -30,7 +31,7 @@ The list shows each tracked item with its type, name, an existing hotkey (if Ble
 
 ### Convert to Chord
 
-The main payoff: items in the list can be converted directly into a chord mapping. Frequently-used operators without a convenient hotkey are ideal candidates — one click pre-fills a new mapping using the same conversion mechanism as the context menu.
+The main payoff: items in the list can be converted directly into a chord mapping. Frequently-used operators without a convenient hotkey are ideal candidates — one click pre-fills a new mapping using the same conversion mechanism as the context menu. Tracked **properties** convert too: the dialog pre-fills a Property mapping with the path and the last value you set it to.
 
 ### Blacklist
 

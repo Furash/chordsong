@@ -5,9 +5,10 @@ Blender (see tests/test_stats_store.py). The bpy-facing glue lives in
 core/stats_manager.py.
 """
 
-CATEGORIES = ("operators", "chords", "scripts")
+CATEGORIES = ("operators", "chords", "scripts", "properties")
 
 _OPERATOR_REPORT_PREFIX = "bpy.ops."
+_PROPERTY_REPORT_PREFIX = "bpy.context."
 
 # Operators whose usage is tracked separately (chords) or is pure UI noise.
 DEFAULT_EXCLUDED_PREFIXES = ("chordsong.",)
@@ -40,6 +41,24 @@ def parse_operator_report(message: str, excluded_prefixes=DEFAULT_EXCLUDED_PREFI
         if idname.startswith(prefix):
             return None
     return idname
+
+
+def parse_property_report(message: str):
+    """Extract (path, value) from a PROPERTY report message.
+
+    Report messages look like "bpy.context.space_data.clip_end = 996.7".
+    The path is returned relative to bpy.context ("space_data.clip_end"),
+    matching the context_path form used by CONTEXT_PROPERTY mappings.
+    Returns None for anything else (bpy.data assignments, malformed lines).
+    """
+    if not message or not message.startswith(_PROPERTY_REPORT_PREFIX):
+        return None
+    head = message[len(_PROPERTY_REPORT_PREFIX):]
+    path, sep, value = head.partition(" = ")
+    path = path.strip()
+    if not sep or not path:
+        return None
+    return path, value.strip()
 
 
 def normalize_count(value) -> int:
@@ -98,12 +117,13 @@ def merge_counts(base: dict, extra: dict) -> dict:
     return merged
 
 
-def counts_to_data(counts: dict, blacklist=None, last_saved: str = "") -> dict:
+def counts_to_data(counts: dict, blacklist=None, last_saved: str = "", property_values=None) -> dict:
     """Build the JSON-serializable stats file structure."""
     data = {category: dict(counts.get(category, {})) for category in CATEGORIES}
     data["_metadata"] = {
         "last_saved": last_saved,
         "blacklist": sorted(blacklist) if blacklist else [],
+        "property_values": dict(property_values) if property_values else {},
     }
     return data
 

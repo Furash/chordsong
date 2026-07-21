@@ -30,6 +30,15 @@ def _find_mapping_for_script(p, script_name):
     return None
 
 
+def _find_mapping_for_property(p, path):
+    """Find a CONTEXT_PROPERTY/TOGGLE mapping whose context_path matches."""
+    for m in p.mappings:
+        if getattr(m, "mapping_type", "") in ("CONTEXT_PROPERTY", "CONTEXT_TOGGLE") \
+                and (getattr(m, "context_path", "") or "").strip() == path:
+            return m
+    return None
+
+
 def _find_mapping_for_chord(p, chord_str):
     """Find the mapping whose chord matches a recorded chord token string."""
     key_tokens = split_chord(chord_str)
@@ -70,6 +79,8 @@ def refresh_stats_ui(p):
                 mapping = _find_mapping_for_chord(p, name)
             elif category == "scripts":
                 mapping = _find_mapping_for_script(p, name)
+            elif category == "properties":
+                mapping = _find_mapping_for_property(p, name)
             else:
                 mapping = None
             if mapping:
@@ -173,21 +184,32 @@ class CHORDSONG_OT_Stats_Blacklist(Operator):
 
         if self.action == 'TOGGLE':
             if self.category and self.name:
-                key = stats_store.blacklist_key(self.category, self.name)
+                category, name = self.category, self.name
             else:
                 index = p.stats_collection_index
                 if index < 0 or index >= len(p.stats_collection):
                     self.report({'WARNING'}, "No item selected")
                     return {'CANCELLED'}
                 item = p.stats_collection[index]
-                key = stats_store.blacklist_key(item.category, item.name)
+                category, name = item.category, item.name
+            key = stats_store.blacklist_key(category, name)
             if key in blacklist:
                 blacklist.discard(key)
             else:
                 blacklist.add(key)
+            # Remember the toggled row's position: the rebuild below replaces
+            # the collection, and template_list auto-scrolls to wherever the
+            # stale active index ends up. Re-anchoring it at the same spot
+            # keeps the view where the user was working.
+            pos = next(
+                (i for i, it in enumerate(p.stats_collection)
+                 if it.category == category and it.name == name),
+                p.stats_collection_index,
+            )
             p.stats_blacklist = stats_store.dump_blacklist(blacklist)
             stats_manager.mark_dirty()
             refresh_stats_ui(p)
+            p.stats_collection_index = max(0, min(pos, len(p.stats_collection) - 1))
 
         elif self.action == 'REMOVE':
             if not self.category or not self.name:
@@ -222,7 +244,7 @@ class CHORDSONG_OT_Stats_Blacklist(Operator):
         for key in sorted(blacklist):
             category, _, name = key.partition(':')
             row = box.row(align=True)
-            icon = {'chords': 'EVENT_SPACE', 'scripts': 'FILE_SCRIPT'}.get(category, 'SETTINGS')
+            icon = {'chords': 'EVENT_SPACE', 'scripts': 'FILE_SCRIPT', 'properties': 'RNA'}.get(category, 'SETTINGS')
             row.label(text=category.capitalize(), icon=icon)
             row.separator()
             row.label(text=name)
@@ -239,13 +261,15 @@ class CHORDSONG_OT_Stats_Blacklist(Operator):
 
 
 class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
-    """Create a new chord mapping for a tracked operator"""
+    """Create a new chord mapping for a tracked operator or property"""
     bl_idname = "chordsong.stats_convert_to_chord"
     bl_label = "Convert to Chord"
     bl_options = {'INTERNAL'}
 
     stats_name: bpy.props.StringProperty(default="")
+    stats_category: bpy.props.StringProperty(default="operators")
 
+    property_value: bpy.props.StringProperty(name="Value", default="")
     operator: bpy.props.StringProperty(name="Operator", default="")
     chord: bpy.props.StringProperty(name="Chord", default="")
     name: bpy.props.StringProperty(name="Label", default="")
@@ -264,21 +288,33 @@ class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
     )
 
     def invoke(self, context, _event):
-        # Stats store operator idnames as "module.op"; mappings use the same form.
-        idname = (self.stats_name or "").strip()
-        self.operator = idname
+        name = (self.stats_name or "").strip()
         self.kwargs = ""
         self.chord = ""
-        module, _, op_name = idname.partition(".")
-        self.group = module.replace("_", " ").title() if module else ""
-        self.name = op_name.replace("_", " ").title() if op_name else ""
+        if self.stats_category == "properties":
+            # name is a context path like "space_data.clip_end"
+            self.operator = name
+            from ..core.stats_manager import get_last_property_value
+            self.property_value = get_last_property_value(name)
+            parts = name.split(".")
+            self.group = parts[0].replace("_", " ").title() if parts else ""
+            self.name = parts[-1].replace("_", " ").title() if parts else ""
+        else:
+            # Stats store operator idnames as "module.op"; mappings use the same form.
+            self.operator = name
+            module, _, op_name = name.partition(".")
+            self.group = module.replace("_", " ").title() if module else ""
+            self.name = op_name.replace("_", " ").title() if op_name else ""
         self.editor_context = detect_editor_context(context, self.operator, self.kwargs)
         self.chord = suggest_chord(self.group, self.name)
         return context.window_manager.invoke_props_dialog(self, width=450)
 
     def draw(self, _context):
         col = self.layout.column(align=True)
-        col.label(text=f"Operator: {self.operator}", icon="SETTINGS")
+        if self.stats_category == "properties":
+            col.label(text=f"Property: {self.operator}", icon="RNA")
+        else:
+            col.label(text=f"Operator: {self.operator}", icon="SETTINGS")
         col.separator()
         col.label(text="Enter Chord:")
         col.prop(self, "chord", text="")
@@ -288,7 +324,10 @@ class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
         col.separator()
         col.prop(self, "name", text="Label")
         col.prop(self, "group", text="Group")
-        col.prop(self, "kwargs", text="Parameters")
+        if self.stats_category == "properties":
+            col.prop(self, "property_value", text="Value")
+        else:
+            col.prop(self, "kwargs", text="Parameters")
 
     def execute(self, context):
         p = prefs(context)
@@ -296,7 +335,7 @@ class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
             self.report({'WARNING'}, "Please enter a chord")
             return {"CANCELLED"}
         if not self.operator:
-            self.report({'WARNING'}, "No operator specified")
+            self.report({'WARNING'}, "Nothing to convert")
             return {"CANCELLED"}
 
         m = p.mappings.add()
@@ -305,10 +344,15 @@ class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
         m.label = self.name or "New Chord"
         m.group = self.group or ""
         m.context = self.editor_context
-        m.operator = self.operator
-        m.call_context = "INVOKE_DEFAULT"
-        m.kwargs_json = self.kwargs or ""
-        m.mapping_type = "OPERATOR"
+        if self.stats_category == "properties":
+            m.mapping_type = "CONTEXT_PROPERTY"
+            m.context_path = self.operator
+            m.property_value = self.property_value
+        else:
+            m.operator = self.operator
+            m.call_context = "INVOKE_DEFAULT"
+            m.kwargs_json = self.kwargs or ""
+            m.mapping_type = "OPERATOR"
 
         last_index = len(p.mappings) - 1
         if last_index > 0:

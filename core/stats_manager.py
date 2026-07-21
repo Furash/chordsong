@@ -39,6 +39,7 @@ _last_uid = 0
 _uid_initialized = False
 _last_save = 0.0
 _cached_internal_path = None
+_property_values = {}  # path -> last seen value string (for convert prefill)
 
 # Operator runs triggered by chordsong itself (chord mappings, recents
 # replay). Those are already counted as chord usage, so the next matching
@@ -213,6 +214,12 @@ def _poll_reports() -> None:
             idname = stats_store.parse_operator_report(r.message)
             if idname and not _consume_expected(idname):
                 record("operators", idname)
+        elif r.type == 'PROPERTY':
+            parsed = stats_store.parse_property_report(r.message)
+            if parsed:
+                path, value = parsed
+                record("properties", path)
+                _property_values[path] = value
 
 
 # -- Persistence --
@@ -230,11 +237,25 @@ def _load_data(path: str) -> dict:
         return {}
 
 
+def _load_property_values(data: dict) -> None:
+    """Sync last-seen property values from a stats file's metadata."""
+    global _property_values
+    raw = data.get("_metadata", {}).get("property_values", {})
+    if isinstance(raw, dict):
+        _property_values = {str(k): str(v) for k, v in raw.items()}
+
+
+def get_last_property_value(path: str) -> str:
+    """Last value seen for a tracked property path ("" when unknown)."""
+    return _property_values.get(path, "")
+
+
 def load_from_file() -> None:
     """Load counts from the canonical stats file into the cache."""
     global _file_cache, _buffer, _dirty
     data = _load_data(get_stats_file_path())
     _file_cache = stats_store.data_to_counts(data)
+    _load_property_values(data)
     _buffer = _empty_counts()
     _dirty = False
 
@@ -249,6 +270,7 @@ def reload_from_path(path: str) -> bool:
         return False
     data = _load_data(path)
     _file_cache = stats_store.data_to_counts(data)
+    _load_property_values(data)
     _buffer = _empty_counts()
     _dirty = False
     load_blacklist_from_path(path)
@@ -272,7 +294,10 @@ def write_current_to_file(path: str = "") -> bool:
         getattr(prefs, "stats_blacklist", "[]") if prefs else "[]"
     )
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    data = stats_store.counts_to_data(counts, blacklist=blacklist, last_saved=stamp)
+    data = stats_store.counts_to_data(
+        counts, blacklist=blacklist, last_saved=stamp,
+        property_values=_property_values,
+    )
 
     try:
         parent = os.path.dirname(path)
@@ -292,9 +317,10 @@ def write_current_to_file(path: str = "") -> bool:
 
 def clear_all() -> None:
     """Reset all statistics (memory and file)."""
-    global _buffer, _file_cache, _dirty
+    global _buffer, _file_cache, _dirty, _property_values
     _buffer = _empty_counts()
     _file_cache = _empty_counts()
+    _property_values = {}
     _dirty = False
     path = get_stats_file_path()
     if path and os.path.exists(path):

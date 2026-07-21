@@ -84,6 +84,7 @@ def test_data_to_counts_ignores_metadata_and_junk():
         "operators": {"mesh.bevel": 5, "legacy.op": 2},
         "chords": {"g g": 1},
         "scripts": {},
+        "properties": {},
     }
 
 
@@ -115,7 +116,7 @@ def test_data_to_counts_migrates_legacy_operator_keys():
 
 
 def test_data_to_counts_handles_missing_categories():
-    empty = {"operators": {}, "chords": {}, "scripts": {}}
+    empty = {"operators": {}, "chords": {}, "scripts": {}, "properties": {}}
     assert data_to_counts({}) == empty
     assert data_to_counts({"operators": "corrupt"}) == empty
 
@@ -124,12 +125,13 @@ def test_merge_counts_sums_without_mutation():
     base = {"operators": {"a.b": 1}, "chords": {}}
     extra = {"operators": {"a.b": 2, "c.d": 3}, "chords": {"g": 1}}
     merged = merge_counts(base, extra)
-    assert merged == {"operators": {"a.b": 3, "c.d": 3}, "chords": {"g": 1}, "scripts": {}}
+    assert merged == {"operators": {"a.b": 3, "c.d": 3}, "chords": {"g": 1}, "scripts": {}, "properties": {}}
     assert base == {"operators": {"a.b": 1}, "chords": {}}
 
 
 def test_counts_to_data_roundtrip():
-    counts = {"operators": {"mesh.bevel": 4}, "chords": {"g g": 2}, "scripts": {"x.py": 1}}
+    counts = {"operators": {"mesh.bevel": 4}, "chords": {"g g": 2}, "scripts": {"x.py": 1},
+              "properties": {"space_data.clip_end": 3}}
     data = counts_to_data(counts, blacklist={"operators:x", "chords:y"}, last_saved="now")
     assert data["_metadata"]["blacklist"] == ["chords:y", "operators:x"]
     assert data["_metadata"]["last_saved"] == "now"
@@ -149,3 +151,41 @@ def test_parse_blacklist_tolerates_garbage():
     assert parse_blacklist(None) == set()
     assert parse_blacklist("not json") == set()
     assert parse_blacklist('{"a": 1}') == set()
+
+
+def test_parse_property_report_basic():
+    from core.stats_store import parse_property_report
+    assert parse_property_report("bpy.context.space_data.clip_end = 996.7") == \
+        ("space_data.clip_end", "996.7")
+    assert parse_property_report("bpy.context.space_data.shading.type = 'RENDERED'") == \
+        ("space_data.shading.type", "'RENDERED'")
+    assert parse_property_report("bpy.context.scene.frame_current = 42") == \
+        ("scene.frame_current", "42")
+
+
+def test_parse_property_report_rejects_non_context():
+    from core.stats_store import parse_property_report
+    assert parse_property_report("bpy.data.objects['Cube'].location = (0, 0, 0)") is None
+    assert parse_property_report("bpy.ops.mesh.select_all(action='SELECT')") is None
+    assert parse_property_report("bpy.context.space_data.clip_end") is None  # no assignment
+    assert parse_property_report("") is None
+    assert parse_property_report(None) is None
+
+
+def test_properties_category_roundtrip():
+    from core.stats_store import data_to_counts, merge_counts
+    counts = {"operators": {}, "chords": {}, "scripts": {},
+              "properties": {"space_data.clip_end": 3}}
+    data = counts_to_data(counts, property_values={"space_data.clip_end": "996.7"})
+    assert data["properties"] == {"space_data.clip_end": 3}
+    assert data["_metadata"]["property_values"] == {"space_data.clip_end": "996.7"}
+    # loading and merging keep the category
+    assert data_to_counts(data)["properties"] == {"space_data.clip_end": 3}
+    merged = merge_counts(counts, {"properties": {"space_data.clip_end": 2}})
+    assert merged["properties"] == {"space_data.clip_end": 5}
+
+
+def test_properties_missing_in_legacy_files():
+    from core.stats_store import data_to_counts
+    legacy = {"operators": {"mesh.bevel": 1}, "chords": {}, "scripts": {}}
+    assert data_to_counts(legacy)["properties"] == {}
