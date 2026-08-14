@@ -114,8 +114,10 @@ When **Custom** style is selected, you can define your own format strings using 
 - `C` = Chord
 - `I` = Icon (mapping's icon)
 - `i` = Group Icon (first group's icon)
-- `G` = All Groups
-- `g` = First Group Only
+- `G` = All Groups (level-aware: shows only the current nesting level for `|`-separated group names)
+- `g` = First Group Only (level-aware, same as `G`)
+- `G*` = All Groups, full paths (never trimmed by nesting level)
+- `g*` = First Group Only, full path (never trimmed by nesting level)
 - `L` = Label
 - `N` = Verbose Count (e.g., "+5 keymaps")
 - `n` = Compact Count (e.g., "+5")

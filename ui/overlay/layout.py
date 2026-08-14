@@ -5,6 +5,7 @@ from .tokenizer import (
     generate_tokens_for_folder,
     generate_tokens_for_item,
     tokens_to_display_parts,
+    common_prefix_len,
 )
 
 def _get_preset_formats(style):
@@ -135,6 +136,17 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
     # flagged-first, Folders First) — the leader sort string must not reorder them.
     sorted_cands = cands if is_scripts_overlay else sorted(cands, key=_sort_key)
 
+    # Nested groups (issue #18): group names may encode hierarchy with '|'
+    # separators. Drop the token-prefix shared by every group reachable at
+    # this chord level, so G/g show only the current level's token.
+    level_groups = set()
+    for c in cands:
+        if c.groups:
+            level_groups.update(c.groups)
+        elif c.group:
+            level_groups.add(c.group)
+    group_prefix_len = common_prefix_len(level_groups)
+
     for c in sorted_cands:
         token = c.next_token
         icon = c.icon if c.icon else ""
@@ -151,8 +163,9 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 separator_a=separator_a,
                 separator_b=separator_b,
                 group_icons=group_icons,
+                group_prefix_len=group_prefix_len,
             )
-            
+
             # Store tokens in the row for rendering
             rows.append({
                 "kind": "item",
@@ -186,6 +199,7 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 separator_b=separator_b,
                 mapping_type=c.mapping_type,
                 group_icons=group_icons,
+                group_prefix_len=group_prefix_len,
             )
 
             # Containers get the group color rather than the item color:

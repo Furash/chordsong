@@ -16,6 +16,28 @@ Groups organize chord mappings into logical categories for easier management.
 <img src="/chordsong/scr/groups_overlay.png" alt="Groups in Overlay" width="300">
 <!-- markdownlint-enable MD033 -->
 
+## Nested Groups
+
+Group names can encode a hierarchy using `|` separators:
+
+```text
+HardSurface | Kushiro
+HardSurface | MACHIN3
+HardSurface | TeamC
+```
+
+The data model stays flat — each mapping still belongs to exactly one group — but the overlay renders the hierarchy level by level:
+
+- At the root, all `HardSurface | …` groups collapse into a single **HardSurface** label.
+- After entering the shared chord prefix, the common `HardSurface` token is dropped and the overlay shows **Kushiro**, **MACHIN3**, **TeamC**.
+
+The overlay drops the token-prefix shared by every group reachable at the current chord level, always keeping at least the last token. Flat group names are unaffected.
+
+To always display the full group path regardless of level, use the `g*` / `G*` format tokens in a custom overlay format (see [Overlay Customization](../customization/overlay.md)).
+
+!!! tip
+    Sorting, group icons, and the Preferences group list all use the full group name (e.g. `HardSurface | Kushiro`). Only the overlay text is level-aware.
+
 ## Group Management
 
 ### Adding Groups

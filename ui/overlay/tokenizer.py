@@ -10,6 +10,45 @@ class Token:
     content: str  # The actual text content to display
     color_key: str  # Key to look up color in preferences
 
+def split_group_path(name: str) -> List[str]:
+    """Split a group name into hierarchy tokens on '|' (issue #18).
+
+    "HardSurface | Kushiro" -> ["HardSurface", "Kushiro"]. Flat names
+    yield a single token; blank names yield [].
+    """
+    return [t.strip() for t in (name or "").split("|") if t.strip()]
+
+def common_prefix_len(group_names) -> int:
+    """Longest common token-prefix length across group names at a level.
+
+    Blank names are ignored. Used to drop already-traversed hierarchy
+    levels from overlay group display.
+    """
+    paths = [p for p in (split_group_path(g) for g in group_names) if p]
+    if not paths:
+        return 0
+    n = 0
+    for tokens in zip(*paths):
+        if any(t != tokens[0] for t in tokens):
+            break
+        n += 1
+    return n
+
+def _display_groups(groups: List[str], prefix_len: int) -> List[str]:
+    """Level-relative display tokens: drop the common prefix (always
+    keeping the last token), dedupe preserving order."""
+    seen = set()
+    out = []
+    for g in groups:
+        tokens = split_group_path(g)
+        if not tokens:
+            continue
+        name = tokens[min(prefix_len, len(tokens) - 1)]
+        if name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
 def parse_format_string(format_str: str) -> List[str]:
     """Parse format string into list of token types.
     
@@ -32,6 +71,7 @@ def generate_tokens_for_folder(
     separator_a: str,
     separator_b: str,
     group_icons: Optional[dict] = None,
+    group_prefix_len: int = 0,
 ) -> List[Token]:
     """Generate tokens for a folder item (multiple keymaps).
     
@@ -60,17 +100,29 @@ def generate_tokens_for_folder(
             tokens.append(Token(type='C', content=chord, color_key='overlay_color_chord'))
         
         elif token_type == 'G':
-            # All groups (or first 2 + ellipsis)
-            groups_str = _format_groups_all(groups)
+            # All groups, level-relative (or first 2 + ellipsis)
+            groups_str = _format_groups_all(groups, group_prefix_len)
             if groups_str:
                 tokens.append(Token(type='G', content=groups_str, color_key='overlay_color_group'))
-        
+
         elif token_type == 'g':
-            # First group only
-            groups_str = _format_groups_first(groups)
+            # First group only, level-relative
+            groups_str = _format_groups_first(groups, group_prefix_len)
             if groups_str:
                 tokens.append(Token(type='g', content=groups_str, color_key='overlay_color_group'))
-        
+
+        elif token_type == 'G*':
+            # All groups, full paths (no level trimming)
+            groups_str = _format_groups_all_full(groups)
+            if groups_str:
+                tokens.append(Token(type='G*', content=groups_str, color_key='overlay_color_group'))
+
+        elif token_type == 'g*':
+            # First group only, full path (no level trimming)
+            groups_str = _format_groups_first_full(groups)
+            if groups_str:
+                tokens.append(Token(type='g*', content=groups_str, color_key='overlay_color_group'))
+
         elif token_type == 'i':
             # Group icon (first group's icon)
             if groups and group_icons:
@@ -79,7 +131,7 @@ def generate_tokens_for_folder(
                     group_icon = group_icons[first_group]
                     if group_icon:
                         tokens.append(Token(type='i', content=group_icon, color_key='overlay_color_group'))
-        
+
         elif token_type == 'L':
             # Label - not typically used for folders, but we can show something
             tokens.append(Token(type='L', content="", color_key='overlay_color_label'))
@@ -119,6 +171,7 @@ def generate_tokens_for_item(
     separator_b: str,
     mapping_type: Optional[str] = None,
     group_icons: Optional[dict] = None,
+    group_prefix_len: int = 0,
 ) -> List[Token]:
     """Generate tokens for a single item.
     
@@ -148,16 +201,28 @@ def generate_tokens_for_item(
             tokens.append(Token(type='C', content=chord, color_key='overlay_color_chord'))
         
         elif token_type == 'G':
-            # All groups (or first 2 + ellipsis)
-            groups_str = _format_groups_all(groups)
+            # All groups, level-relative (or first 2 + ellipsis)
+            groups_str = _format_groups_all(groups, group_prefix_len)
             if groups_str:
                 tokens.append(Token(type='G', content=groups_str, color_key='overlay_color_group'))
-        
+
         elif token_type == 'g':
-            # First group only
-            groups_str = _format_groups_first(groups)
+            # First group only, level-relative
+            groups_str = _format_groups_first(groups, group_prefix_len)
             if groups_str:
                 tokens.append(Token(type='g', content=groups_str, color_key='overlay_color_group'))
+
+        elif token_type == 'G*':
+            # All groups, full paths (no level trimming)
+            groups_str = _format_groups_all_full(groups)
+            if groups_str:
+                tokens.append(Token(type='G*', content=groups_str, color_key='overlay_color_group'))
+
+        elif token_type == 'g*':
+            # First group only, full path (no level trimming)
+            groups_str = _format_groups_first_full(groups)
+            if groups_str:
+                tokens.append(Token(type='g*', content=groups_str, color_key='overlay_color_group'))
         
         elif token_type == 'i':
             # Group icon (first group's icon)
@@ -204,23 +269,42 @@ def generate_tokens_for_item(
     
     return tokens
 
-def _format_groups_all(groups: List[str]) -> str:
-    """Format all groups (up to 2, then ellipsis)."""
-    if not groups:
+def _format_groups_all(groups: List[str], prefix_len: int = 0) -> str:
+    """Format all groups level-relative (up to 2 distinct, then ellipsis)."""
+    display = _display_groups(groups, prefix_len)
+    if not display:
         return "(unlabeled)"
-    
-    visible_groups = groups[:2]
-    groups_str = ", ".join(visible_groups)
-    if len(groups) > 2:
+
+    groups_str = ", ".join(display[:2])
+    if len(display) > 2:
         groups_str += "..."
-    
+
     return groups_str
 
-def _format_groups_first(groups: List[str]) -> str:
-    """Format first group only."""
+def _format_groups_first(groups: List[str], prefix_len: int = 0) -> str:
+    """Format first group only, level-relative."""
+    display = _display_groups(groups, prefix_len)
+    if not display:
+        return "(unlabeled)"
+
+    return display[0]
+
+def _format_groups_all_full(groups: List[str]) -> str:
+    """Format all groups as full paths (G* token; pre-#18 G behavior)."""
     if not groups:
         return "(unlabeled)"
-    
+
+    groups_str = ", ".join(groups[:2])
+    if len(groups) > 2:
+        groups_str += "..."
+
+    return groups_str
+
+def _format_groups_first_full(groups: List[str]) -> str:
+    """Format first group as full path (g* token; pre-#18 g behavior)."""
+    if not groups:
+        return "(unlabeled)"
+
     return groups[0]
 
 def tokens_to_display_parts(tokens: List[Token]) -> tuple[str, str]:
