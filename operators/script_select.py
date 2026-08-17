@@ -9,7 +9,6 @@ import bpy
 from bpy.props import IntProperty, StringProperty
 
 from .common import prefs
-from ..utils.fuzzy import fuzzy_match
 
 class CHORDSONG_OT_Script_Select(bpy.types.Operator):
     """Select a Python script from the configured scripts folder."""
@@ -50,28 +49,12 @@ class CHORDSONG_OT_Script_Select(bpy.types.Operator):
         layout.prop(self, "search_filter", text="", icon="VIEWZOOM")
         layout.separator()
 
-        # Get all .py files from the folder
+        # Scan the whole tree (context folders, groups) — same walker the
+        # scripts overlay uses, so subfolder scripts are selectable too.
         try:
-            files = []
-            for filename in os.listdir(scripts_folder):
-                if filename.endswith(".py"):
-                    full_path = os.path.join(scripts_folder, filename)
-                    if os.path.isfile(full_path):
-                        files.append((filename, full_path))
-
-            # Fuzzy filter and sort by match score
-            if self.search_filter:
-                matched_files = []
-                for filename, full_path in files:
-                    matched, score = fuzzy_match(self.search_filter, filename)
-                    if matched:
-                        matched_files.append((filename, full_path, score))
-                # Sort by score (lower is better), then by filename
-                matched_files.sort(key=lambda x: (x[2], x[0].lower()))
-                files = [(f[0], f[1]) for f in matched_files]
-            else:
-                # No search filter - sort alphabetically
-                files.sort(key=lambda x: x[0].lower())
+            from ..core.script_scanner import scan_scripts_folder, script_select_items
+            entries, _warnings = scan_scripts_folder(scripts_folder)
+            files = script_select_items(entries, self.search_filter)
 
             if not files:
                 if self.search_filter:
@@ -84,11 +67,11 @@ class CHORDSONG_OT_Script_Select(bpy.types.Operator):
             box = layout.box()
             col = box.column(align=True)
 
-            for filename, full_path in files:
+            for display, full_path in files:
                 row = col.row(align=True)
                 op = row.operator(
                     "chordsong.script_select_apply",
-                    text=filename,
+                    text=display,
                     icon="FILE_SCRIPT",
                     emboss=True,
                 )

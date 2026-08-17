@@ -252,3 +252,37 @@ def test_sort_flat_when_folders_first_off():
     ordered = [e.name for e in sort_entries(entries, folders_first=False)]
     # flagged still first, rest flat name A-Z regardless of group
     assert ordered == ["bad", "alpha", "beta", "zeta"]
+
+
+# ---------------------------------------------------------------------------
+# script_select_items — searchable list for chordsong.script_select
+# ---------------------------------------------------------------------------
+
+def test_select_items_includes_subfolder_scripts():
+    from core.script_scanner import script_select_items
+    entries = [_e("loose"), _e("aligner", group="shader"), _e("tool", group="my_tools")]
+    items = script_select_items(entries)
+    displays = [d for d, _p in items]
+    assert "shader / aligner" in displays
+    assert "my_tools / tool" in displays
+    assert "loose" in displays
+    # paths carried through
+    assert dict(items)["shader / aligner"] == "/x/aligner.py"
+
+
+def test_select_items_sorted_by_display():
+    from core.script_scanner import script_select_items
+    entries = [_e("zeta"), _e("beta", group="Tools"), _e("alpha")]
+    displays = [d for d, _p in script_select_items(entries)]
+    assert displays == sorted(displays, key=str.lower)
+
+
+def test_select_items_query_matches_name_and_group():
+    from core.script_scanner import script_select_items
+    entries = [_e("aligner", group="shader"), _e("boxcut", group="view3d")]
+    # match by name fragment
+    assert [d for d, _p in script_select_items(entries, "align")] == ["shader / aligner"]
+    # match by group fragment
+    assert [d for d, _p in script_select_items(entries, "shader")] == ["shader / aligner"]
+    # no match
+    assert script_select_items(entries, "zzzz") == []

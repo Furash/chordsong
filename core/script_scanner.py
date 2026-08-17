@@ -323,3 +323,36 @@ def sort_entries(entries, folders_first=True):
         def key(e):
             return (0 if e.flagged else 1, e.name.lower())
     return sorted(entries, key=key)
+
+
+def script_select_items(entries, query=""):
+    """(display, path) list for the script-select dialog.
+
+    Grouped scripts display as "group / name" so subfolder scripts are
+    findable; the query fuzzy-matches against name and group together.
+    Sorted by display name.
+    """
+    # Dual import: relative inside the addon package, top-level when the
+    # module is imported as `core.script_scanner` in bpy-free tests.
+    try:
+        from ..utils.fuzzy import fuzzy_match
+    except ImportError:
+        from utils.fuzzy import fuzzy_match
+
+    items = []
+    for e in entries:
+        display = f"{e.group} / {e.name}" if e.group else e.name
+        if query:
+            haystack = f"{e.group} {e.name}" if e.group else e.name
+            matched, score = fuzzy_match(query, haystack)
+            if not matched:
+                continue
+            items.append((score, display, e.path))
+        else:
+            items.append((0, display, e.path))
+
+    if query:
+        items.sort(key=lambda t: (t[0], t[1].lower()))
+    else:
+        items.sort(key=lambda t: t[1].lower())
+    return [(d, p) for _s, d, p in items]
