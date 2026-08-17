@@ -246,9 +246,11 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                 fake_mappings.append(fm)
             else:
                 entry = item[1]
+                # No fallback group for root-level scripts — a "Scripts"
+                # label on every loose row is redundant noise.
                 fake_mappings.append(FakeMapping(
                     chord, entry.name, entry.path, python_icon,
-                    group=entry.group or "Scripts", flagged=entry.flagged,
+                    group=entry.group or "", flagged=entry.flagged,
                 ))
 
         # Header: script count for the current scope (folder rows aside)

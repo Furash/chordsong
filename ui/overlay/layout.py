@@ -1,5 +1,12 @@
 """Layout calculation functions for overlay."""
-from ...core.engine import get_leader_key_token, get_str_attr, humanize_token
+from ...core.engine import (
+    Candidate,
+    get_leader_key_token,
+    get_str_attr,
+    humanize_token,
+    split_chord,
+    tokens_match,
+)
 from .tokenizer import (
     parse_format_string,
     generate_tokens_for_folder,
@@ -30,6 +37,60 @@ def _get_preset_formats(style):
         "CUSTOM": None,  # Use user-defined formats
     }
     return presets.get(style, presets["DEFAULT"])
+
+def build_scripts_candidates(filtered_mappings, buffer_tokens):
+    """Convert scripts-overlay fake mappings directly into Candidates.
+
+    Bypasses candidates_for_prefix so empty chords (display-only items
+    beyond the first 9) survive, and preserves the incoming order for
+    the numbered list. The mapping's group is carried into
+    Candidate.groups so g/G format tokens render it instead of the
+    empty-groups "(unlabeled)" fallback.
+    """
+    buffer_tokens = list(buffer_tokens) if buffer_tokens else []
+    cands = []
+    for m in filtered_mappings:
+        chord = get_str_attr(m, "chord", "")
+        tokens = split_chord(chord) if chord else []
+
+        if tokens and len(tokens) <= len(buffer_tokens) + 1:
+            # Final item (one more token than buffer, or exact match)
+            compare = tokens if len(tokens) == len(buffer_tokens) else tokens[:len(buffer_tokens)]
+            if buffer_tokens and not all(
+                    tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(compare, buffer_tokens)):
+                continue
+            nxt = tokens[len(buffer_tokens)] if len(tokens) > len(buffer_tokens) else ""
+            is_final = True
+        elif tokens:
+            # Deeper chord: show next token, not final yet
+            if buffer_tokens and not all(
+                    tokens_match(m_tok, b_tok)
+                    for m_tok, b_tok in zip(tokens[:len(buffer_tokens)], buffer_tokens)):
+                continue
+            nxt = tokens[len(buffer_tokens)]
+            is_final = False
+        else:
+            # Empty chord: display-only item (beyond first 9); empty token
+            # keeps the chord column blank
+            nxt = ""
+            is_final = True
+
+        # Folder rows label themselves "Name :: +N" with group=Name;
+        # carrying the group would print the folder name twice on the row.
+        group = "" if getattr(m, "is_folder_entry", False) else get_str_attr(m, "group", "")
+        cands.append(Candidate(
+            next_token=nxt,
+            label=get_str_attr(m, "label", ""),
+            group=group,
+            icon=get_str_attr(m, "icon", ""),
+            is_final=is_final,
+            mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
+            property_value="",
+            count=1,
+            groups=(group,) if group else (),
+            mapping_ref=m,
+        ))
+    return cands
 
 def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buffer_tokens=None, run_labels=None):
     """Build display rows from candidates, footer returned separately.
@@ -147,6 +208,14 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
             level_groups.add(c.group)
     group_prefix_len = common_prefix_len(level_groups)
 
+    # Scripts overlay: when every row carries the identical group (drilled
+    # into a folder), the label adds no information — the header already
+    # names the folder. Drop group tokens for the whole view.
+    suppress_groups = False
+    if is_scripts_overlay and cands:
+        first_groups = cands[0].groups
+        suppress_groups = bool(first_groups) and all(c.groups == first_groups for c in cands)
+
     for c in sorted_cands:
         token = c.next_token
         icon = c.icon if c.icon else ""
@@ -158,12 +227,13 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 token_types=token_types,
                 chord=token,
                 icon=icon,
-                groups=c.groups if c.groups else [],
+                groups=[] if suppress_groups else (c.groups if c.groups else []),
                 count=c.count,
                 separator_a=separator_a,
                 separator_b=separator_b,
                 group_icons=group_icons,
                 group_prefix_len=group_prefix_len,
+                show_unlabeled=not is_scripts_overlay,
             )
 
             # Store tokens in the row for rendering
@@ -185,7 +255,12 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
             if "::" in label:
                 parts = label.split("::", 1)
                 label = parts[0].strip()
-                label_extra = f":: {parts[1].strip()}"
+                # Scripts overlay folder rows use "::" only as a split marker
+                # for the "+N" counter — no separator prefix on display.
+                if getattr(c.mapping_ref, "is_folder_entry", False):
+                    label_extra = parts[1].strip()
+                else:
+                    label_extra = f":: {parts[1].strip()}"
 
             # Use tokenization for all styles
             token_types = parse_format_string(format_item)
@@ -193,13 +268,14 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 token_types=token_types,
                 chord=token,
                 icon=icon,
-                groups=c.groups if c.groups else [],
+                groups=[] if suppress_groups else (c.groups if c.groups else []),
                 label=label,
                 separator_a=separator_a,
                 separator_b=separator_b,
                 mapping_type=c.mapping_type,
                 group_icons=group_icons,
                 group_prefix_len=group_prefix_len,
+                show_unlabeled=not is_scripts_overlay,
             )
 
             # Containers get the group color rather than the item color:

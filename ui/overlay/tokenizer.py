@@ -72,6 +72,7 @@ def generate_tokens_for_folder(
     separator_b: str,
     group_icons: Optional[dict] = None,
     group_prefix_len: int = 0,
+    show_unlabeled: bool = True,
 ) -> List[Token]:
     """Generate tokens for a folder item (multiple keymaps).
     
@@ -88,17 +89,22 @@ def generate_tokens_for_folder(
         List of Token objects with content and color keys
     """
     tokens = []
-    
+
+    # Ungrouped rows outside the leader overlay skip group tokens entirely
+    # instead of rendering the "(unlabeled)" placeholder.
+    if not groups and not show_unlabeled:
+        token_types = [t for t in token_types if t not in ('G', 'g', 'G*', 'g*')]
+
     for token_type in token_types:
         if token_type == 'I':
             # Icon
             if icon:
                 tokens.append(Token(type='I', content=icon, color_key='overlay_color_icon'))
-        
+
         elif token_type == 'C':
             # Chord
             tokens.append(Token(type='C', content=chord, color_key='overlay_color_chord'))
-        
+
         elif token_type == 'G':
             # All groups, level-relative (or first 2 + ellipsis)
             groups_str = _format_groups_all(groups, group_prefix_len)
@@ -172,6 +178,7 @@ def generate_tokens_for_item(
     mapping_type: Optional[str] = None,
     group_icons: Optional[dict] = None,
     group_prefix_len: int = 0,
+    show_unlabeled: bool = True,
 ) -> List[Token]:
     """Generate tokens for a single item.
     
@@ -189,13 +196,18 @@ def generate_tokens_for_item(
         List of Token objects with content and color keys
     """
     tokens = []
-    
+
+    # Ungrouped rows outside the leader overlay skip group tokens entirely
+    # instead of rendering the "(unlabeled)" placeholder.
+    if not groups and not show_unlabeled:
+        token_types = [t for t in token_types if t not in ('G', 'g', 'G*', 'g*')]
+
     for token_type in token_types:
         if token_type == 'I':
             # Icon
             if icon:
                 tokens.append(Token(type='I', content=icon, color_key='overlay_color_icon'))
-        
+
         elif token_type == 'C':
             # Chord
             tokens.append(Token(type='C', content=chord, color_key='overlay_color_chord'))

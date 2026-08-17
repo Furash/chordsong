@@ -6,7 +6,7 @@ from gpu_extras.batch import batch_for_shader  # type: ignore
 from ...utils.render import calculate_scale_factor, calculate_overlay_position
 from ...core.engine import candidates_for_prefix, get_leader_key_token
 from .cache import _overlay_cache, get_prefs_hash
-from .layout import build_overlay_rows, wrap_into_columns, calculate_column_widths
+from .layout import build_overlay_rows, build_scripts_candidates, wrap_into_columns, calculate_column_widths
 
 # Hit-boxes for clickable rows emitted by the most recent render pass.
 # Each entry: {"x1", "y1", "x2", "y2", "kind", "payload"} in region coords.
@@ -802,92 +802,10 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
         # Compute candidates from filtered mappings
         # For scripts overlay, bypass candidates_for_prefix to handle empty chords
         if scripts_overlay_settings:
-            # Directly convert mappings to candidates for scripts overlay or toggle multi-execution mode
-            # For scripts overlay, all items are already filtered and should be displayed
-            # For toggle multi-execution mode with empty buffer, show all toggle mappings as final items
-            from ...core.engine import Candidate, split_chord, get_str_attr, tokens_match
-            cands = []
-            for m in filtered_mappings:
-                chord = get_str_attr(m, "chord", "")
-                tokens = split_chord(chord) if chord else []
-                
-                # For scripts overlay, handle empty chords (items beyond first 9)
-                if not tokens:
-                    # Empty chord means it's a display-only item (beyond first 9)
-                    # Mark as final so it displays as an item (not a folder)
-                    # Use empty token - rendering will skip chord display for empty tokens
-                    cands.append(Candidate(
-                        next_token="",  # Empty token - chord column will be empty
-                        label=get_str_attr(m, "label", ""),
-                        group=get_str_attr(m, "group", ""),
-                        icon=get_str_attr(m, "icon", ""),
-                        is_final=True,  # Mark as final so it displays as an item
-                        mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
-                        property_value=None,
-                        count=1,
-                        groups=(),
-                        mapping_ref=m,
-                    ))
-                elif len(tokens) == len(buffer_tokens) + 1:
-                    # This is a final item (one more token than buffer)
-                    # Check if buffer matches the prefix
-                    if buffer_tokens:
-                        if not all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(tokens[:len(buffer_tokens)], buffer_tokens)):
-                            continue  # Skip if prefix doesn't match
-                    # Final item - show the last token as next_token for display, but mark as final
-                    nxt = tokens[len(buffer_tokens)]
-                    cands.append(Candidate(
-                        next_token=nxt,
-                        label=get_str_attr(m, "label", ""),
-                        group=get_str_attr(m, "group", ""),
-                        icon=get_str_attr(m, "icon", ""),
-                        is_final=True,  # This is a final item
-                        mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
-                        property_value=None,
-                        count=1,
-                        groups=(),
-                        mapping_ref=m,
-                    ))
-                elif len(tokens) > len(buffer_tokens) + 1:
-                    # Has more tokens than buffer + 1, show next token (not final yet)
-                    # Check if buffer matches the prefix
-                    if buffer_tokens:
-                        if not all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(tokens[:len(buffer_tokens)], buffer_tokens)):
-                            continue  # Skip if prefix doesn't match
-                    # Show next token
-                    nxt = tokens[len(buffer_tokens)]
-                    cands.append(Candidate(
-                        next_token=nxt,
-                        label=get_str_attr(m, "label", ""),
-                        group=get_str_attr(m, "group", ""),
-                        icon=get_str_attr(m, "icon", ""),
-                        is_final=False,  # Not final yet
-                        mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
-                        property_value=None,
-                        count=1,
-                        groups=(),
-                        mapping_ref=m,
-                    ))
-                elif len(tokens) == len(buffer_tokens):
-                    # Exact match - final item (buffer fully matches chord)
-                    # Check if buffer matches exactly
-                    if buffer_tokens:
-                        if not all(tokens_match(m_tok, b_tok) for m_tok, b_tok in zip(tokens, buffer_tokens)):
-                            continue  # Skip if doesn't match exactly
-                    # Exact match - final item
-                    cands.append(Candidate(
-                        next_token="",
-                        label=get_str_attr(m, "label", ""),
-                        group=get_str_attr(m, "group", ""),
-                        icon=get_str_attr(m, "icon", ""),
-                        is_final=True,
-                        mapping_type=get_str_attr(m, "mapping_type", "OPERATOR"),
-                        property_value=None,
-                        count=1,
-                        groups=(),
-                        mapping_ref=m,
-                    ))
-            # Don't sort - maintain original order from filtered list to preserve numbered order
+            # Directly convert mappings to candidates (bypasses
+            # candidates_for_prefix so empty chords survive and incoming
+            # order is preserved) — see layout.build_scripts_candidates.
+            cands = build_scripts_candidates(filtered_mappings, buffer_tokens)
             # Apply scripts overlay max items limit (use scripts_overlay_max_items preference)
             max_items_limit = getattr(p, "scripts_overlay_max_items", p.overlay_max_items)
             cands = cands[:max_items_limit]
