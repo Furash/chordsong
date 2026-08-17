@@ -263,11 +263,9 @@ def test_select_items_includes_subfolder_scripts():
     entries = [_e("loose"), _e("aligner", group="shader"), _e("tool", group="my_tools")]
     items = script_select_items(entries)
     displays = [d for d, _p in items]
-    assert "shader / aligner" in displays
-    assert "my_tools / tool" in displays
-    assert "loose" in displays
-    # paths carried through
-    assert dict(items)["shader / aligner"] == "/x/aligner.py"
+    # display is the bare script name — no folder prefix
+    assert displays == ["aligner", "loose", "tool"]
+    assert dict(items)["aligner"] == "/x/aligner.py"
 
 
 def test_select_items_sorted_by_display():
@@ -281,8 +279,8 @@ def test_select_items_query_matches_name_and_group():
     from core.script_scanner import script_select_items
     entries = [_e("aligner", group="shader"), _e("boxcut", group="view3d")]
     # match by name fragment
-    assert [d for d, _p in script_select_items(entries, "align")] == ["shader / aligner"]
-    # match by group fragment
-    assert [d for d, _p in script_select_items(entries, "shader")] == ["shader / aligner"]
+    assert [d for d, _p in script_select_items(entries, "align")] == ["aligner"]
+    # group still searchable even though it isn't displayed
+    assert [d for d, _p in script_select_items(entries, "shader")] == ["aligner"]
     # no match
     assert script_select_items(entries, "zzzz") == []
