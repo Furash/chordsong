@@ -1182,7 +1182,8 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Item Format",
         description=(
             "Custom format for single items\n"
-            "Tokens: I=Icon, C=Chord, G=All Groups, g=First Group, L=Label, S=Separator A, s=Separator B, T=Toggle"
+            "Tokens: I=Icon, C=Chord, G=All Groups, g=First Group, G*/g*=Full Group Paths, "
+            "L=Label, S=Separator A, s=Separator B, T=Toggle, P=Property Value"
         ),
         default="C I S L T",
         update=_on_prefs_changed,

@@ -349,11 +349,8 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
                 label = f"{label}  󰨚"
         elif mapping_type == "CONTEXT_TOGGLE":
              label = f"{label}  󰨚"
-        elif mapping_type == "CONTEXT_PROPERTY":
-            if property_value:
-                # Store it in label so layout can decide how to split it
-                # or better, just use a separator that layout/render understands
-                label = f"{label}::  {property_value}"
+        # CONTEXT_PROPERTY values stay in Candidate.property_value and
+        # render only where the item format places a P token.
 
         # Check if this is the final token in the chord
         is_final = len(tokens) == len(bt) + 1

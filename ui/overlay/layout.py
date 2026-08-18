@@ -28,12 +28,12 @@ def _get_preset_formats(style):
     - C: Chord, I: Icon, i: Group Icon, G: Groups (all), g: Group (first only)
     - L: Label, N: Count (verbose), n: Count (compact)
     - S: Separator A (→), s: Separator B (::)
-    - T: Toggle icon
-    
+    - T: Toggle icon, P: Property value (CONTEXT_PROPERTY)
+
     Returns: (folder_format, item_format, separator_a, separator_b)
     """
     presets = {
-        "DEFAULT": ("C S N", "C I L T", "→", "::"),
+        "DEFAULT": ("C S N", "C I L T P", "→", "::"),
         "CUSTOM": None,  # Use user-defined formats
     }
     return presets.get(style, presets["DEFAULT"])
@@ -276,6 +276,7 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 group_icons=group_icons,
                 group_prefix_len=group_prefix_len,
                 show_unlabeled=not is_scripts_overlay,
+                property_value=c.property_value or "",
             )
 
             # Containers get the group color rather than the item color:

@@ -124,6 +124,7 @@ When **Custom** style is selected, you can define your own format strings using 
 - `S` = Separator A (default: `→`)
 - `s` = Separator B (default: `::`)
 - `T` = Toggle State (on/off glyph for toggle mappings)
+- `P` = Property Value (what a `CONTEXT_PROPERTY` chord sets, e.g. `'MATERIAL'`; omit the token to hide values)
 
 - **Folder Format**: Controls how folders (prefixes with multiple mappings) are displayed
 - **Item Format**: Controls how individual chord items are displayed

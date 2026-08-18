@@ -143,12 +143,14 @@ def draw_ui_tab(prefs, layout):
         col1.label(text="C = Chord")
         col1.label(text="G = All Groups")
         col1.label(text="g = First Group")
-        
+        col1.label(text="G*/g* = Full Group Paths")
+
         col2.label(text="L = Label")
         col2.label(text="N = Verbose Count")
         col2.label(text="n = Compact Count")
         col2.label(text="S/s = Separators")
         col2.label(text="T = Toggle State")
+        col2.label(text="P = Property Value")
         
         custom_box.separator()
         sep_row = custom_box.row(align=True)

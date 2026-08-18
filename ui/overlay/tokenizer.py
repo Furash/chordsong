@@ -179,6 +179,7 @@ def generate_tokens_for_item(
     group_icons: Optional[dict] = None,
     group_prefix_len: int = 0,
     show_unlabeled: bool = True,
+    property_value: str = "",
 ) -> List[Token]:
     """Generate tokens for a single item.
     
@@ -265,6 +266,11 @@ def generate_tokens_for_item(
             # Separator B (secondary)
             tokens.append(Token(type='s', content=separator_b, color_key='overlay_color_separator'))
         
+        elif token_type == 'P':
+            # Property value (CONTEXT_PROPERTY mappings), e.g. "'MATERIAL'"
+            if property_value:
+                tokens.append(Token(type='P', content=property_value, color_key='overlay_color_counter'))
+
         elif token_type == 'T':
             # Toggle icon - check if this is a toggle item
             if mapping_type == "CONTEXT_TOGGLE":
