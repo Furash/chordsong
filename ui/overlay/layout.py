@@ -75,12 +75,13 @@ def build_scripts_candidates(filtered_mappings, buffer_tokens):
             nxt = ""
             is_final = True
 
-        # Folder rows label themselves "Name :: +N" with group=Name;
-        # carrying the group would print the folder name twice on the row.
+        # Folder rows are labeled with their own name (counter rides in
+        # label_extra); carrying the group would print the name twice.
         group = "" if getattr(m, "is_folder_entry", False) else get_str_attr(m, "group", "")
         cands.append(Candidate(
             next_token=nxt,
             label=get_str_attr(m, "label", ""),
+            label_extra=get_str_attr(m, "label_extra", ""),
             group=group,
             icon=get_str_attr(m, "icon", ""),
             is_final=is_final,
@@ -246,18 +247,12 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
                 "tokens": tokens,  # Custom tokens for rendering
             })
         else:
-            # Single final chord, show its label
+            # Single final chord, show its label. Secondary text (scripts
+            # folder "+N" counters, search overlay real chords) arrives as
+            # an explicit field, never parsed out of the label.
             label = c.label
             icon = c.icon
-            label_extra = ""
-
-            # "::" in a label is a split marker for secondary text (scripts
-            # folder "+N" counters, search overlay real chords) — the extra
-            # renders bare, no separator prefix.
-            if "::" in label:
-                parts = label.split("::", 1)
-                label = parts[0].strip()
-                label_extra = parts[1].strip()
+            label_extra = c.label_extra or ""
 
             # Use tokenization for all styles
             token_types = parse_format_string(format_item)

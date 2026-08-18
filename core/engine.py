@@ -166,6 +166,7 @@ class Candidate:
     count: int = 1          # Number of mappings reachable through this token
     groups: tuple[str, ...] = () # Unique groups reachable through this token
     mapping_ref: object = None  # Underlying mapping when this is a final item; None otherwise
+    label_extra: str = ""       # Secondary text drawn after the token columns
 
 def _get_token_parts(token: str) -> tuple[set[str], str]:
     """Split a token into a set of modifiers and a base key."""

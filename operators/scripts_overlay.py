@@ -188,9 +188,10 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
         # Create a simple object to mimic a mapping
         class FakeMapping:
-            def __init__(self, chord, label, script_path, icon="", group="", flagged=False):
+            def __init__(self, chord, label, script_path, icon="", group="", flagged=False, label_extra=""):
                 self.chord = chord
                 self.label = label
+                self.label_extra = label_extra
                 self.icon = icon
                 self.group = group
                 self.flagged = flagged
@@ -238,8 +239,9 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
                 # rendered in group color (red when flagged) — see layout/render.
                 _, gname, count, gflagged = item
                 fm = FakeMapping(
-                    chord, f"{gname} :: +{count}", f"folder://{gname}",
+                    chord, gname, f"folder://{gname}",
                     folder_icon, group=gname, flagged=gflagged,
+                    label_extra=f"+{count}",
                 )
                 fm.is_folder_entry = True
                 fm.folder_name = gname

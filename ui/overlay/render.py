@@ -522,7 +522,7 @@ def render_overlay(_context, p, columns, footer, x, y, header, header_size, chor
                     if col_width > 0:
                         current_x += col_width + gap
 
-                # Extra label (e.g. ":: value" for properties, ":: chord" in
+                # Extra label (e.g. "+N" folder counters, real chord hints in
                 # the search overlay) — drawn after the token columns, which
                 # start at the same x in every row so extras align vertically.
                 if r.get("label_extra"):

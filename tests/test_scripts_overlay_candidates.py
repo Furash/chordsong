@@ -41,9 +41,10 @@ def _load_layout():
 
 
 class FakeMapping:
-    def __init__(self, chord, label, group="", mapping_type="PYTHON_FILE"):
+    def __init__(self, chord, label, group="", mapping_type="PYTHON_FILE", label_extra=""):
         self.chord = chord
         self.label = label
+        self.label_extra = label_extra
         self.group = group
         self.icon = ""
         self.enabled = True
@@ -144,7 +145,7 @@ def test_scripts_rows_show_group_not_unlabeled():
     assert g_by_row["3"] == ["Scripts"]
 
 
-def test_folder_row_counter_has_no_separator_prefix():
+def test_folder_row_counter_carried_as_explicit_extra():
     layout = _load_layout()
 
     class _FakePrefs:
@@ -158,17 +159,18 @@ def test_folder_row_counter_has_no_separator_prefix():
         overlay_sort_mode = "PRESET_C"
         overlay_max_label_length = 0
 
-    folder = FakeMapping("1", "MyFolder :: +3", group="MyFolder")
+    folder = FakeMapping("1", "MyFolder", group="MyFolder", label_extra="+3")
     folder.is_folder_entry = True
     cands = layout.build_scripts_candidates([folder], [])
+    assert cands[0].label_extra == "+3"
     rows, _ = layout.build_overlay_rows(cands, has_buffer=False, p=_FakePrefs(),
                                         is_scripts_overlay=True)
     assert rows[0]["label_extra"] == "+3"
+    label_tokens = [t.content for t in rows[0]["tokens"] if t.type == "L"]
+    assert label_tokens == ["MyFolder"]
 
 
-def test_search_row_chord_extra_has_no_separator_prefix():
-    # Search overlay embeds the real chord as "label :: chord"; the extra
-    # renders bare — no ":: " prefix re-added.
+def test_search_row_chord_carried_as_explicit_extra():
     layout = _load_layout()
 
     class _FakePrefs:
@@ -183,10 +185,34 @@ def test_search_row_chord_extra_has_no_separator_prefix():
         overlay_max_label_length = 0
 
     cands = layout.build_scripts_candidates(
-        [FakeMapping("1", "Frame Selected :: g g", group="View")], [])
+        [FakeMapping("1", "Frame Selected", group="View", label_extra="g g")], [])
     rows, _ = layout.build_overlay_rows(cands, has_buffer=False, p=_FakePrefs(),
                                         is_scripts_overlay=True)
     assert rows[0]["label_extra"] == "g g"
+
+
+def test_label_containing_separator_is_not_split():
+    # No more in-band "::" marker — a user label with "::" stays whole.
+    layout = _load_layout()
+
+    class _FakePrefs:
+        groups = []
+        mappings = []
+        overlay_item_format = "CUSTOM"
+        overlay_separator_a = "→"
+        overlay_separator_b = "::"
+        overlay_format_folder = "C n s g"
+        overlay_format_item = "C g L"
+        overlay_sort_mode = "PRESET_C"
+        overlay_max_label_length = 0
+
+    cands = layout.build_scripts_candidates(
+        [FakeMapping("1", "Align :: X", group="View")], [])
+    rows, _ = layout.build_overlay_rows(cands, has_buffer=False, p=_FakePrefs(),
+                                        is_scripts_overlay=True)
+    assert rows[0]["label_extra"] == ""
+    label_tokens = [t.content for t in rows[0]["tokens"] if t.type == "L"]
+    assert label_tokens == ["Align :: X"]
 
 
 def test_uniform_group_suppressed_when_inside_folder():

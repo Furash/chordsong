@@ -224,9 +224,10 @@ class CHORDSONG_OT_SearchOverlay(bpy.types.Operator):
         self._filter_mappings()
 
         class FakeMapping:
-            def __init__(self, chord, label, icon, group, hit_key, source_mapping):
+            def __init__(self, chord, label, icon, group, hit_key, source_mapping, label_extra=""):
                 self.chord = chord
                 self.label = label
+                self.label_extra = label_extra
                 self.icon = icon
                 self.group = group
                 self.context = "ALL"
@@ -260,12 +261,12 @@ class CHORDSONG_OT_SearchOverlay(bpy.types.Operator):
                 chord = ""
 
             # Show the real chord as secondary text so the user can learn it.
-            # "::" splits into label_extra in build_overlay_rows.
             real_chord = humanize_chord(split_chord(get_str_attr(m, "chord")))
-            label = f"{get_str_attr(m, 'label')} :: {real_chord}"
             fake_mappings.append(FakeMapping(
-                chord, label, get_str_attr(m, "icon"), get_str_attr(m, "group"),
+                chord, get_str_attr(m, "label"), get_str_attr(m, "icon"),
+                get_str_attr(m, "group"),
                 hit_key=f"search://{i}", source_mapping=m,
+                label_extra=real_chord,
             ))
 
         total = len(self._filtered_mappings)
