@@ -9,12 +9,37 @@ from bpy.types import UIList
 from ..core import stats_store
 from ..utils.addon_package import addon_root_package
 
-COL_ICON_WIDTH = 2.0
+# Relative column weights (split factors), not absolute units.
+COL_ICON_WIDTH = 1.0
 COL_CONVERT_WIDTH = 2.0
-COL_INFO_WIDTH = 18.0
+COL_INFO_WIDTH = 23.0
 COL_HOTKEY_WIDTH = 4.0
-COL_COUNT_WIDTH = 3.0
-COL_BLACKLIST_WIDTH = 2.0
+COL_COUNT_WIDTH = 2.5
+COL_BLACKLIST_WIDTH = 1.0
+
+COL_WIDTHS = (
+    COL_ICON_WIDTH,
+    COL_CONVERT_WIDTH,
+    COL_INFO_WIDTH,
+    COL_HOTKEY_WIDTH,
+    COL_COUNT_WIDTH,
+    COL_BLACKLIST_WIDTH,
+)
+
+
+def _split_columns(layout, widths):
+    """Fixed-ratio columns via nested splits (content can't shift them)."""
+    cols = []
+    container = layout
+    remaining = sum(widths)
+    for w in widths[:-1]:
+        split = container.split(factor=w / remaining, align=True)
+        cols.append(split.row(align=True))
+        container = split.row(align=True)
+        remaining -= w
+    cols.append(container)
+    return cols
+
 
 TYPE_ICONS = {
     'chords': 'NODE_SOCKET_SHADER',
@@ -89,30 +114,32 @@ class CHORDSONG_UL_Stats(UIList):
             return
 
         row = layout.row(align=True)
+        cols = _split_columns(row, COL_WIDTHS)
 
         # Type indicator (RNA = property, SETTINGS = operator, ...)
-        col = row.row(align=True)
-        col.ui_units_x = COL_ICON_WIDTH
+        col = cols[0]
         col.label(text="", icon=TYPE_ICONS.get(item.category, 'BLANK1'))
 
-        # Convert-to-chord button (operators and properties)
-        col = row.row(align=True)
-        col.ui_units_x = COL_CONVERT_WIDTH
+        # Convert-to-chord button (operators and properties) / chord binding (chords)
+        col = cols[1]
         if item.category in ('operators', 'properties'):
-            op = col.operator("chordsong.stats_convert_to_chord", text="", icon='EVENT_C')
+            sub = col.row(align=True)
+            sub.alignment = 'LEFT'
+            op = sub.operator("chordsong.stats_convert_to_chord", text="", icon='EVENT_C')
             op.stats_name = item.name
             op.stats_category = item.category
+        elif item.category == 'chords':
+            from ..operators.stats_operators import chord_display_text
+            col.label(text=chord_display_text(item.name))
         else:
             col.label(text="")
 
         # Info
-        col = row.row(align=True)
-        col.ui_units_x = COL_INFO_WIDTH
+        col = cols[2]
         if item.category == 'chords':
-            from ..operators.stats_operators import chord_display_text
             group = item.group or "(Ungrouped)"
             label = item.label or "(No label)"
-            col.label(text=f"{chord_display_text(item.name)}     {group} : {label}")
+            col.label(text=f"{group} : {label}")
         elif item.category == 'scripts':
             label = item.label or ""
             col.label(text=f"{item.name}     {label}" if label else item.name)
@@ -124,18 +151,15 @@ class CHORDSONG_UL_Stats(UIList):
             col.label(text=item.name)
 
         # Existing hotkey (operators only)
-        col = row.row(align=True)
-        col.ui_units_x = COL_HOTKEY_WIDTH
+        col = cols[3]
         col.label(text=self._get_operator_hotkey(item.name) if item.category == 'operators' else "")
 
         # Count
-        col = row.row(align=True)
-        col.ui_units_x = COL_COUNT_WIDTH
+        col = cols[4]
         col.label(text=str(item.count))
 
         # Blacklist toggle
-        col = row.row(align=True)
-        col.ui_units_x = COL_BLACKLIST_WIDTH
+        col = cols[5]
         try:
             prefs = context.preferences.addons[addon_root_package(__package__)].preferences
             key = stats_store.blacklist_key(item.category, item.name)
