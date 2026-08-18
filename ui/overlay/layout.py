@@ -251,16 +251,13 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
             icon = c.icon
             label_extra = ""
 
-            # Check for merged extra info (like property values set in engine.py)
+            # "::" in a label is a split marker for secondary text (scripts
+            # folder "+N" counters, search overlay real chords) — the extra
+            # renders bare, no separator prefix.
             if "::" in label:
                 parts = label.split("::", 1)
                 label = parts[0].strip()
-                # Scripts overlay folder rows use "::" only as a split marker
-                # for the "+N" counter — no separator prefix on display.
-                if getattr(c.mapping_ref, "is_folder_entry", False):
-                    label_extra = parts[1].strip()
-                else:
-                    label_extra = f":: {parts[1].strip()}"
+                label_extra = parts[1].strip()
 
             # Use tokenization for all styles
             token_types = parse_format_string(format_item)

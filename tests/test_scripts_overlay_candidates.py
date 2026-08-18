@@ -166,6 +166,29 @@ def test_folder_row_counter_has_no_separator_prefix():
     assert rows[0]["label_extra"] == "+3"
 
 
+def test_search_row_chord_extra_has_no_separator_prefix():
+    # Search overlay embeds the real chord as "label :: chord"; the extra
+    # renders bare — no ":: " prefix re-added.
+    layout = _load_layout()
+
+    class _FakePrefs:
+        groups = []
+        mappings = []
+        overlay_item_format = "CUSTOM"
+        overlay_separator_a = "→"
+        overlay_separator_b = "::"
+        overlay_format_folder = "C n s g"
+        overlay_format_item = "C g L"
+        overlay_sort_mode = "PRESET_C"
+        overlay_max_label_length = 0
+
+    cands = layout.build_scripts_candidates(
+        [FakeMapping("1", "Frame Selected :: g g", group="View")], [])
+    rows, _ = layout.build_overlay_rows(cands, has_buffer=False, p=_FakePrefs(),
+                                        is_scripts_overlay=True)
+    assert rows[0]["label_extra"] == "g g"
+
+
 def test_uniform_group_suppressed_when_inside_folder():
     # Drilled into a folder every row shares that folder's group — the
     # header already names it, so rows drop the group token.
