@@ -9,6 +9,16 @@ from bpy.props import IntProperty, StringProperty
 
 from .common import prefs
 
+# Icon picked for a dialog that has no persistent target yet (e.g. the
+# context-menu "Add Chord Mapping" dialog). The dialog's draw() consumes it.
+_pending_dialog_icon = None
+
+def consume_pending_dialog_icon():
+    """Return and clear the icon picked for a pending (unsaved) dialog."""
+    global _pending_dialog_icon
+    icon, _pending_dialog_icon = _pending_dialog_icon, None
+    return icon
+
 class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
     """Select an icon from Nerd Fonts library."""
 
@@ -41,6 +51,12 @@ class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
     search_filter: StringProperty(
         name="Search",
         description="Filter icons by name",
+        default="",
+    )
+
+    target_dialog: StringProperty(
+        name="Target Dialog",
+        description="bl_idname of an open dialog operator to receive the icon (no persistent target)",
         default="",
     )
 
@@ -109,6 +125,7 @@ class CHORDSONG_OT_Icon_Select(bpy.types.Operator):
             op.mapping_index = self.mapping_index
             op.group_index = self.group_index
             op.target_prop = self.target_prop
+            op.target_dialog = self.target_dialog
 
             # Show icon character below (will be gibberish but shows something)
             sub = col.row()
@@ -141,6 +158,7 @@ class CHORDSONG_OT_Icon_Select_Apply(bpy.types.Operator):
     mapping_index: IntProperty(default=-1)
     group_index: IntProperty(default=-1)
     target_prop: StringProperty(default="")
+    target_dialog: StringProperty(default="")
 
     def execute(self, context):
         """Apply the selected icon."""
@@ -168,8 +186,31 @@ class CHORDSONG_OT_Icon_Select_Apply(bpy.types.Operator):
         except Exception:
             pass
 
+        # Handle dialogs without a persistent target (e.g. context-menu
+        # "Add Chord Mapping"): stash the icon; the dialog's draw() consumes it.
+        if self.target_dialog:
+            global _pending_dialog_icon
+            _pending_dialog_icon = icon_char
+
+            # Best effort: also set the property on the open dialog operator directly
+            if self.target_prop:
+                try:
+                    wm = context.window_manager
+                    if hasattr(wm, 'operators'):
+                        for op_id, op in wm.operators.items():
+                            try:
+                                if (hasattr(op, 'bl_idname') and
+                                    op.bl_idname == self.target_dialog and
+                                    hasattr(op, self.target_prop)):
+                                    setattr(op, self.target_prop, icon_char)
+                                    break
+                            except Exception:
+                                continue
+                except Exception:
+                    pass
+
         # Handle group editing
-        if self.group_index >= 0:
+        elif self.group_index >= 0:
             if self.group_index >= len(p.groups):
                 self.report({"WARNING"}, "Invalid group index")
                 return {"CANCELLED"}

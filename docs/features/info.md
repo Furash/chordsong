@@ -37,9 +37,10 @@ bpy.context.space_data.overlay.show_wireframes = False
 ### Step 3: Configure the Mapping
 
 - **Enter Chord**: The sequence of keys that will trigger the mapping.
-- **Editor Context**: Context in which the mapping will be active.
+- **Editor Context**: Contexts in which the mapping will be active. Multiple contexts can be selected with Shift+click — a separate mapping is created in each.
 - **Label**: Chord name.
-- **Group**: Chord group.
+- **Icon**: Optional Nerd Fonts icon shown in the overlay. Use the dropdown button next to the field to pick one from the icon library.
+- **Group**: Chord group. Start typing to search existing groups, or enter a new name to create one.
 - **Parameters**: Operator parameters.
 
 Enter your chord sequence and adjust settings as needed.

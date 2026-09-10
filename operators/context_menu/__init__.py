@@ -16,6 +16,13 @@ from .extractors import (
 from .suggester import suggest_chord
 from ...utils.context_path import normalize_bpy_data_path
 
+def _group_search(_self, context, _edit_text):
+    """Suggest existing group names; new names can still be typed freely."""
+    try:
+        return sorted(g.name for g in prefs(context).groups if g.name)
+    except Exception:
+        return []
+
 class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
     """Add a chord mapping for this UI element"""
     bl_idname = "chordsong.context_menu"
@@ -68,19 +75,27 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
         name="Group",
         description="Group for organizing the mapping",
         default="",
+        search=_group_search,
+    )
+
+    icon: StringProperty(
+        name="Icon",
+        description="Nerd Fonts emoji/icon for this chord",
+        default="",
     )
 
     editor_context: EnumProperty(
         name="Editor Context",
-        description="Editor context where this chord mapping will be active",
+        description="Editor contexts where this chord mapping will be active (one mapping added per selected context)",
         items=(
-            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)", "OBJECT_DATAMODE", 0),
-            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)", "EDITMODE_HLT", 1),
-            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor", "GEOMETRY_NODES", 2),
-            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor", "NODE_MATERIAL", 3),
-            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor", "IMAGE_COL", 4),
+            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)", "OBJECT_DATAMODE", 1),
+            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)", "EDITMODE_HLT", 2),
+            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor", "GEOMETRY_NODES", 4),
+            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor", "NODE_MATERIAL", 8),
+            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor", "IMAGE_COL", 16),
         ),
-        default="VIEW_3D",
+        options={'ENUM_FLAG'},
+        default={"VIEW_3D"},
     )
 
     sub_operators_json: StringProperty(
@@ -114,7 +129,8 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
             self.chord = ""
             self.name = ""
             self.group = ""
-            self.editor_context = "VIEW_3D"
+            self.icon = ""
+            self.editor_context = {"VIEW_3D"}
 
             button_operator = getattr(context, "button_operator", None)
             button_prop = getattr(context, "button_prop", None)
@@ -185,7 +201,7 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
                 if self.context_path:
                     self.context_path = normalize_bpy_data_path(self.context_path)
                 self.name = button_prop.name or button_prop.identifier.replace("_", " ").title()
-                self.editor_context = detect_editor_context(context, kwargs=self.kwargs)
+                self.editor_context = {detect_editor_context(context, kwargs=self.kwargs)}
 
                 if button_prop.type == 'BOOLEAN':
                     self.mapping_type = "CONTEXT_TOGGLE"
@@ -217,7 +233,7 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
                         self.group = parts[0].replace("_", " ").title()
                         self.name = parts[1].replace("_", " ").title()
 
-                self.editor_context = detect_editor_context(context, self.operator, self.kwargs)
+                self.editor_context = {detect_editor_context(context, self.operator, self.kwargs)}
 
                 # Refine info if we have the button_operator instance
                 if button_operator:
@@ -278,7 +294,7 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
 
             # 5. Process found property (from Info selection)
             if self.context_path:
-                self.editor_context = detect_editor_context(context, kwargs=self.kwargs)
+                self.editor_context = {detect_editor_context(context, kwargs=self.kwargs)}
                 self.chord = suggest_chord(self.group, self.name)
                 return self._invoke_dialog(context)
 
@@ -298,6 +314,12 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
     def draw(self, context):
         """Draw the dialog UI"""
         layout = self.layout
+
+        # Pick up icon chosen via the icon-select popup (no persistent target yet)
+        from ..icon_select import consume_pending_dialog_icon
+        pending_icon = consume_pending_dialog_icon()
+        if pending_icon is not None:
+            self.icon = pending_icon
 
         col = layout.column(align=True)
         if self.mapping_type in ("CONTEXT_TOGGLE", "CONTEXT_PROPERTY"):
@@ -359,7 +381,14 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
         row.prop(self, "editor_context", expand=True)
         col.separator()
 
-        col.prop(self, "name", text="Label")
+        row = col.row(align=True)
+        row.prop(self, "name", text="Label")
+        icon_sub = row.row(align=True)
+        icon_sub.scale_x = 0.6
+        icon_sub.prop(self, "icon", text="Icon")
+        op = row.operator("chordsong.icon_select", text="", icon="DOWNARROW_HLT")
+        op.target_dialog = self.bl_idname
+        op.target_prop = "icon"
         col.prop(self, "group", text="Group")
         if self.mapping_type == "CONTEXT_PROPERTY":
             col.prop(self, "property_value", text="Value")
@@ -373,6 +402,13 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
             self.report({'WARNING'}, "Please enter a chord")
             return {"CANCELLED"}
 
+        # One mapping is added per selected editor context, in enum order
+        ctx_order = ("VIEW_3D", "VIEW_3D_EDIT", "GEOMETRY_NODE", "SHADER_EDITOR", "IMAGE_EDITOR")
+        contexts = [c for c in ctx_order if c in self.editor_context]
+        if not contexts:
+            self.report({'WARNING'}, "Select at least one editor context")
+            return {"CANCELLED"}
+
         # Normalize context_path if it contains bpy.data or matches indexed collection pattern
         # This handles both manually entered paths and paths from Info panel
         if self.context_path:
@@ -383,27 +419,29 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
                 self.report({'WARNING'}, "No context path specified")
                 return {"CANCELLED"}
 
-            m = p.mappings.add()
-            m.enabled = True
-            m.chord = self.chord
-            m.label = self.name if self.name else "Toggle"
-            m.group = self.group if self.group else ""
-            m.context = self.editor_context
-            m.context_path = self.context_path
-            m.mapping_type = "CONTEXT_TOGGLE"
-            
-            # Handle additional items
-            if self.sub_items_json:
-                try:
-                    import json
-                    subs = json.loads(self.sub_items_json)
-                    for sub_data in subs:
-                        if sub_data['type'] == 'PROPERTY':
-                            sub = m.sub_items.add()
-                            sub.path = sub_data['path']
-                            sub.value = sub_data['value']
-                except Exception:
-                    pass
+            for ctx in contexts:
+                m = p.mappings.add()
+                m.enabled = True
+                m.chord = self.chord
+                m.label = self.name if self.name else "Toggle"
+                m.group = self.group if self.group else ""
+                m.icon = self.icon
+                m.context = ctx
+                m.context_path = self.context_path
+                m.mapping_type = "CONTEXT_TOGGLE"
+
+                # Handle additional items
+                if self.sub_items_json:
+                    try:
+                        import json
+                        subs = json.loads(self.sub_items_json)
+                        for sub_data in subs:
+                            if sub_data['type'] == 'PROPERTY':
+                                sub = m.sub_items.add()
+                                sub.path = sub_data['path']
+                                sub.value = sub_data['value']
+                    except Exception:
+                        pass
 
             msg = f"Added chord '{self.chord}' for toggle: {self.context_path}"
         elif self.mapping_type == "CONTEXT_PROPERTY":
@@ -411,28 +449,30 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
                 self.report({'WARNING'}, "No context path specified")
                 return {"CANCELLED"}
 
-            m = p.mappings.add()
-            m.enabled = True
-            m.chord = self.chord
-            m.label = self.name if self.name else "Set Property"
-            m.group = self.group if self.group else "Property"
-            m.context = self.editor_context
-            m.context_path = self.context_path
-            m.property_value = self.property_value
-            m.mapping_type = "CONTEXT_PROPERTY"
-            
-            # Handle additional items
-            if self.sub_items_json:
-                try:
-                    import json
-                    subs = json.loads(self.sub_items_json)
-                    for sub_data in subs:
-                        if sub_data['type'] == 'PROPERTY':
-                            sub = m.sub_items.add()
-                            sub.path = sub_data['path']
-                            sub.value = sub_data['value']
-                except Exception:
-                    pass
+            for ctx in contexts:
+                m = p.mappings.add()
+                m.enabled = True
+                m.chord = self.chord
+                m.label = self.name if self.name else "Set Property"
+                m.group = self.group if self.group else "Property"
+                m.icon = self.icon
+                m.context = ctx
+                m.context_path = self.context_path
+                m.property_value = self.property_value
+                m.mapping_type = "CONTEXT_PROPERTY"
+
+                # Handle additional items
+                if self.sub_items_json:
+                    try:
+                        import json
+                        subs = json.loads(self.sub_items_json)
+                        for sub_data in subs:
+                            if sub_data['type'] == 'PROPERTY':
+                                sub = m.sub_items.add()
+                                sub.path = sub_data['path']
+                                sub.value = sub_data['value']
+                    except Exception:
+                        pass
 
             msg = f"Added chord '{self.chord}' to set {self.context_path} to {self.property_value}"
         else:
@@ -450,37 +490,44 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
                         if not self.name:
                             self.name = parts[1].replace("_", " ").title()
 
-            m = p.mappings.add()
-            m.enabled = True
-            m.chord = self.chord
-            m.label = self.name if self.name else "New Chord"
-            m.group = self.group if self.group else ""
-            m.context = self.editor_context
-            m.operator = self.operator
-            m.call_context = "INVOKE_DEFAULT"
-            m.kwargs_json = self.kwargs if self.kwargs else ""
-            m.mapping_type = "OPERATOR"
-            
-            # Handle consecutive operators
-            if self.sub_operators_json:
-                try:
-                    import json
-                    subs = json.loads(self.sub_operators_json)
-                    for sub_data in subs:
-                        if sub_data['type'] == 'OPERATOR':
-                            sub = m.sub_operators.add()
-                            sub.operator = sub_data['operator']
-                            sub.kwargs_json = sub_data['kwargs']
-                            sub.call_context = "EXEC_DEFAULT"
-                except Exception as e:
-                    self.report({'WARNING'}, f"Failed to parse sub-operators: {e}")
-                    print(f"Chord Song: Failed to parse sub-operators: {e}")
+            for ctx in contexts:
+                m = p.mappings.add()
+                m.enabled = True
+                m.chord = self.chord
+                m.label = self.name if self.name else "New Chord"
+                m.group = self.group if self.group else ""
+                m.icon = self.icon
+                m.context = ctx
+                m.operator = self.operator
+                m.call_context = "INVOKE_DEFAULT"
+                m.kwargs_json = self.kwargs if self.kwargs else ""
+                m.mapping_type = "OPERATOR"
+
+                # Handle consecutive operators
+                if self.sub_operators_json:
+                    try:
+                        import json
+                        subs = json.loads(self.sub_operators_json)
+                        for sub_data in subs:
+                            if sub_data['type'] == 'OPERATOR':
+                                sub = m.sub_operators.add()
+                                sub.operator = sub_data['operator']
+                                sub.kwargs_json = sub_data['kwargs']
+                                sub.call_context = "EXEC_DEFAULT"
+                    except Exception as e:
+                        self.report({'WARNING'}, f"Failed to parse sub-operators: {e}")
+                        print(f"Chord Song: Failed to parse sub-operators: {e}")
 
             msg = f"Added chord '{self.chord}' for: {self.operator}"
 
-        last_index = len(p.mappings) - 1
-        if last_index > 0:
-            p.mappings.move(last_index, 0)
+        # Move the newly added mappings to the top, preserving their order
+        for _ in contexts:
+            last_index = len(p.mappings) - 1
+            if last_index > 0:
+                p.mappings.move(last_index, 0)
+
+        if len(contexts) > 1:
+            msg += f" ({len(contexts)} contexts)"
 
         schedule_autosave_safe(p, delay_s=5.0)
 
