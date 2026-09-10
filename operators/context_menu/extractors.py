@@ -2,7 +2,7 @@
 import re
 import bpy  # type: ignore
 
-from ...utils.context_path import normalize_bpy_data_path
+from ...utils.context_path import normalize_bpy_data_path, addon_prefs_context_path, is_operator_idname
 
 def parse_operator_from_text(text):
     """Parse operator ID and arguments from text like 'bpy.ops.uv.weld()' or 'bpy.ops.uv.weld(type="TEST")'.
@@ -177,8 +177,10 @@ def extract_from_button_pointer(button_pointer):
     if operator:
         return operator, None, kwargs
 
-    # Check if button_pointer is actually an operator instance
-    if hasattr(button_pointer, "bl_idname"):
+    # Check if button_pointer is actually an operator instance. Panels, menus
+    # and AddonPreferences also expose bl_idname (prefs instances return
+    # garbage), so require the module.name operator shape.
+    if is_operator_idname(getattr(button_pointer, "bl_idname", None)):
         operator = button_pointer.bl_idname
         button_operator = button_pointer
     elif hasattr(button_pointer, "operator"):
@@ -224,6 +226,17 @@ def extract_context_path(button_prop, button_pointer, context=None):
     then tries button_prop.data_path if available,
     finally falls back to constructing the path from RNA type information.
     """
+    # Addon preferences first: copy_data_path_button is unreliable for them
+    # and the RNA-name fallback below can't know the addon module key.
+    # Yields preferences.addons["bl_ext.repo.Name"].preferences.<prop>.
+    try:
+        addons = (context or bpy.context).preferences.addons
+        addon_path = addon_prefs_context_path(button_pointer, button_prop.identifier, addons)
+    except Exception:
+        addon_path = None
+    if addon_path:
+        return addon_path
+
     # Try to get full data path using Blender's copy_data_path_button operator
     # This gives us the complete path including intermediate properties
     if context:

@@ -10,6 +10,20 @@ Unlike [Property Mappings](property.md), toggle mappings flip the state each tim
 - **Context Menu**: Right-click any checkbox or boolean property in Blender's UI and select **Add Chord Mapping**.
 - **Info Panel**: Extract toggle actions from Blender's history for batch creation.
 
+## Addon Preference Paths
+
+Paths may contain bracket lookups, so add-on preferences can be bound like any
+other toggle:
+
+```text
+preferences.addons["bl_ext.user_default.UniV"].preferences.use_trims
+```
+
+Right-clicking a checkbox or field inside an add-on's preferences panel (or a
+panel that draws its preferences) fills this path in automatically. The key in
+brackets is the add-on's module name as listed in
+`bpy.context.preferences.addons.keys()`.
+
 ## Chaining & "Sync Toggles"
 
 You can bind multiple toggles to a single chord to create "Presets" (e.g., one chord that toggles text and statistics at once).

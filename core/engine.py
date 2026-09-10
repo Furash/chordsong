@@ -2,6 +2,12 @@ import json
 import warnings
 from dataclasses import dataclass
 
+try:
+    from ..utils.context_path import resolve_context_path as _resolve_context_path
+except ImportError:  # tests import core.engine as a top-level package
+    from utils.context_path import resolve_context_path as _resolve_context_path
+
+
 def get_str_attr(obj, attr, default=""):
     """Get string attribute with fallback and strip whitespace."""
     return (getattr(obj, attr, default) or default).strip()
@@ -320,19 +326,12 @@ def candidates_for_prefix(mappings, buffer_tokens, context=None):
                 path = get_str_attr(m, "context_path")
                 # Very basic evaluation - match the logic used in toggle execution
                 if path:
-                    # Resolve path against context (same logic as do_toggle_path)
-                    obj = context
-                    parts = path.split(".")
-                    for part in parts[:-1]:
-                        next_obj = getattr(obj, part, None)
-                        if next_obj is None:
-                            # Path resolution failed, fallback to switch icon
-                            raise AttributeError(f"Could not resolve path part: {part}")
-                        obj = next_obj
-                    prop_name = parts[-1]
-                    if not hasattr(obj, prop_name):
-                        # Property doesn't exist, fallback to switch icon
-                        raise AttributeError(f"Property not found: {prop_name}")
+                    # Resolve path against context (same walker as do_toggle_path,
+                    # so bracket keys like addons["bl_ext.x.Y"] work here too)
+                    obj, prop_name, err = _resolve_context_path(context, path)
+                    if err:
+                        # Path resolution failed, fallback to switch icon
+                        raise AttributeError(err)
                     val = getattr(obj, prop_name)
                     if not isinstance(val, bool):
                         # Not a boolean, fallback to switch icon

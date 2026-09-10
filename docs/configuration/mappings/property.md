@@ -10,6 +10,20 @@ Unlike [Toggle Mappings](toggle.md), property mappings set a fixed value rather 
 - **Context Menu**: Right-click any property field (checkboxes, sliders, dropdowns) and select **Add Chord Mapping**.
 - **Info Panel**: Extract property assignments from Blender's history for batch creation.
 
+## Addon Preference Paths
+
+Paths may contain bracket lookups, so add-on preferences can be bound like any
+other property:
+
+```text
+preferences.addons["bl_ext.user_default.UniV"].preferences.use_trims
+```
+
+Right-clicking a checkbox or field inside an add-on's preferences panel (or a
+panel that draws its preferences) fills this path in automatically. The key in
+brackets is the add-on's module name as listed in
+`bpy.context.preferences.addons.keys()`.
+
 ## Chaining Multiple Properties
 
 You can bind multiple properties to a single chord to create "Presets" (e.g., one chord that sets Camera FOV, Clip Start, and Clip End at once).

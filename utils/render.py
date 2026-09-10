@@ -531,14 +531,9 @@ def execute_history_entry_toggle(context, entry):
             effective_context = ContextWrapper(valid_ctx)
 
         def do_toggle():
-            parts = entry.context_path.split('.')
-            obj = effective_context
-            for part in parts[:-1]:
-                obj = getattr(obj, part, None)
-                if obj is None:
-                    return None
-            prop_name = parts[-1]
-            if not hasattr(obj, prop_name):
+            from .context_path import resolve_context_path
+            obj, prop_name, err = resolve_context_path(effective_context, entry.context_path)
+            if err:
                 return None
             current_value = getattr(obj, prop_name)
             if not isinstance(current_value, bool):
@@ -594,14 +589,9 @@ def execute_history_entry_property(context, entry):
             effective_context = ContextWrapper(valid_ctx)
 
         def do_set():
-            parts = entry.context_path.split('.')
-            obj = effective_context
-            for part in parts[:-1]:
-                obj = getattr(obj, part, None)
-                if obj is None:
-                    return False
-            prop_name = parts[-1]
-            if not hasattr(obj, prop_name):
+            from .context_path import resolve_context_path
+            obj, prop_name, err = resolve_context_path(effective_context, entry.context_path)
+            if err:
                 return False
             setattr(obj, prop_name, val_to_set)
             return True

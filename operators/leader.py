@@ -59,6 +59,7 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
         actual attribute existence is only knowable at fire time.
     """
     from ..core.engine import collect_toggle_paths
+    from ..utils.context_path import resolve_context_path
     paths, _errors = collect_toggle_paths(mapping)
     if not paths:
         return [], []
@@ -66,24 +67,9 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
     errors = []
 
     def do_toggle_path(path):
-        parts = path.split('.')
-        obj = bpy.context
-        walked = []
-        for part in parts[:-1]:
-            walked.append(part)
-            next_obj = getattr(obj, part, None)
-            if next_obj is None:
-                errors.append(
-                    f'Toggle path "{path}": attribute "{".".join(walked)}" does not exist on context'
-                )
-                return None
-            obj = next_obj
-        prop_name = parts[-1]
-        if not hasattr(obj, prop_name):
-            parent = ".".join(parts[:-1]) or "context"
-            errors.append(
-                f'Toggle path "{path}": "{parent}" has no attribute "{prop_name}"'
-            )
+        obj, prop_name, err = resolve_context_path(bpy.context, path)
+        if err:
+            errors.append(f"Toggle {err[0].lower()}{err[1:]}")
             return None
         current_value = getattr(obj, prop_name)
         if not isinstance(current_value, bool):
@@ -106,24 +92,9 @@ def _toggle_mapping_paths(mapping, ctx_viewport=None):
         return set_val
 
     def do_set_path(path, value):
-        parts = path.split('.')
-        obj = bpy.context
-        walked = []
-        for part in parts[:-1]:
-            walked.append(part)
-            next_obj = getattr(obj, part, None)
-            if next_obj is None:
-                errors.append(
-                    f'Sub-item path "{path}": attribute "{".".join(walked)}" does not exist on context'
-                )
-                return None
-            obj = next_obj
-        prop_name = parts[-1]
-        if not hasattr(obj, prop_name):
-            parent = ".".join(parts[:-1]) or "context"
-            errors.append(
-                f'Sub-item path "{path}": "{parent}" has no attribute "{prop_name}"'
-            )
+        obj, prop_name, err = resolve_context_path(bpy.context, path)
+        if err:
+            errors.append(f"Sub-item {err[0].lower()}{err[1:]}")
             return None
         try:
             setattr(obj, prop_name, value)
@@ -1087,21 +1058,9 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                             except (ValueError, SyntaxError):
                                 val_to_set = val_str
 
-                            parts = path.split('.')
-                            obj = bpy.context
-
-                            # Navigate to the parent object
-                            for _, part in enumerate(parts[:-1]):
-                                next_obj = getattr(obj, part, None)
-                                if next_obj is None:
-                                    return False
-                                obj = next_obj
-
-                            # Get the property name
-                            prop_name = parts[-1]
-
-                            # Set the value
-                            if not hasattr(obj, prop_name):
+                            from ..utils.context_path import resolve_context_path
+                            obj, prop_name, err = resolve_context_path(bpy.context, path)
+                            if err:
                                 return False
 
                             setattr(obj, prop_name, val_to_set)
