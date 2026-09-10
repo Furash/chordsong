@@ -1015,7 +1015,13 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         clear_overlay_cache()
                         # Force redraw to update toggle icon immediately
                         # In toggle multi-execution mode, ensure overlay refreshes with all toggle mappings
-                        self._tag_redraw()
+                        # NOTE: don't go through self._tag_redraw() — in the
+                        # non-modifier path modal() has already returned
+                        # FINISHED and the operator's StructRNA is freed by
+                        # the time this timer fires; any self.<attr> raises
+                        # ReferenceError.
+                        from ..utils.redraw import tag_redraw_all_areas
+                        tag_redraw_all_areas()
 
                     except Exception as e:
                         import traceback
