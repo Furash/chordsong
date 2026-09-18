@@ -20,7 +20,65 @@ from bpy.props import (
 
 from .layout import draw_addon_preferences
 from .nerd_icons import NERD_ICONS
+from ..core.contexts import (
+    ALL_CONTEXT,
+    DEFAULT_CONTEXT,
+    enum_items as _context_enum_items,
+    tab_enum_items as _context_tab_enum_items,
+)
 from ..utils.addon_package import addon_root_package
+
+# Static enum tuple derived from the editor-context registry. Built once at
+# import so Blender's EnumProperty keeps stable string references.
+_CONTEXT_ENUM_ITEMS = _context_enum_items(include_all=True, icons=True)
+
+# Dynamic items for the Mappings sidebar: labels carry per-context mapping
+# counts. Blender does not own the strings of dynamic enum items, so the
+# last result is pinned here to keep them alive while the UI references them.
+_CONTEXT_TAB_ITEMS_CACHE = []
+
+
+def _on_mapping_context_tab_changed(self, _context):
+    """Selecting a context (a mode button, an "also active here" link, the
+    Add Chord flow) rolls its editor family open so the selection is visible."""
+    try:
+        from ..core.contexts import CONTEXT_BY_TOKEN
+        ctx = CONTEXT_BY_TOKEN.get(self.mapping_context_tab)
+        if ctx is None:
+            return
+        raw = self.open_editor_families or ""
+        opened = {s.strip() for s in raw.split(",") if s.strip()}
+        if ctx.space_type not in opened:
+            opened.add(ctx.space_type)
+            self.open_editor_families = ",".join(sorted(opened))
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+
+def _on_mapping_context_changed(self, context):
+    """A mapping's own Context dropdown *moves* it. Follow it with the tab
+    selection, otherwise the row the user was editing simply vanishes from
+    the list with no indication of where it went."""
+    _on_mapping_changed(self, context)
+    try:
+        prefs = context.preferences.addons[_addon_root_pkg()].preferences
+        if prefs.mapping_context_tab != self.context:
+            prefs.mapping_context_tab = self.context
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+
+def _mapping_context_tab_items(self, _context):
+    counts = {}
+    try:
+        for m in self.mappings:
+            tok = getattr(m, "context", DEFAULT_CONTEXT) or DEFAULT_CONTEXT
+            counts[tok] = counts.get(tok, 0) + 1
+    except Exception:  # pylint: disable=broad-exception-caught
+        counts = {}
+    items = _context_tab_enum_items(counts)
+    _CONTEXT_TAB_ITEMS_CACHE[:] = items
+    return _CONTEXT_TAB_ITEMS_CACHE
 
 # Module-level flag to suspend callbacks during bulk operations
 # This persists across prefs object reinitializations
@@ -582,16 +640,9 @@ class CHORDSONG_PG_Mapping(PropertyGroup):
     context: EnumProperty(
         name="Context",
         description="Editor context where this chord mapping is active",
-        items=(
-            ("ALL", "All Contexts", "Active in all editor contexts", "WORLD", 0),
-            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)", "OBJECT_DATAMODE", 1),
-            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)", "EDITMODE_HLT", 2),
-            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor", "GEOMETRY_NODES", 3),
-            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor", "NODE_MATERIAL", 4),
-            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor", "UV", 5),
-        ),
-        default="VIEW_3D",
-        update=_on_mapping_changed,
+        items=_CONTEXT_ENUM_ITEMS,
+        default=DEFAULT_CONTEXT,
+        update=_on_mapping_context_changed,
     )
     mapping_type: EnumProperty(
         name="Type",
@@ -729,17 +780,41 @@ class CHORDSONG_Preferences(AddonPreferences):
         default="[]",
     )
 
+    # Dynamic items (counts in labels) — Blender forbids `default` here; the
+    # first item, "Global", is the initial selection.
     mapping_context_tab: EnumProperty(
         name="Mapping Context Tab",
         description="Select the editor context for chord mappings",
-        items=(
-            ("VIEW_3D", "3D View (Object)", "3D View (Object Mode) chord mappings"),
-            ("VIEW_3D_EDIT", "3D View (Edit)", "3D View (Edit Modes) chord mappings"),
-            ("GEOMETRY_NODE", "Geometry Nodes", "Geometry Nodes editor chord mappings"),
-            ("SHADER_EDITOR", "Shader Editor", "Shader Editor chord mappings"),
-            ("IMAGE_EDITOR", "UV Editor", "UV Editor chord mappings"),
-        ),
+        items=_mapping_context_tab_items,
+        update=_on_mapping_context_tab_changed,
+    )
+
+    # Editor families rolled open in the Mappings-tab context selector
+    # (comma-separated space types; see operators/mapping/family_toggle.py).
+    open_editor_families: StringProperty(
+        name="Open Editor Rollouts",
         default="VIEW_3D",
+        options={'HIDDEN'},
+    )
+
+    # Editors that have their own leader key, as comma-separated space types.
+    # Authoritative: "is this editor overridden?" is membership here, never a
+    # key comparison — the fields bind full events (Ctrl+Space), so comparing
+    # key types alone silently loses modifiers.
+    leader_key_overrides: StringProperty(
+        name="Leader Key Overrides",
+        default="",
+        options={'HIDDEN'},
+    )
+
+    # Master leader binding as last seen by the preferences UI, as an event
+    # signature (see ui.keymap.event_signature). A differing live signature
+    # means the user changed it, and the change is propagated to the editors
+    # that follow the default (see ui.keymap.schedule_master_sync).
+    leader_key_last: StringProperty(
+        name="Leader Key (last seen)",
+        default="",
+        options={'HIDDEN'},
     )
 
     selection_mode: BoolProperty(

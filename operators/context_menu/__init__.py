@@ -5,7 +5,7 @@
 # pylint: disable=import-error,broad-exception-caught
 
 import bpy  # type: ignore
-from bpy.props import StringProperty, EnumProperty  # type: ignore
+from bpy.props import BoolProperty, StringProperty, EnumProperty  # type: ignore
 
 from ..common import prefs, schedule_autosave_safe
 from .extractors import (
@@ -14,7 +14,21 @@ from .extractors import (
     detect_editor_context
 )
 from .suggester import suggest_chord
+from ...core.contexts import (
+    ALL_CONTEXT,
+    CONTEXTS,
+    CONTEXT_TOKENS,
+    DEFAULT_CONTEXT,
+    context_label,
+    enum_items as _context_enum_items,
+)
 from ...utils.context_path import normalize_bpy_data_path
+
+# ENUM_FLAG items (power-of-two values) so several contexts can be ticked
+# at once in the "Add Chord Mapping" dialog.
+_CONTEXT_FLAG_ENUM_ITEMS = _context_enum_items(include_all=False, icons=True, flags=True)
+# Context toggles per row in the dialog (dialog is ~450 px wide).
+_CONTEXT_GRID_COLUMNS = 3
 
 def _group_search(_self, context, _edit_text):
     """Suggest existing group names; new names can still be typed freely."""
@@ -87,15 +101,15 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
     editor_context: EnumProperty(
         name="Editor Context",
         description="Editor contexts where this chord mapping will be active (one mapping added per selected context)",
-        items=(
-            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)", "OBJECT_DATAMODE", 1),
-            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)", "EDITMODE_HLT", 2),
-            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor", "GEOMETRY_NODES", 4),
-            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor", "NODE_MATERIAL", 8),
-            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor", "IMAGE_COL", 16),
-        ),
+        items=_CONTEXT_FLAG_ENUM_ITEMS,
         options={'ENUM_FLAG'},
-        default={"VIEW_3D"},
+        default={DEFAULT_CONTEXT},
+    )
+
+    global_context: BoolProperty(
+        name="Global",
+        description="Add one chord active in every editor instead of one per selected context",
+        default=False,
     )
 
     sub_operators_json: StringProperty(
@@ -111,7 +125,25 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
     )
 
     def _invoke_dialog(self, context):
-        """Helper method to invoke the dialog with window-level context."""
+        """Helper method to invoke the dialog with window-level context.
+
+        The editor the dialog was summoned from is pre-ticked on top of
+        whatever the operator/property heuristics suggested — but only when
+        that editor actually has a context. Editors without one (Properties,
+        Outliner, File Browser, ...) detect as the 3D View default, and
+        unioning that in would quietly add a second, unwanted 3D View copy
+        of every chord made from their buttons.
+        """
+        try:
+            from ...core.contexts import SUPPORTED_SPACE_TYPES
+            from ..common import detect_editor_context as detect_area_context, editor_state
+            (space_type, _tree, _mode), _hints = editor_state(context)
+            if space_type in SUPPORTED_SPACE_TYPES:
+                area_context = detect_area_context(context)
+                if area_context in CONTEXT_TOKENS:
+                    self.editor_context = set(self.editor_context) | {area_context}
+        except Exception:
+            pass
         window_manager = context.window_manager
         return window_manager.invoke_props_dialog(self, width=450)
 
@@ -130,7 +162,8 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
             self.name = ""
             self.group = ""
             self.icon = ""
-            self.editor_context = {"VIEW_3D"}
+            self.editor_context = {DEFAULT_CONTEXT}
+            self.global_context = False
 
             button_operator = getattr(context, "button_operator", None)
             button_prop = getattr(context, "button_prop", None)
@@ -377,8 +410,13 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
         col.separator()
 
         col.label(text="Editor Context:")
-        row = col.row(align=True)
-        row.prop(self, "editor_context", expand=True)
+        col.prop(self, "global_context", text="Global (every editor)", icon="WORLD", toggle=True)
+        # One toggle per editor, wrapped into a grid so 16 contexts fit the
+        # dialog width; greyed out while Global is on.
+        grid = col.grid_flow(row_major=True, columns=_CONTEXT_GRID_COLUMNS, even_columns=True, align=True)
+        grid.enabled = not self.global_context
+        for ctx in CONTEXTS:
+            grid.prop_enum(self, "editor_context", ctx.token, icon=ctx.icon)
         col.separator()
 
         row = col.row(align=True)
@@ -398,16 +436,24 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
 
+        # Never cancel here: Blender cannot disable a dialog's OK, and
+        # cancelling discards the operator, label, group and parameters the
+        # user just filled in. Create the mapping and say what is missing —
+        # "Add New Chord" already creates chordless mappings the same way.
         if not self.chord:
-            self.report({'WARNING'}, "Please enter a chord")
-            return {"CANCELLED"}
+            self.report({'WARNING'}, "No chord entered - set it in the Mappings tab")
 
-        # One mapping is added per selected editor context, in enum order
-        ctx_order = ("VIEW_3D", "VIEW_3D_EDIT", "GEOMETRY_NODE", "SHADER_EDITOR", "IMAGE_EDITOR")
-        contexts = [c for c in ctx_order if c in self.editor_context]
+        # One mapping is added per selected editor context, in registry order;
+        # Global adds a single ALL mapping instead.
+        if self.global_context:
+            contexts = [ALL_CONTEXT]
+        else:
+            contexts = [c for c in CONTEXT_TOKENS if c in self.editor_context]
         if not contexts:
-            self.report({'WARNING'}, "Select at least one editor context")
-            return {"CANCELLED"}
+            from ..common import detect_editor_context as _detect
+            contexts = [_detect(context)]
+            self.report({'WARNING'}, "No context ticked - added to "
+                        + context_label(contexts[0]))
 
         # Normalize context_path if it contains bpy.data or matches indexed collection pattern
         # This handles both manually entered paths and paths from Info panel

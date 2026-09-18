@@ -93,7 +93,30 @@ def build_scripts_candidates(filtered_mappings, buffer_tokens):
         ))
     return cands
 
-def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buffer_tokens=None, run_labels=None):
+def meta_chord_candidates(p, context=None):
+    """Enabled operator mappings that can fire in the editor under `context`.
+
+    Meta chords (Close Overlay, Recents) are matched by scanning mappings by
+    hand rather than through the chord engine, so without this filter a chord
+    bound to one editor would answer for every editor — and the footer would
+    advertise chords that can never fire where it is drawn.
+    """
+    if not p:
+        return []
+    mappings = getattr(p, "mappings", []) or []
+    try:
+        from ...operators.common import detect_editor_context
+        from ...core.engine import filter_mappings_by_context
+        if context is not None:
+            mappings = filter_mappings_by_context(mappings, detect_editor_context(context))
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+    return [m for m in mappings
+            if getattr(m, "enabled", True)
+            and getattr(m, "mapping_type", "OPERATOR") == "OPERATOR"]
+
+
+def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buffer_tokens=None, run_labels=None, context=None):
     """Build display rows from candidates, footer returned separately.
 
     Args:
@@ -305,11 +328,12 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
     # 1. Mod hints (informational)
     footer.append({"kind": "hint", "token": ">R  ^Ctrl  !Alt  +Shift  #Win", "label": "", "icon": ""})
 
-    # Scan mappings once for meta-operator chords (single-token only)
+    # Scan mappings once for meta-operator chords (single-token only),
+    # restricted to the chords actually active in this editor.
     recents_chord = None
     close_chord = None
     if p:
-        for m in p.mappings:
+        for m in meta_chord_candidates(p, context):
             if not getattr(m, "enabled", True):
                 continue
             if getattr(m, "mapping_type", "OPERATOR") != "OPERATOR":
@@ -330,7 +354,7 @@ def build_overlay_rows(cands, has_buffer, p=None, is_scripts_overlay=False, buff
         else:
             # Check if the leader key is claimed by any single-token mapping
             # If claimed, the double-leader fallback won't fire
-            leader_token = get_leader_key_token()
+            leader_token = get_leader_key_token(context)
             leader_claimed = False
             if p:
                 for m in p.mappings:

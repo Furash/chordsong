@@ -225,7 +225,7 @@
             "label": "Bevel 4",
             "icon": "󰘇",
             "group": "Mesh",
-            "context": "VIEW_3D_EDIT",
+            "context": "EDIT_MESH",
             "mapping_type": "OPERATOR",
             "operators": [
                 {
@@ -244,7 +244,7 @@
             "label": "Bevel 6",
             "icon": "󰘇",
             "group": "Mesh",
-            "context": "VIEW_3D_EDIT",
+            "context": "EDIT_MESH",
             "mapping_type": "OPERATOR",
             "operators": [
                 {
@@ -263,7 +263,7 @@
             "label": "Bevel 8",
             "icon": "󰘇",
             "group": "Mesh",
-            "context": "VIEW_3D_EDIT",
+            "context": "EDIT_MESH",
             "mapping_type": "OPERATOR",
             "operators": [
                 {
@@ -282,7 +282,7 @@
             "label": "Bevel 16",
             "icon": "",
             "group": "Mesh",
-            "context": "VIEW_3D_EDIT",
+            "context": "EDIT_MESH",
             "mapping_type": "OPERATOR",
             "operators": [
                 {

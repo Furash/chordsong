@@ -2,6 +2,7 @@ import json
 
 # pylint: disable=broad-exception-caught
 
+from .contexts import DEFAULT_CONTEXT, normalize_context
 from .engine import (
     parse_kwargs,
     get_str_attr,
@@ -652,9 +653,16 @@ def apply_config(prefs, data: dict, *, apply_leader_key: bool = False) -> list[s
     # Sort by order index
     mappings_to_load.sort(key=lambda x: x[0])
     
-    # Add mappings in sorted order
+    # Add mappings in sorted order. One malformed entry must never cost the
+    # user the mappings that follow it, so each add is isolated.
     for order_idx, item in mappings_to_load:
-        _add_mapping_from_dict(prefs, item, order_idx)
+        try:
+            _add_mapping_from_dict(prefs, item, order_idx, warnings)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            label = (item.get("label") or item.get("chord") or "?") if isinstance(item, dict) else "?"
+            warnings.append(f'Skipped mapping "{label}": {exc}')
+            if len(prefs.mappings) and not get_str_attr(prefs.mappings[-1], "chord"):
+                prefs.mappings.remove(len(prefs.mappings) - 1)
     
     # Normalize all order indices to match final array positions
     _normalize_order_indices(prefs.mappings)
@@ -663,16 +671,50 @@ def apply_config(prefs, data: dict, *, apply_leader_key: bool = False) -> list[s
     # returns — keeping core/ from reaching into ui/ preserves layering.
     return warnings
 
-def _add_mapping_from_dict(prefs, item: dict, order_index: int = 0):
-    """Helper function to add a single mapping from a dict to prefs.mappings."""
+def _set_enum(target, attr, value, default, warnings=None, what=""):
+    """Assign an enum property, falling back to `default` when this build
+    has no such identifier.
+
+    Blender raises TypeError on an unknown enum identifier. Inside the
+    config loader that aborts the whole load, so a single stale value would
+    cost the user every mapping after it — always degrade instead, and tell
+    them what changed.
+    """
+    value = (value or default)
+    try:
+        setattr(target, attr, value)
+        return
+    except TypeError:
+        pass
+    try:
+        setattr(target, attr, default)
+    except TypeError:
+        return
+    if warnings is not None and value != default:
+        warnings.append(f'Unknown {what or attr} "{value}", using "{default}"')
+
+
+def _add_mapping_from_dict(prefs, item: dict, order_index: int = 0, warnings=None):
+    """Helper function to add a single mapping from a dict to prefs.mappings.
+
+    `warnings` collects human-readable notes about values this build had to
+    substitute (retired contexts, unknown mapping types, ...).
+    """
     m = prefs.mappings.add()
     m.order_index = order_index
     m.enabled = bool(item.get("enabled", True))
     m.chord = (item.get("chord", "") or "").strip()
     m.icon = (item.get("icon", "") or "").strip()
     m.group = (item.get("group", "") or "").strip()
-    m.context = item.get("context", "VIEW_3D")
-    m.mapping_type = item.get("mapping_type", "OPERATOR")
+    # Retired tokens (the generic VIEW_3D_EDIT, ...) map to their surviving
+    # context; a context this build doesn't have at all falls back to the
+    # default rather than aborting the load — see core.contexts.
+    raw_context = item.get("context", DEFAULT_CONTEXT)
+    m.context = normalize_context(raw_context)
+    if warnings is not None and m.context != raw_context:
+        label = (item.get("label") or item.get("chord") or "chord").strip()
+        warnings.append(f'"{label}": context "{raw_context}" is gone, moved to "{m.context}"')
+    _set_enum(m, "mapping_type", item.get("mapping_type"), "OPERATOR", warnings, "mapping type")
     m.sync_toggles = bool(item.get("sync_toggles", False))
     m.label = (item.get("label", "") or "").strip()
 
@@ -743,24 +785,32 @@ def _add_mapping_from_dict(prefs, item: dict, order_index: int = 0):
                 op_kwargs = _kwargs_dict_to_str(op_data.get("kwargs", {}))
                 if idx == 0:
                     m.operator = op_id
-                    m.call_context = op_ctx
+                    _set_enum(m, "call_context", op_ctx, "EXEC_DEFAULT", warnings, "call context")
                     m.kwargs_json = op_kwargs
                 else:
                     sub = m.sub_operators.add()
                     sub.operator = op_id
-                    sub.call_context = op_ctx
+                    _set_enum(sub, "call_context", op_ctx, "EXEC_DEFAULT", warnings, "call context")
                     sub.kwargs_json = op_kwargs
         else:
             # Backward compatibility (Version 1)
             m.operator = (item.get("operator", "") or "").strip()
-            m.call_context = (item.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
-            m.kwargs_json = _kwargs_dict_to_str(item.get("kwargs", {}))
+            _set_enum(m, "call_context", (item.get("call_context") or "").strip(),
+                      "EXEC_DEFAULT", warnings, "call context")
+            # Chord snippets (core.chord_serialization) write the parameters
+            # as the pre-formatted "kwargs_json" string; config files write a
+            # "kwargs" dict. Accept both or pasted chords lose every parameter
+            # and silently fire the operator with its defaults.
+            m.kwargs_json = ((item.get("kwargs_json") or "").strip()
+                             or _kwargs_dict_to_str(item.get("kwargs", {})))
             for sub_data in item.get("sub_operators", []):
                 if isinstance(sub_data, dict):
                     sub = m.sub_operators.add()
                     sub.operator = (sub_data.get("operator", "") or "").strip()
-                    sub.call_context = (sub_data.get("call_context", "EXEC_DEFAULT") or "EXEC_DEFAULT").strip()
-                    sub.kwargs_json = _kwargs_dict_to_str(sub_data.get("kwargs", {}))
+                    _set_enum(sub, "call_context", (sub_data.get("call_context") or "").strip(),
+                              "EXEC_DEFAULT", warnings, "call context")
+                    sub.kwargs_json = ((sub_data.get("kwargs_json") or "").strip()
+                                       or _kwargs_dict_to_str(sub_data.get("kwargs", {})))
 
     for sub_data in item.get("sub_items", []):
         if isinstance(sub_data, dict):
@@ -794,6 +844,7 @@ def apply_config_append(prefs, data: dict) -> list[str]:
                 if grp_name and grp_name not in existing_group_names:
                     grp = prefs.groups.add()
                     grp.name = grp_name
+                    grp.icon = (grp_item.get("icon", "") or "").strip()
                     grp.display_order = int(grp_item.get("display_order", 0))
                     grp.expanded = bool(grp_item.get("expanded", False))
 
@@ -803,7 +854,7 @@ def apply_config_append(prefs, data: dict) -> list[str]:
         # Add all new mappings (order_index will be normalized after)
         for item in mappings:
             if isinstance(item, dict):
-                _add_mapping_from_dict(prefs, item, 0)
+                _add_mapping_from_dict(prefs, item, 0, warnings)
         
         # Normalize all order indices to match array positions
         # This prevents gaps and ensures move operations work correctly

@@ -47,28 +47,16 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         self._area = area
         self._region = region
 
-        # Register handlers for all major space types
-        self._draw_handles = {}
-        supported_types = [
-            bpy.types.SpaceView3D,
-            bpy.types.SpaceNodeEditor,
-            bpy.types.SpaceImageEditor,
-            bpy.types.SpaceSequenceEditor,
-        ]
-
-        for st in supported_types:
-            handle = st.draw_handler_add(self._draw_callback, (), "WINDOW", "POST_PIXEL")
-            self._draw_handles[st] = handle
+        # Register handlers for every supported space type
+        from ..utils.spaces import add_overlay_handlers
+        self._draw_handles = add_overlay_handlers(self._draw_callback)
 
     def _remove_draw_handler(self):
         if not self._draw_handles:
             return
-        for st, handle in self._draw_handles.items():
-            try:
-                st.draw_handler_remove(handle, "WINDOW")
-            except Exception:
-                pass
-        self._draw_handles = {}
+        from ..utils.spaces import remove_overlay_handlers
+        remove_overlay_handlers(self._draw_handles)
+        self._draw_handles = []
 
     def _tag_redraw(self):
         """Tag all relevant areas for redraw."""
@@ -291,7 +279,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
         the current area can't host draw handlers. Search all windows for
         a supported area and return (area, region) or (None, None).
         """
-        supported = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
+        from ..utils.spaces import SUPPORTED_SPACE_TYPES as supported
         for window in context.window_manager.windows:
             try:
                 screen = window.screen
@@ -331,7 +319,7 @@ class CHORDSONG_OT_ScriptsOverlay(bpy.types.Operator):
 
         # If invoked from a non-viewport area (e.g. Preferences debug panel),
         # find a suitable viewport area to host the overlay
-        supported = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
+        from ..utils.spaces import SUPPORTED_SPACE_TYPES as supported
         area = context.area
         region = context.region
         if area and area.type not in supported:

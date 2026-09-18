@@ -235,7 +235,84 @@ jobs:
             4. Enable the add-on
             
             ### Changes
-            See the [changelog](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.ref_name }}) for details.
+
+            **Chords now work in every editor.** Chord Song used to run in the
+            3D View, the node editors and the UV editor only. It now covers the
+            Video Sequencer (timeline and preview), Movie Clip, Dope Sheet,
+            Timeline, Graph Editor, Drivers and the NLA, and the 3D View is
+            split by mode: Object, Sculpt, Paint, Pose, and one context per Edit
+            mode (mesh, curve, armature, text, lattice, metaball, grease pencil,
+            point cloud). The Compositor joins Geometry Nodes and the Shader
+            Editor, and the UV editor gains its Paint mode. Resolves #21.
+
+            **Each editor can have its own leader key.** The field at the top of
+            the Mappings tab is the default; open an editor's rollout and press
+            Override to give it a different key — useful where Space drives
+            playback, such as the Video Sequencer. Changing the default moves
+            the editors that still follow it and leaves overrides alone.
+
+            **Global chords have their own tab.** A chord that should fire
+            everywhere is one mapping, not one copy per editor. The globe button
+            on any mapping row opens a single dialog showing every context: tick
+            one to put a copy there, untick to remove it, or press Make Global to
+            merge all the copies into one.
+
+            **The preferences are fast again.** Both tabs did work proportional
+            to your chord library on every single redraw, so dragging or
+            resizing the preferences window crawled. Per frame, measured in
+            Blender:
+
+            | | Before | After |
+            | :--- | ---: | ---: |
+            | Mappings tab, 100 chords | 84 ms | 0.3 ms |
+            | Mappings tab, 250 chords | 460 ms | 0.9 ms |
+            | Statistics tab | 16-21 ms | under 0.6 ms |
+
+            Conflict highlighting compared every chord against every other one,
+            three times per redraw; it is now built once as an index. The
+            Statistics tab looked each row's shortcut up by walking every keymap
+            in Blender, and rebuilt its whole list every frame; it now reads the
+            keymaps once and rebuilds only when something actually changed.
+
+            ### Fixes
+
+            - Loading a config that held a context this version no longer has
+              could abort part-way and lose every mapping after it. Unknown
+              contexts now degrade with a warning instead.
+            - Copy & paste dropped every operator parameter, so a pasted chord
+              silently ran with defaults.
+            - Leader key bindings ignored modifiers: Ctrl+Space never
+              propagated, read as "follows the default", and was overwritten by
+              the next default change. Reset left a stray modifier behind.
+            - The Contexts dialog treated a renamed or disabled copy as a
+              different chord, under-reporting where a chord lived and creating
+              a duplicate when you put it back.
+            - Right-clicking a button in an editor without a context of its own
+              quietly added a second 3D View copy of the chord.
+            - OK on an incomplete Add Chord dialog cancelled and discarded
+              everything typed; it now completes and says what is missing.
+            - Conflict reports show context names instead of raw tokens.
+            - Close Overlay and Recents chords are matched only where they can
+              actually fire.
+            - Append Config no longer drops group icons.
+            - T/N panels now hide and restore with Blender's own animation, and
+              only in the editor the overlay was opened in.
+            - The chord confirmation overlay appears in the editor the chord was
+              fired from, not in every 3D View.
+
+            ### Notes for existing configs
+
+            Chords keep working, but three things changed shape:
+
+            - **Object-mode chords no longer fire in Sculpt, Paint or Pose.**
+              Those modes are separate contexts now. Use Global, or the globe
+              button, for a chord that should reach several modes.
+            - **The generic "3D View (Edit)" context is gone**, replaced by one
+              context per object type. Chords saved under it load as Edit Mesh;
+              re-tick the other edit contexts if you need them there.
+            - **The Outliner, Properties, File Browser and Info editors are not
+              chord contexts.** Their buttons drive the scene, so chords made
+              from them belong to the 3D View.
           draft: false
           prerelease: false
         env:

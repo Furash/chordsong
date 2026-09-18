@@ -61,6 +61,10 @@ from .operators import (
     CHORDSONG_OT_Mapping_Copy_Single,
     CHORDSONG_OT_Mapping_Deselect_All,
     CHORDSONG_OT_Mapping_Duplicate,
+    CHORDSONG_OT_Mapping_Contexts,
+    CHORDSONG_OT_Context_Select,
+    CHORDSONG_OT_Family_Toggle,
+    CHORDSONG_OT_Leader_Override_Toggle,
     CHORDSONG_OT_Mapping_Fold_All,
     CHORDSONG_OT_Mapping_Move_Down,
     CHORDSONG_OT_Mapping_Move_Up,
@@ -143,6 +147,10 @@ _classes = (
     CHORDSONG_OT_Mapping_Copy_Single,
     CHORDSONG_OT_Mapping_Deselect_All,
     CHORDSONG_OT_Mapping_Duplicate,
+    CHORDSONG_OT_Mapping_Contexts,
+    CHORDSONG_OT_Context_Select,
+    CHORDSONG_OT_Family_Toggle,
+    CHORDSONG_OT_Leader_Override_Toggle,
     CHORDSONG_OT_Mapping_Fold_All,
     CHORDSONG_OT_Mapping_Move_Down,
     CHORDSONG_OT_Mapping_Move_Up,
@@ -230,13 +238,11 @@ def register():
     if kc_addon:
         addon_keymaps.clear()
 
-        keymap_configs = [
-            ('3D View', 'VIEW_3D'),
-            ('Node Editor', 'NODE_EDITOR'),
-            ('Image', 'IMAGE_EDITOR'),
-        ]
+        # One leader keymap per supported editor; the list lives in
+        # core.contexts so contexts, keymaps and draw handlers stay in sync.
+        from .core.contexts import LEADER_KEYMAPS
 
-        for km_name, space_type in keymap_configs:
+        for km_name, space_type in LEADER_KEYMAPS:
             km = kc_addon.keymaps.new(name=km_name, space_type=space_type)
 
             # Check if keymap item already exists (avoid duplicates on reload)

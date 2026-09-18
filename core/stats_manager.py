@@ -35,6 +35,7 @@ def _empty_counts() -> dict:
 _buffer = _empty_counts()
 _file_cache = None  # counts loaded from disk; None until first load
 _dirty = False
+_revision = 0
 _last_uid = 0
 _uid_initialized = False
 _last_save = 0.0
@@ -105,11 +106,12 @@ def get_stats_file_path() -> str:
 
 
 def record(category: str, identifier: str) -> None:
-    global _dirty
+    global _dirty, _revision
     if category not in _buffer or not identifier:
         return
     _buffer[category][identifier] = _buffer[category].get(identifier, 0) + 1
     _dirty = True
+    _revision += 1
 
 
 def _tracking_active() -> bool:
@@ -162,6 +164,13 @@ def _consume_expected(idname: str) -> bool:
     else:
         _expected_ops.pop(idname, None)
     return consumed
+
+
+def revision() -> int:
+    """Bumped whenever the counts change. Lets the UI skip rebuilding its
+    list on a redraw where nothing happened — the preferences region
+    redraws every frame while the window is dragged."""
+    return _revision
 
 
 def mark_dirty() -> None:
@@ -252,6 +261,8 @@ def get_last_property_value(path: str) -> str:
 
 def load_from_file() -> None:
     """Load counts from the canonical stats file into the cache."""
+    global _revision  # pylint: disable=global-statement
+    _revision += 1
     global _file_cache, _buffer, _dirty
     data = _load_data(get_stats_file_path())
     _file_cache = stats_store.data_to_counts(data)
@@ -262,6 +273,8 @@ def load_from_file() -> None:
 
 def reload_from_path(path: str) -> bool:
     """Replace in-memory counts with the contents of an arbitrary JSON file."""
+    global _revision  # pylint: disable=global-statement
+    _revision += 1
     global _file_cache, _buffer, _dirty
     path = (path or "").strip()
     if path and not path.lower().endswith(".json"):
@@ -317,6 +330,8 @@ def write_current_to_file(path: str = "") -> bool:
 
 def clear_all() -> None:
     """Reset all statistics (memory and file)."""
+    global _revision  # pylint: disable=global-statement
+    _revision += 1
     global _buffer, _file_cache, _dirty, _property_values
     _buffer = _empty_counts()
     _file_cache = _empty_counts()

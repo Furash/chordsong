@@ -860,7 +860,7 @@ def draw_overlay(context, p, buffer_tokens, filtered_mappings=None, custom_heade
 
         # Build rows and footer (sorted by group display_order, then chord order_index)
         run_labels = scripts_overlay_settings.get("run_labels") if scripts_overlay_settings else None
-        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, is_scripts_overlay=bool(scripts_overlay_settings), buffer_tokens=buffer_tokens, run_labels=run_labels)
+        rows, footer = build_overlay_rows(cands, bool(buffer_tokens), p=p, is_scripts_overlay=bool(scripts_overlay_settings), buffer_tokens=buffer_tokens, run_labels=run_labels, context=context)
         max_rows = max(int(max_rows_setting), 1)
         columns = wrap_into_columns(rows, max_rows)
 

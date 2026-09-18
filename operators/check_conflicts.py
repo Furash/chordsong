@@ -153,96 +153,107 @@ def generate_chord(base_chord, all_chords, exclude_chord=None, exclude_symbols=N
 def find_conflicts_util(mappings, generate_fixes=True):
     """Shared utility function to find all chord conflicts.
 
+    Conflicts are evaluated per *effective* context: for every editor
+    context, the chords active there are its own, those inherited from
+    parent contexts (3D View chords in Sculpt mode, Sequencer chords in the
+    Preview, ...) and Global ones. A conflict found in several effective
+    contexts (e.g. two Global duplicates) is reported once.
+
     Args:
         mappings: Collection of mapping objects to check
         generate_fixes: If True, generate suggested fixes (expensive). If False, only detect conflicts.
 
     Returns a dict with 'prefix_conflicts' and 'duplicates' lists.
     """
+    from ..core.contexts import (
+        ALL_CONTEXT, CONTEXT_TOKENS, DEFAULT_CONTEXT, context_active_in, context_label,
+    )
+
     conflicts = {"prefix_conflicts": [], "duplicates": []}
-    by_context = {}
+    enabled = [m for m in mappings if getattr(m, "enabled", True)]
+    seen_duplicates = set()
+    seen_prefixes = set()
 
-    for m in mappings:
-        if not getattr(m, "enabled", True):
+    def _ctx_of(m):
+        return getattr(m, "context", DEFAULT_CONTEXT) or DEFAULT_CONTEXT
+
+    def _context_label(involved, live_ctx):
+        # "ALL", "VIEW_3D", or "ALL/VIEW_3D_SCULPT" when several contexts meet
+        ctxs = []
+        for m in involved:
+            c = _ctx_of(m)
+            if c not in ctxs:
+                ctxs.append(c)
+        # Human-readable, like every other context label in the UI
+        if len(ctxs) == 1:
+            return context_label(ctxs[0])
+        ordered = sorted(ctxs, key=lambda c: (c != ALL_CONTEXT, c != live_ctx, c))
+        return " / ".join(context_label(c) for c in ordered)
+
+    for live_ctx in CONTEXT_TOKENS:
+        ctx_mappings = [m for m in enabled if context_active_in(_ctx_of(m), live_ctx)]
+        if not ctx_mappings:
             continue
-        ctx = getattr(m, "context", "VIEW_3D")
-        by_context.setdefault(ctx, []).append(m)
 
-    # Get "ALL" context mappings separately
-    all_context_mappings = by_context.get("ALL", [])
-    all_context_chords = {}
-    for m in all_context_mappings:
-        chord_str = get_str_attr(m, "chord")
-        tokens = split_chord(chord_str)
-        if tokens:
-            chord_key = tuple(tokens)
-            all_context_chords.setdefault(chord_key, []).append(m)
-
-    for ctx, ctx_mappings in by_context.items():
         chord_map = {}
         all_chords = []
-
         for m in ctx_mappings:
             chord_str = get_str_attr(m, "chord")
             tokens = split_chord(chord_str)
             if not tokens:
                 continue
-
             all_chords.append(chord_str)
-            chord_key = tuple(tokens)
-            chord_map.setdefault(chord_key, []).append(m)
+            chord_map.setdefault(tuple(tokens), []).append(m)
 
-        # Check for duplicates
+        # Duplicates: same chord bound more than once in this effective context
         for chord_key, mappings_list in chord_map.items():
-            if len(mappings_list) > 1:
-                base_chord = " ".join(chord_key)
+            if len(mappings_list) < 2:
+                continue
+            dedupe_key = frozenset(id(m) for m in mappings_list)
+            if dedupe_key in seen_duplicates:
+                continue
+            seen_duplicates.add(dedupe_key)
 
-                conflict_data = {
-                    "chord": base_chord,
-                    "context": ctx,
-                    "count": len(mappings_list),
-                    "labels": [get_str_attr(m, "label") for m in mappings_list],
-                    "groups": [get_str_attr(m, "group") for m in mappings_list],
-                    "mappings": mappings_list,
-                }
+            base_chord = " ".join(chord_key)
+            conflict_data = {
+                "chord": base_chord,
+                "context": _context_label(mappings_list, live_ctx),
+                "count": len(mappings_list),
+                "labels": [get_str_attr(m, "label") for m in mappings_list],
+                "groups": [get_str_attr(m, "group") for m in mappings_list],
+                "mappings": mappings_list,
+            }
 
-                # Only generate fixes if requested (expensive operation)
-                if generate_fixes:
-                    fixes = {"add": [], "change_last": []}
-                    base_key = chord_key
+            if generate_fixes:
+                fixes = {"add": [], "change_last": []}
+                for strategy in fixes:
+                    # Never test candidate fixes against the duplicates
+                    # themselves — the existing chord would block them all.
+                    temp_chords = [c for c in all_chords if tuple(split_chord(c)) != chord_key]
+                    used_symbols = []
+                    for _ in mappings_list:
+                        fix = generate_chord(
+                            base_chord, temp_chords,
+                            exclude_symbols=used_symbols,
+                            change_last=(strategy == "change_last")
+                        )
+                        if fix:
+                            fixes[strategy].append(fix)
+                            temp_chords.append(fix)
+                            fix_tokens = split_chord(fix)
+                            if strategy == "change_last":
+                                used_symbols.append(fix_tokens[-1])
+                            elif len(fix_tokens) > len(chord_key):
+                                used_symbols.append(fix_tokens[-1])
+                conflict_data["suggested_fixes_add"] = fixes["add"]
+                conflict_data["suggested_fixes_change_last"] = fixes["change_last"]
 
-                    for strategy, _ in fixes.items():
-                        # CRITICAL: When generating fixes for a duplicate set,
-                        # we must NOT check against the duplicates themselves,
-                        # otherwise the existing chord will block many potential fixes.
-                        temp_chords = [c for c in all_chords if tuple(split_chord(c)) != base_key]
-                        used_symbols = []
+            conflicts["duplicates"].append(conflict_data)
 
-                        for _ in mappings_list:
-                            fix = generate_chord(
-                                base_chord, temp_chords,
-                                exclude_symbols=used_symbols,
-                                change_last=(strategy == "change_last")
-                            )
-                            if fix:
-                                fixes[strategy].append(fix)
-                                temp_chords.append(fix)
-
-                                fix_tokens = split_chord(fix)
-                                if strategy == "change_last":
-                                    used_symbols.append(fix_tokens[-1])
-                                elif len(fix_tokens) > len(chord_key):
-                                    used_symbols.append(fix_tokens[-1])
-
-                    conflict_data["suggested_fixes_add"] = fixes["add"]
-                    conflict_data["suggested_fixes_change_last"] = fixes["change_last"]
-
-                conflicts["duplicates"].append(conflict_data)
-
-        # Check for prefix conflicts
+        # Prefix conflicts: one chord is a prefix of another (shorter one wins, longer never fires)
         chord_keys = list(chord_map.keys())
         for i, chord1 in enumerate(chord_keys):
-            for chord2 in chord_keys[i+1:]:
+            for chord2 in chord_keys[i + 1:]:
                 if len(chord1) < len(chord2) and chord2[:len(chord1)] == chord1:
                     prefix_key, full_key = chord1, chord2
                 elif len(chord2) < len(chord1) and chord1[:len(chord2)] == chord2:
@@ -250,111 +261,28 @@ def find_conflicts_util(mappings, generate_fixes=True):
                 else:
                     continue
 
+                prefix_mapping = chord_map[prefix_key][0]
+                full_mapping = chord_map[full_key][0]
+                dedupe_key = (id(prefix_mapping), id(full_mapping))
+                if dedupe_key in seen_prefixes:
+                    continue
+                seen_prefixes.add(dedupe_key)
+
                 prefix_chord = " ".join(prefix_key)
                 full_chord = " ".join(full_key)
-
                 conflict_data = {
                     "prefix_chord": prefix_chord,
-                    "prefix_label": get_str_attr(chord_map[prefix_key][0], "label"),
-                    "prefix_group": get_str_attr(chord_map[prefix_key][0], "group"),
+                    "prefix_label": get_str_attr(prefix_mapping, "label"),
+                    "prefix_group": get_str_attr(prefix_mapping, "group"),
                     "full_chord": full_chord,
-                    "full_label": get_str_attr(chord_map[full_key][0], "label"),
-                    "full_group": get_str_attr(chord_map[full_key][0], "group"),
-                    "context": ctx,
-                    "prefix_mapping": chord_map[prefix_key][0],
+                    "full_label": get_str_attr(full_mapping, "label"),
+                    "full_group": get_str_attr(full_mapping, "group"),
+                    "context": _context_label([prefix_mapping, full_mapping], live_ctx),
+                    "prefix_mapping": prefix_mapping,
                 }
-
-                # Only generate fix if requested
                 if generate_fixes:
                     conflict_data["suggested_fix"] = generate_chord(prefix_chord, all_chords, exclude_chord=full_chord)
-
                 conflicts["prefix_conflicts"].append(conflict_data)
-
-    # Check "ALL" context mappings against all other contexts
-    if all_context_mappings and len(by_context) > 1:
-        # Check "ALL" mappings for conflicts with each specific context
-        for ctx, ctx_mappings in by_context.items():
-            if ctx == "ALL":
-                continue
-
-            ctx_chord_map = {}
-            ctx_all_chords = []
-            for m in ctx_mappings:
-                chord_str = get_str_attr(m, "chord")
-                tokens = split_chord(chord_str)
-                if tokens:
-                    ctx_all_chords.append(chord_str)
-                    chord_key = tuple(tokens)
-                    ctx_chord_map.setdefault(chord_key, []).append(m)
-
-            # Check for duplicates: "ALL" mappings vs this context
-            for chord_key, all_mappings_list in all_context_chords.items():
-                if chord_key in ctx_chord_map:
-                    # Conflict: same chord in "ALL" and this specific context
-                    base_chord = " ".join(chord_key)
-                    conflict_data = {
-                        "chord": base_chord,
-                        "context": f"ALL/{ctx}",
-                        "count": len(all_mappings_list) + len(ctx_chord_map[chord_key]),
-                        "labels": ([get_str_attr(m, "label") for m in all_mappings_list] +
-                                  [get_str_attr(m, "label") for m in ctx_chord_map[chord_key]]),
-                        "groups": ([get_str_attr(m, "group") for m in all_mappings_list] +
-                                  [get_str_attr(m, "group") for m in ctx_chord_map[chord_key]]),
-                        "mappings": all_mappings_list + ctx_chord_map[chord_key],
-                    }
-                    if generate_fixes:
-                        fixes = {"add": [], "change_last": []}
-                        temp_chords = [c for c in ctx_all_chords if tuple(split_chord(c)) != chord_key]
-                        used_symbols = []
-                        for _ in all_mappings_list + ctx_chord_map[chord_key]:
-                            fix = generate_chord(
-                                base_chord, temp_chords,
-                                exclude_symbols=used_symbols,
-                                change_last=(len(fixes["change_last"]) < len(fixes["add"]))
-                            )
-                            if fix:
-                                strategy = "change_last" if len(fixes["change_last"]) < len(fixes["add"]) else "add"
-                                fixes[strategy].append(fix)
-                                temp_chords.append(fix)
-                                fix_tokens = split_chord(fix)
-                                if strategy == "change_last":
-                                    used_symbols.append(fix_tokens[-1])
-                                elif len(fix_tokens) > len(chord_key):
-                                    used_symbols.append(fix_tokens[-1])
-                        conflict_data["suggested_fixes_add"] = fixes["add"]
-                        conflict_data["suggested_fixes_change_last"] = fixes["change_last"]
-                    conflicts["duplicates"].append(conflict_data)
-
-            # Check for prefix conflicts: "ALL" mappings vs this context
-            for all_chord_key, all_mappings_list in all_context_chords.items():
-                for ctx_chord_key, ctx_mappings_list in ctx_chord_map.items():
-                    if len(all_chord_key) < len(ctx_chord_key) and ctx_chord_key[:len(all_chord_key)] == all_chord_key:
-                        prefix_key, full_key = all_chord_key, ctx_chord_key
-                        prefix_mappings, full_mappings = all_mappings_list, ctx_mappings_list
-                    elif len(ctx_chord_key) < len(all_chord_key) and all_chord_key[:len(ctx_chord_key)] == ctx_chord_key:
-                        prefix_key, full_key = ctx_chord_key, all_chord_key
-                        prefix_mappings, full_mappings = ctx_mappings_list, all_mappings_list
-                    else:
-                        continue
-
-                    prefix_chord = " ".join(prefix_key)
-                    full_chord = " ".join(full_key)
-
-                    conflict_data = {
-                        "prefix_chord": prefix_chord,
-                        "prefix_label": get_str_attr(prefix_mappings[0], "label"),
-                        "prefix_group": get_str_attr(prefix_mappings[0], "group"),
-                        "full_chord": full_chord,
-                        "full_label": get_str_attr(full_mappings[0], "label"),
-                        "full_group": get_str_attr(full_mappings[0], "group"),
-                        "context": f"ALL/{ctx}",
-                        "prefix_mapping": prefix_mappings[0],
-                    }
-
-                    if generate_fixes:
-                        conflict_data["suggested_fix"] = generate_chord(prefix_chord, ctx_all_chords, exclude_chord=full_chord)
-
-                    conflicts["prefix_conflicts"].append(conflict_data)
 
     return conflicts
 

@@ -596,17 +596,19 @@ def filter_mappings_by_context(mappings, context_type: str):
 
     Args:
         mappings: Collection of mapping objects
-        context_type: One of "VIEW_3D", "GEOMETRY_NODE", "SHADER_EDITOR", "IMAGE_EDITOR"
+        context_type: A context token from core.contexts.CONTEXT_TOKENS
 
     Returns:
         List of mappings matching the context (includes mappings with "ALL" context)
     """
+    from .contexts import context_active_in
     filtered = []
     for m in mappings:
         # Get the context attribute, default to VIEW_3D for backward compatibility
         mapping_context = getattr(m, "context", "VIEW_3D")
-        # Include mappings with "ALL" context or matching context
-        if mapping_context == context_type or mapping_context == "ALL":
+        # Own context, an inherited parent context (3D View chords in Sculpt
+        # mode, Sequencer chords in the Preview, ...) or Global
+        if context_active_in(mapping_context, context_type):
             filtered.append(m)
     return filtered
 
@@ -614,14 +616,14 @@ def filter_mappings_by_context(mappings, context_type: str):
 # concern). These thin re-exports keep `from ..core.engine import
 # get_leader_key_type` working for existing callers; new code should
 # import from `..ui.keymap` directly.
-def get_leader_key_type():
+def get_leader_key_type(context=None):
     from ..ui.keymap import get_leader_key_type as _f
-    return _f()
+    return _f(context)
 
 
-def get_leader_key_token() -> str:
+def get_leader_key_token(context=None) -> str:
     from ..ui.keymap import get_leader_key_token as _f
-    return _f()
+    return _f(context)
 
 
 def set_leader_key_in_keymap(key_type: str):

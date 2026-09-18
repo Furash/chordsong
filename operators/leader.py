@@ -18,7 +18,7 @@ from ..core.engine import (
 )
 from ..core.history import add_to_history
 from ..ui.overlay import draw_overlay
-from ..utils.render import capture_viewport_context, OverlayContext, ContextWithRegion
+from ..utils.render import capture_viewport_context, OverlayContext, ContextWithRegion, overlay_context_from_viewport
 from .common import prefs
 from .fading_overlay import (
     _is_reloading,
@@ -180,14 +180,11 @@ def cleanup_all_handlers():
     # and never populated, so this loop currently does nothing in practice.
     # Kept for defence against a future refactor that reinstates a class
     # registry; the None-guard prevents AttributeError.
+    from ..utils.spaces import remove_overlay_handlers
     try:
         handles = CHORDSONG_OT_Leader._draw_handles
         if handles:
-            for st, handle in list(handles.items()):
-                try:
-                    st.draw_handler_remove(handle, "WINDOW")
-                except Exception:
-                    pass
+            remove_overlay_handlers(handles)
             handles.clear()
     except Exception:
         pass
@@ -196,11 +193,7 @@ def cleanup_all_handlers():
         from .scripts_overlay import CHORDSONG_OT_ScriptsOverlay
         handles = CHORDSONG_OT_ScriptsOverlay._draw_handles
         if handles:
-            for st, handle in list(handles.items()):
-                try:
-                    st.draw_handler_remove(handle, "WINDOW")
-                except Exception:
-                    pass
+            remove_overlay_handlers(handles)
             handles.clear()
     except Exception:
         pass
@@ -275,7 +268,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
     # happens before any mutation — but the explicit None makes "not yet
     # invoked" states unambiguous and guards against future edits that
     # read-then-mutate before rebind.
-    _draw_handles = None  # dict of space_type -> handle, populated in _ensure_draw_handler
+    _draw_handles = None  # list of (space_class, region_type, handle), populated in _ensure_draw_handler
     _buffer = None
     _region = None
     _area = None
@@ -327,28 +320,16 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         self._area = context.area
         self._region = context.region
 
-        # Register handlers for all major space types to ensure visibility across split views
-        self._draw_handles = {}
-        supported_types = [
-            bpy.types.SpaceView3D,
-            bpy.types.SpaceNodeEditor,
-            bpy.types.SpaceImageEditor,
-            bpy.types.SpaceSequenceEditor,
-        ]
-
-        for st in supported_types:
-            handle = st.draw_handler_add(self._draw_callback, (), "WINDOW", "POST_PIXEL")
-            self._draw_handles[st] = handle
+        # Register handlers for every supported space type to ensure visibility across split views
+        from ..utils.spaces import add_overlay_handlers
+        self._draw_handles = add_overlay_handlers(self._draw_callback)
 
     def _remove_draw_handler(self):
         if not self._draw_handles:
             return
-        for st, handle in self._draw_handles.items():
-            try:
-                st.draw_handler_remove(handle, "WINDOW")
-            except Exception:
-                pass
-        self._draw_handles = {}
+        from ..utils.spaces import remove_overlay_handlers
+        remove_overlay_handlers(self._draw_handles)
+        self._draw_handles = []
 
     def _tag_redraw(self):
         """Tag all relevant areas for redraw to ensure overlay is visible."""
@@ -418,7 +399,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
         
         # Store the leader key to ignore its first RELEASE if it's a mouse button
         # This prevents double-triggering when mouse buttons are used as leader key
-        self._leader_key_type = get_leader_key_type()
+        self._leader_key_type = get_leader_key_type(context)
         self._ignore_leader_release = event.type in {
             "LEFTMOUSE", "RIGHTMOUSE", "MIDDLEMOUSE",
             "BUTTON4MOUSE", "BUTTON5MOUSE", "BUTTON6MOUSE", "BUTTON7MOUSE"
@@ -653,7 +634,7 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
             return {"RUNNING_MODAL"}
 
         # Fallback: double-leader opens Recents if no mapping claims the leader key
-        leader_key = get_leader_key_type()
+        leader_key = get_leader_key_type(context)
         if not self._buffer and event.type == leader_key:
             # Check if any enabled mapping has a single-token chord for this key
             leader_token = normalize_token(leader_key)
@@ -871,27 +852,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
 
                         # Show fading overlay using the original captured context (ctx_viewport)
                         # This ensures overlay appears in the editor where leader was invoked
-                        overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-                        if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
-                            try:
-                                # Get space_data directly from the area (area.spaces[0] is the active space)
-                                area = overlay_ctx["area"]
-                                region = overlay_ctx["region"]
-                                space_data = None
-                                try:
-                                    if area.spaces:
-                                        space_data = area.spaces[0]
-                                except Exception:
-                                    pass
-
-                                # Create a context-like object with the area from overlay_ctx
-                                # This ensures we store the correct area pointer and space type
-                                wrapped_ctx = OverlayContext(area, region, space_data)
-                                _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
-                            except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                        else:
-                            _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                        # Timers have no context.area: hand the captured editor over so the
+                        # confirmation fades in where the chord was fired (never every 3D View).
+                        overlay_ctx = overlay_context_from_viewport(
+                            validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                        ) or bpy.context
+                        _show_fading_overlay(overlay_ctx, chord_tokens, label, icon)
 
                         # Add to history
                         add_to_history(
@@ -979,26 +945,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                 overlay_label = f"{label} ({status_str})"
 
                             # Use the original captured viewport context (ctx_viewport) for overlay
-                            overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-                            if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
-                                try:
-                                    # Get space_data directly from the area (area.spaces[0] is the active space)
-                                    area = overlay_ctx["area"]
-                                    region = overlay_ctx["region"]
-                                    space_data = None
-                                    try:
-                                        if area.spaces:
-                                            space_data = area.spaces[0]
-                                    except Exception:
-                                        pass
-
-                                    # Create a context-like object with the area from overlay_ctx
-                                    wrapped_ctx = OverlayContext(area, region, space_data)
-                                    _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
-                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                    _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
-                            else:
-                                _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
+                            # Timers have no context.area: hand the captured editor over so the
+                            # confirmation fades in where the chord was fired (never every 3D View).
+                            overlay_ctx = overlay_context_from_viewport(
+                                validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                            ) or bpy.context
+                            _show_fading_overlay(overlay_ctx, chord_tokens, overlay_label, icon)
 
                         # Add to history
                         add_to_history(
@@ -1111,26 +1063,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                                 overlay_label = f"{label}: {success_count} values set"
 
                             # Use the original captured viewport context (ctx_viewport) for overlay
-                            overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-                            if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
-                                try:
-                                    # Get space_data directly from the area (area.spaces[0] is the active space)
-                                    area = overlay_ctx["area"]
-                                    region = overlay_ctx["region"]
-                                    space_data = None
-                                    try:
-                                        if area.spaces:
-                                            space_data = area.spaces[0]
-                                    except Exception:
-                                        pass
-
-                                    # Create a context-like object with the area from overlay_ctx
-                                    wrapped_ctx = OverlayContext(area, region, space_data)
-                                    _show_fading_overlay(wrapped_ctx, chord_tokens, overlay_label, icon)
-                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                    _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
-                            else:
-                                _show_fading_overlay(bpy.context, chord_tokens, overlay_label, icon)
+                            # Timers have no context.area: hand the captured editor over so the
+                            # confirmation fades in where the chord was fired (never every 3D View).
+                            overlay_ctx = overlay_context_from_viewport(
+                                validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                            ) or bpy.context
+                            _show_fading_overlay(overlay_ctx, chord_tokens, overlay_label, icon)
 
                         # Add to history
                         add_to_history(
@@ -1332,7 +1270,11 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         # fade. Literal "CANCEL" rendered as text and took
                         # more horizontal space than expected.
                         try:
-                            _show_fading_overlay(bpy.context, chord_tokens, warn_label, "󰀦")
+                            _show_fading_overlay(
+                                overlay_context_from_viewport(
+                                    validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                                ) or bpy.context,
+                                chord_tokens, warn_label, "󰀦")
                         except Exception:  # pylint: disable=broad-exception-caught
                             pass
 
@@ -1341,24 +1283,12 @@ class CHORDSONG_OT_Leader(bpy.types.Operator):
                         _meta_ops = ("chordsong.scripts_overlay", "chordsong.search", "chordsong.recents", "chordsong.close_overlay")
                         primary_operator = operators_to_run[0]["op"] if operators_to_run else None
                         if primary_operator not in _meta_ops:
-                            overlay_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
-                            if overlay_ctx and overlay_ctx.get("area") and overlay_ctx.get("region"):
-                                try:
-                                    area = overlay_ctx["area"]
-                                    region = overlay_ctx["region"]
-                                    space_data = None
-                                    try:
-                                        if area.spaces:
-                                            space_data = area.spaces[0]
-                                    except Exception:
-                                        pass
-
-                                    wrapped_ctx = OverlayContext(area, region, space_data)
-                                    _show_fading_overlay(wrapped_ctx, chord_tokens, label, icon)
-                                except (TypeError, RuntimeError, AttributeError, ReferenceError):
-                                    _show_fading_overlay(bpy.context, chord_tokens, label, icon)
-                            else:
-                                _show_fading_overlay(bpy.context, chord_tokens, label, icon)
+                            # Timers have no context.area: hand the captured editor over so the
+                            # confirmation fades in where the chord was fired (never every 3D View).
+                            overlay_ctx = overlay_context_from_viewport(
+                                validate_viewport_context(ctx_viewport) if ctx_viewport else None
+                            ) or bpy.context
+                            _show_fading_overlay(overlay_ctx, chord_tokens, label, icon)
 
                             add_to_history(
                                 chord_tokens=chord_tokens,

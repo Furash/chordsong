@@ -81,30 +81,26 @@ def _show_fading_overlay(_context, chord_tokens, label, icon, show_chord=True):
     # overlay only draws in the editor where it was invoked. Fall back to
     # SpaceView3D for PREFERENCES and other non-editor contexts — the
     # invoke_area_ptr check in the draw callback prevents mis-draws.
-    space = None
+    # The area is what the draw callback pointer-matches, so its type wins;
+    # space_data is the fallback for contexts that only carry a space.
+    space_type = None
     try:
         if _context:
-            space = getattr(_context, 'space_data', None)
+            area = getattr(_context, 'area', None)
+            space_type = getattr(area, 'type', None) if area else None
+            if not space_type:
+                space = getattr(_context, 'space_data', None)
+                space_type = getattr(space, 'type', None) if space else None
     except Exception:
-        pass
+        space_type = None
 
-    if space:
+    space_type_class = bpy.types.SpaceView3D
+    if space_type:
         try:
-            space_type = getattr(space, 'type', None)
-            if space_type == 'NODE_EDITOR':
-                space_type_class = bpy.types.SpaceNodeEditor
-            elif space_type == 'IMAGE_EDITOR':
-                space_type_class = bpy.types.SpaceImageEditor
-            elif space_type == 'SEQUENCE_EDITOR':
-                space_type_class = bpy.types.SpaceSequenceEditor
-            elif space_type == 'VIEW_3D':
-                space_type_class = bpy.types.SpaceView3D
-            else:
-                space_type_class = bpy.types.SpaceView3D
+            from ..utils.spaces import space_class_for
+            space_type_class = space_class_for(space_type)
         except Exception:
             space_type_class = bpy.types.SpaceView3D
-    else:
-        space_type_class = bpy.types.SpaceView3D
 
     if not space_type_class:
         return

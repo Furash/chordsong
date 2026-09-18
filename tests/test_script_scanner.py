@@ -53,7 +53,7 @@ def test_contexts_node_editors():
 
 def test_contexts_image_editor_and_unknown_space():
     assert script_contexts_for("IMAGE_EDITOR", None, "OBJECT") == {"image"}
-    assert script_contexts_for("SEQUENCE_EDITOR", None, "OBJECT") == set()
+    assert script_contexts_for("SEQUENCE_EDITOR", None, "OBJECT") == {"sequencer"}
     assert script_contexts_for("", None, None) == set()
 
 

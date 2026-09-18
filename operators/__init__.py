@@ -29,6 +29,12 @@ from .mapping.mapping_add import CHORDSONG_OT_Mapping_Add
 from .mapping.mapping_convert import CHORDSONG_OT_Mapping_Convert
 from .mapping.mapping_copy import CHORDSONG_OT_Mapping_Copy, CHORDSONG_OT_Mapping_Copy_Single
 from .mapping.mapping_duplicate import CHORDSONG_OT_Mapping_Duplicate
+from .mapping.mapping_global import CHORDSONG_OT_Mapping_Contexts
+from .mapping.family_toggle import (
+    CHORDSONG_OT_Context_Select,
+    CHORDSONG_OT_Family_Toggle,
+    CHORDSONG_OT_Leader_Override_Toggle,
+)
 from .mapping.mapping_fold import CHORDSONG_OT_Mapping_Fold_All, CHORDSONG_OT_Mapping_Unfold_All
 from .mapping.mapping_move import (
     CHORDSONG_OT_Mapping_Move_Up,
@@ -102,8 +108,12 @@ __all__ = [
     "CHORDSONG_OT_Mapping_Copy",
     "CHORDSONG_OT_Mapping_Copy_Single",
     "CHORDSONG_OT_Mapping_Deselect_All",
+    "CHORDSONG_OT_Context_Select",
+    "CHORDSONG_OT_Family_Toggle",
+    "CHORDSONG_OT_Leader_Override_Toggle",
     "CHORDSONG_OT_Mapping_Duplicate",
     "CHORDSONG_OT_Mapping_Fold_All",
+    "CHORDSONG_OT_Mapping_Contexts",
     "CHORDSONG_OT_Mapping_Move_Down",
     "CHORDSONG_OT_Mapping_Move_Up",
     "CHORDSONG_OT_Mapping_Normalize_Indices",

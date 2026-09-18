@@ -2,58 +2,32 @@
 Drawing logic for individual mapping items.
 """
 
-from ...core.engine import get_str_attr, split_chord
+from ...core.conflicts import conflict_map
+from ...core.engine import get_str_attr
 
-def _is_mapping_conflicted(m, all_mappings):
-    """Check if a mapping conflicts with other mappings in real-time."""
+def _is_mapping_conflicted(m, all_mappings, index=None, conflicts=None):
+    """Is this mapping in conflict with another chord right now?
+
+    Answered from the indexed conflict map (core.conflicts). Callers inside
+    a draw pass should hand in both `index` and the `conflicts` map they
+    already built: deriving the map here means hashing the whole mapping
+    list, and doing that once per row is exactly the quadratic cost the
+    index exists to remove.
+    """
     if not getattr(m, "enabled", True):
         return False
-
-    chord_str = get_str_attr(m, "chord")
-    if not chord_str:
+    if conflicts is None:
+        conflicts = conflict_map(all_mappings)
+    if not conflicts:
         return False
-
-    chord_tokens = tuple(split_chord(chord_str))
-    if not chord_tokens:
-        return False
-
-    context = getattr(m, "context", "VIEW_3D")
-
-    # Check against all other enabled mappings in the same context
-    # Mappings with "ALL" context should be checked against all contexts
-    for other_m in all_mappings:
-        if not getattr(other_m, "enabled", True):
-            continue
-
-        if other_m == m:
-            continue
-
-        other_context = getattr(other_m, "context", "VIEW_3D")
-        # Skip if contexts don't match (unless one is "ALL")
-        if context != "ALL" and other_context != "ALL" and other_context != context:
-            continue
-
-        other_chord_str = get_str_attr(other_m, "chord")
-        if not other_chord_str:
-            continue
-
-        other_tokens = tuple(split_chord(other_chord_str))
-        if not other_tokens:
-            continue
-
-        # Check for exact duplicate
-        if chord_tokens == other_tokens:
-            return True
-
-        # Check for prefix conflict: this chord is prefix of other
-        if len(chord_tokens) < len(other_tokens) and other_tokens[:len(chord_tokens)] == chord_tokens:
-            return True
-
-        # Check for prefix conflict: other chord is prefix of this
-        if len(other_tokens) < len(chord_tokens) and chord_tokens[:len(other_tokens)] == other_tokens:
-            return True
-
-    return False
+    if index is None:
+        for i, other in enumerate(all_mappings):
+            if other == m:
+                index = i
+                break
+        else:
+            return False
+    return index in conflicts
 
 def _draw_dropdowns(layout, m, split_factor=0.35, left_padding=0.0, separator_factor=0.8, context_scale=0.3, type_scale=0.15):
     """Draw context and mapping type dropdown selectors.
@@ -78,25 +52,29 @@ def _draw_dropdowns(layout, m, split_factor=0.35, left_padding=0.0, separator_fa
     dropdown_col.separator(factor=separator_factor)
     dropdown_row = dropdown_col.row(align=True)
 
-    # Optional left padding
+    # Each control gets its own sub-row: scale_x belongs to the layout, so
+    # setting it repeatedly on one row only ever applied the last value.
     if left_padding > 0:
-        dropdown_row.scale_x = left_padding
-        dropdown_row.label(text="")
+        pad = dropdown_row.row(align=True)
+        pad.scale_x = left_padding
+        pad.label(text="")
 
     # Context dropdown selector
-    dropdown_row.scale_x = context_scale
-    dropdown_row.prop(m, "context", text="")
+    ctx_cell = dropdown_row.row(align=True)
+    ctx_cell.scale_x = context_scale
+    ctx_cell.prop(m, "context", text="")
 
     dropdown_row.separator()
 
     # Mapping type dropdown selector
-    dropdown_row.scale_x = type_scale
-    dropdown_row.prop(m, "mapping_type", text="")
+    type_cell = dropdown_row.row(align=True)
+    type_cell.scale_x = type_scale
+    type_cell.prop(m, "mapping_type", text="")
 
     # Right side: Type-specific fields
     return split.column()
 
-def draw_mapping_item(prefs, m, idx, layout, all_mappings=None, search_query=""):
+def draw_mapping_item(prefs, m, idx, layout, all_mappings=None, search_query="", conflicts=None):
     """Draw a single mapping item box."""
     # Get expanded state (default to True if not set)
     is_expanded = getattr(m, "expanded", True)
@@ -133,7 +111,7 @@ def draw_mapping_item(prefs, m, idx, layout, all_mappings=None, search_query="")
     chord_cell.scale_x = 0.65
     # Use all mappings if provided, otherwise fall back to prefs.mappings
     mappings_to_check = all_mappings if all_mappings is not None else prefs.mappings
-    is_conflicted = _is_mapping_conflicted(m, mappings_to_check)
+    is_conflicted = _is_mapping_conflicted(m, mappings_to_check, idx, conflicts)
     # Always set alert state explicitly (don't rely on previous state)
     chord_cell.alert = is_conflicted
     chord_cell.prop(m, "chord", text="", icon="NODE_SOCKET_MATERIAL" if is_conflicted else "NODE_SOCKET_GEOMETRY")
@@ -167,6 +145,10 @@ def draw_mapping_item(prefs, m, idx, layout, all_mappings=None, search_query="")
     
     r.separator()
     
+    # Where is this chord active? One dialog: tick contexts to copy the chord
+    # there, untick to remove copies, or make it Global.
+    op = r.operator("chordsong.mapping_contexts", text="", icon="WORLD", emboss=True)
+    op.index = idx
     op = r.operator("chordsong.mapping_copy_single", text="", icon="COPYDOWN", emboss=True)
     op.index = idx
     op = r.operator("chordsong.mapping_duplicate", text="", icon="DUPLICATE", emboss=True)

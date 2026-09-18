@@ -72,6 +72,11 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         if not p.overlay_enabled:
             return
 
+        # Only draw in the area Recents was invoked in — the handler fires
+        # for every area of the same space type (e.g. Dope Sheet + Timeline).
+        if self._draw_manager and not self._draw_manager.is_invoke_area(bpy.context):
+            return
+
         # Get history
         history = get_history()
         entries = history.get_all()
@@ -246,11 +251,8 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             # Scan for single-token meta-operator chords
             close_chord = None
             recents_chord = None
-            for m in p.mappings:
-                if not getattr(m, "enabled", True):
-                    continue
-                if getattr(m, "mapping_type", "OPERATOR") != "OPERATOR":
-                    continue
+            from ..ui.overlay.layout import meta_chord_candidates
+            for m in meta_chord_candidates(p, context):
                 op = get_str_attr(m, "operator")
                 chord = get_str_attr(m, "chord")
                 if not chord or " " in chord:
@@ -265,7 +267,7 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
             close_token = f"ESC|{humanize_token(close_chord)}" if close_chord else "ESC"
             # Leader key always works for "Repeat Most Recent" inside the recents modal
             # (recents has its own key handling, not the chord engine)
-            recents_token = humanize_token(recents_chord) if recents_chord else get_leader_key_token()
+            recents_token = humanize_token(recents_chord) if recents_chord else get_leader_key_token(context)
             footer_items = [
                 {"token": close_token, "label": "Close", "icon": ""},
                 {"token": recents_token, "label": "Repeat Most Recent", "icon": ""},
@@ -424,14 +426,17 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         # Execute based on mapping type
         if entry.mapping_type == "OPERATOR":
             def execute_operator_delayed():
-                from ..utils.render import validate_viewport_context
+                from ..utils.render import validate_viewport_context, overlay_context_from_viewport
                 valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                 ctx_wrapper = _create_context_wrapper(valid_ctx)
                 success, error_msg = execute_history_entry_operator(ctx_wrapper, entry)
+                # Timers have no context.area: hand the captured editor over
+                # so the confirmation fades in where the chord was fired.
+                overlay_ctx = overlay_context_from_viewport(valid_ctx) or bpy.context
                 if success:
-                    _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
+                    _show_fading_overlay(overlay_ctx, entry.chord_tokens, entry.label, entry.icon)
                 elif error_msg:
-                    _show_fading_overlay(bpy.context, entry.chord_tokens, error_msg, "CANCEL")
+                    _show_fading_overlay(overlay_ctx, entry.chord_tokens, error_msg, "CANCEL")
                 return None
 
             bpy.app.timers.register(execute_operator_delayed, first_interval=0.01)
@@ -439,14 +444,15 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         if entry.mapping_type == "PYTHON_FILE":
             def execute_script_delayed():
-                from ..utils.render import validate_viewport_context
+                from ..utils.render import validate_viewport_context, overlay_context_from_viewport
                 valid_ctx = validate_viewport_context(ctx_viewport) if ctx_viewport else None
                 ctx_wrapper = _create_context_wrapper(valid_ctx)
                 success, error_msg = execute_history_entry_script(ctx_wrapper, entry)
+                overlay_ctx = overlay_context_from_viewport(valid_ctx) or bpy.context
                 if success:
-                    _show_fading_overlay(bpy.context, entry.chord_tokens, entry.label, entry.icon)
+                    _show_fading_overlay(overlay_ctx, entry.chord_tokens, entry.label, entry.icon)
                 elif error_msg:
-                    _show_fading_overlay(bpy.context, entry.chord_tokens, error_msg, "CANCEL")
+                    _show_fading_overlay(overlay_ctx, entry.chord_tokens, error_msg, "CANCEL")
                 return None
 
             bpy.app.timers.register(execute_script_delayed, first_interval=0.01)
@@ -515,12 +521,11 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
         tok = normalize_token(event.type, shift=event.shift, ctrl=event.ctrl, alt=event.alt, oskey=event.oskey)
         p = prefs(context)
 
-        # Check for single-token close_overlay chord
-        for m in p.mappings:
-            if not getattr(m, "enabled", True):
-                continue
-            if getattr(m, "mapping_type", "OPERATOR") != "OPERATOR":
-                continue
+        # Check for single-token close_overlay chord, among the chords that
+        # are actually active in this editor.
+        from ..ui.overlay.layout import meta_chord_candidates
+        meta_chords = meta_chord_candidates(p, context)
+        for m in meta_chords:
             op = get_str_attr(m, "operator")
             chord = get_str_attr(m, "chord")
             if op == "chordsong.close_overlay" and chord and " " not in chord and tokens_match(chord, tok):
@@ -529,16 +534,12 @@ class CHORDSONG_OT_Recents(bpy.types.Operator):
 
         # Check for leader key or custom recents chord to repeat most recent
         repeat = False
-        leader_key = get_leader_key_type()
+        leader_key = get_leader_key_type(context)
         if event.type == leader_key:
             repeat = True
         else:
             # Check if a custom single-token chord is mapped to chordsong.recents
-            for m in p.mappings:
-                if not getattr(m, "enabled", True):
-                    continue
-                if getattr(m, "mapping_type", "OPERATOR") != "OPERATOR":
-                    continue
+            for m in meta_chords:
                 op = get_str_attr(m, "operator")
                 chord = get_str_attr(m, "chord")
                 if op == "chordsong.recents" and chord and " " not in chord and tokens_match(chord, tok):

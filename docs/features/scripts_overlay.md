@@ -60,7 +60,7 @@ scripts/
 
 | Level | Tokens |
 | :--- | :--- |
-| Editor | `view3d`, `geonodes`, `shader`, `image` |
+| Editor | `view3d`, `geonodes`, `shader`, `compositor`, `image`, `sequencer`, `clip`, `dopesheet`, `graph`, `nla` |
 | Object type | `mesh`, `curve`, `curves`, `surface`, `metaball`, `text`, `armature`, `lattice`, `empty`, `greasepencil`, `camera`, `light`, `speaker`, `lightprobe`, `volume`, `pointcloud` |
 | Mode | `object`, `edit`, `pose`, `sculpt`, `vertex_paint`, `weight_paint`, `texture_paint`, `particle` |
 | Shorthands | `edit_mesh`, `edit_curve`, `edit_surface`, `edit_text`, `edit_armature`, `edit_metaball`, `edit_lattice`, `edit_greasepencil` (type + edit fused) |

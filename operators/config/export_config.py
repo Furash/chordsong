@@ -190,17 +190,15 @@ class CHORDSONG_OT_Export_Config(bpy.types.Operator, ExportHelper):
                     # Show context icons before group name
                     contexts = group_contexts.get(item.name, set())
                     if contexts:
-                        # Map contexts to Blender icon names
-                        context_icons = {
-                            "ALL": "WORLD",
-                            "VIEW_3D": "OBJECT_DATAMODE",
-                            "VIEW_3D_EDIT": "EDITMODE_HLT",
-                            "GEOMETRY_NODE": "GEOMETRY_NODES",
-                            "SHADER_EDITOR": "SHADING_RENDERED",
-                            "IMAGE_EDITOR": "UV",
-                        }
+                        # Icons come from the context registry, so a new
+                        # context never shows up here as a blank square.
+                        from ...core.contexts import ALL_CONTEXT, CONTEXT_BY_TOKEN
                         for ctx in sorted(contexts):
-                            icon_name = context_icons.get(ctx, "BLANK1")
+                            if ctx == ALL_CONTEXT:
+                                icon_name = "WORLD"
+                            else:
+                                entry = CONTEXT_BY_TOKEN.get(ctx)
+                                icon_name = entry.icon if entry else "BLANK1"
                             row.label(text="", icon=icon_name)
 
                     # Group name

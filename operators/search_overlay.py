@@ -17,6 +17,7 @@ from ..core.engine import (
 from ..core.history import HistoryEntry, add_to_history
 from ..ui.overlay import draw_overlay
 from ..utils.fuzzy import fuzzy_match
+from ..utils.render import OverlayContext
 from .common import prefs, detect_editor_context
 
 
@@ -112,26 +113,15 @@ class CHORDSONG_OT_SearchOverlay(bpy.types.Operator):
         self._area = area
         self._region = region
 
-        self._draw_handles = {}
-        supported_types = [
-            bpy.types.SpaceView3D,
-            bpy.types.SpaceNodeEditor,
-            bpy.types.SpaceImageEditor,
-            bpy.types.SpaceSequenceEditor,
-        ]
-        for st in supported_types:
-            handle = st.draw_handler_add(self._draw_callback, (), "WINDOW", "POST_PIXEL")
-            self._draw_handles[st] = handle
+        from ..utils.spaces import add_overlay_handlers
+        self._draw_handles = add_overlay_handlers(self._draw_callback)
 
     def _remove_draw_handler(self):
         if not self._draw_handles:
             return
-        for st, handle in self._draw_handles.items():
-            try:
-                st.draw_handler_remove(handle, "WINDOW")
-            except Exception:
-                pass
-        self._draw_handles = {}
+        from ..utils.spaces import remove_overlay_handlers
+        remove_overlay_handlers(self._draw_handles)
+        self._draw_handles = []
 
     def _tag_redraw(self):
         """Tag all relevant areas for redraw."""
@@ -287,7 +277,7 @@ class CHORDSONG_OT_SearchOverlay(bpy.types.Operator):
 
     def _find_viewport_area(self, context):
         """Find a suitable viewport area when invoked from a non-viewport context."""
-        supported = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
+        from ..utils.spaces import SUPPORTED_SPACE_TYPES as supported
         for window in context.window_manager.windows:
             try:
                 screen = window.screen
@@ -313,7 +303,7 @@ class CHORDSONG_OT_SearchOverlay(bpy.types.Operator):
         p = prefs(context)
         p.ensure_defaults()
 
-        supported = {'VIEW_3D', 'NODE_EDITOR', 'IMAGE_EDITOR', 'SEQUENCE_EDITOR'}
+        from ..utils.spaces import SUPPORTED_SPACE_TYPES as supported
         area = context.area
         region = context.region
         if area and area.type not in supported:
@@ -332,7 +322,13 @@ class CHORDSONG_OT_SearchOverlay(bpy.types.Operator):
         else:
             self._panel_states = hide_panels(context, p.overlay_hide_panels)
 
-        context_type = detect_editor_context(context)
+        # Detect from the area the overlay will actually draw in: when the
+        # search is invoked from an editor that cannot host it, the overlay
+        # moves to `self._override_area`, and listing the invoking editor's
+        # chords there would run them against the wrong editor.
+        context_type = detect_editor_context(
+            OverlayContext(area, region, area.spaces[0] if area and area.spaces else None)
+            if area is not None else context)
         self._all_mappings = [
             m for m in filter_mappings_by_context(p.mappings, context_type)
             if getattr(m, "enabled", True) and get_str_attr(m, "chord").strip()

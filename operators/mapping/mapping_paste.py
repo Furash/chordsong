@@ -38,7 +38,7 @@ class CHORDSONG_OT_Mapping_Paste(bpy.types.Operator):
             
             # Add each chord as a new mapping (order_index will be normalized after)
             for chord_dict in chord_dicts:
-                _add_mapping_from_dict(p, chord_dict, 0)
+                _add_mapping_from_dict(p, chord_dict, 0, warnings)
             
             # Normalize all order indices to match array positions (0, 1, 2, ...)
             # This ensures no gaps and makes move operations work correctly

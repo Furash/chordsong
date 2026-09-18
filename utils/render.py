@@ -33,6 +33,30 @@ class OverlayContext:
         self.space_data = space_data
 
 
+def overlay_context_from_viewport(valid_ctx):
+    """OverlayContext for a validated viewport-context dict (see
+    validate_viewport_context), or None when it has no live area/region.
+
+    Timers run with ``bpy.context.area`` unset, so anything that must draw
+    in the editor a chord was fired from has to be handed the captured
+    area explicitly — otherwise the fading overlay falls back to every
+    3D View.
+    """
+    if not valid_ctx:
+        return None
+    area = valid_ctx.get("area")
+    region = valid_ctx.get("region")
+    if not area or not region:
+        return None
+    space_data = None
+    try:
+        if area.spaces:
+            space_data = area.spaces[0]
+    except Exception:
+        space_data = None
+    return OverlayContext(area, region, space_data)
+
+
 class ContextWithRegion:
     """Proxy that overrides area/region on a wrapped bpy context, delegating
     everything else to the original. Use when `context.region` might be None
@@ -235,6 +259,7 @@ class DrawHandlerManager:
     def __init__(self):
         self._draw_handle = None
         self._area = None
+        self._area_ptr = None
         self._region = None
         self._space_type = None
 
@@ -245,17 +270,15 @@ class DrawHandlerManager:
 
         self._area = context.area
         self._region = context.region
+        try:
+            self._area_ptr = context.area.as_pointer() if context.area else None
+        except Exception:
+            self._area_ptr = None
 
-        # Determine which space type to use
+        # Space class for the invoking editor (SpaceView3D when unknown)
+        from .spaces import space_class_for
         space = context.space_data
-        if space and space.type == 'NODE_EDITOR':
-            # For Node Editor (Shader Editor, Geometry Nodes)
-            self._space_type = bpy.types.SpaceNodeEditor
-        elif space and space.type == 'IMAGE_EDITOR':
-            self._space_type = bpy.types.SpaceImageEditor
-        else:
-            # Default to 3D View
-            self._space_type = bpy.types.SpaceView3D
+        self._space_type = space_class_for(getattr(space, "type", None) if space else None)
 
         self._draw_handle = self._space_type.draw_handler_add(
             callback, (), "WINDOW", "POST_PIXEL"
@@ -274,6 +297,23 @@ class DrawHandlerManager:
             pass
         self._draw_handle = None
         self._space_type = None
+
+    def is_invoke_area(self, context=None):
+        """True when the draw callback is running for the area the overlay
+        was invoked in. A draw handler is registered per *space type*, so
+        Blender calls it for every area of that type (Dope Sheet and
+        Timeline, split 3D Views, ...); callers skip drawing elsewhere.
+        Falls back to True when pointers can't be compared."""
+        if self._area_ptr is None:
+            return True
+        try:
+            ctx = context if context is not None else bpy.context
+            area = ctx.area
+            if area is None:
+                return True
+            return area.as_pointer() == self._area_ptr
+        except Exception:
+            return True
 
     def tag_redraw(self):
         """Request redraw for the area."""

@@ -14,7 +14,7 @@ Instead of memorizing awkward `Ctrl+Alt+Shift+F5` combinations, use intuitive se
 
 - **Leader Key System** — Single-tap to start chords, double-tap for recents, triple-tap to repeat
 - **Context Menu Integration** — Right-click any UI element to add mappings instantly
-- **Context Awareness** — Mappings filter by active editor (3D View, UV, Shader Editor, etc.)
+- **Context Awareness** — Mappings filter by active editor and mode (3D View Object/Sculpt/Paint/Pose and each Edit mode by object type, node editors, UV/Image, Video Sequencer, Movie Clip, Dope Sheet, Graph, NLA)
 - **Four Mapping Types** — Operators, Properties, Toggles, and Custom Python Scripts
 - **Chord Search** — Fuzzy-search your chord library in an overlay; results show the real chord so you learn as you go
 - **Script Context Folders** — Subfolders scope custom scripts to editor contexts (`edit_mesh/`, `geonodes/`, …) and become navigable groups in the Scripts Overlay

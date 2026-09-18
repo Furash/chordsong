@@ -8,7 +8,7 @@ easy export/import of chord snippets and reliable round-trip conversion.
 import json
 from typing import Any
 
-from ..core.engine import get_str_attr
+from .engine import get_str_attr
 
 CHORD_SNIPPET_VERSION = 1
 
@@ -41,6 +41,35 @@ def serialize_chords(mappings: list, indices: list[int] = None) -> dict:
         "version": CHORD_SNIPPET_VERSION,
         "chords": chords_data
     }
+
+
+# Fields that describe how a mapping *looks* or whether it is currently on,
+# not what it does. Two rows that differ only here are still the same chord.
+_PRESENTATION_FIELDS = ("context", "label", "icon", "group", "enabled")
+
+
+def mapping_signature(m) -> tuple:
+    """Hashable identity of a mapping: its chord plus the full action
+    (operator chain / property paths / script parameters).
+
+    Presentation is deliberately excluded — context, label, icon, group and
+    the enabled checkbox. "Is this chord already in that editor?" must not
+    change answer because the user renamed one copy or switched it off; the
+    Contexts dialog would then under-report where the chord lives and adding
+    it "back" would create a duplicate.
+    """
+    data = _serialize_mapping(m)
+    for field in _PRESENTATION_FIELDS:
+        data.pop(field, None)
+    return _freeze(data)
+
+
+def _freeze(value):
+    if isinstance(value, dict):
+        return tuple(sorted((k, _freeze(v)) for k, v in value.items()))
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(v) for v in value)
+    return value
 
 
 def _serialize_mapping(m) -> dict:

@@ -21,15 +21,29 @@ There are several ways to add chord mappings:
 
 ## Context-Specific Organization
 
-The Mappings tab organizes chords by **Context** using tabs:
+The Mappings tab organizes chords by **Context** using one rollout per editor, laid out in two columns. Each editor button shows how many chords it holds; open a rollout to pick one of the editor's modes and to see that editor's leader key. The first entry, **Global**, holds the chords that are active in every editor. They are managed only there: an editor's tab lists that editor's own mappings and shows an "Also active here" link for Global and for the parent contexts it inherits from. The contexts are:
 
-- **3D View (Object)**: Mappings active in Object Mode
-- **3D View (Edit)**: Mappings active in Edit Mode
-- **Geometry Nodes**: Mappings active in Geometry Nodes editor
-- **Shader Editor**: Mappings active in Shader Editor
-- **UV Editor**: Mappings active in UV/Image Editor
+- **3D View**: Object, Sculpt, Paint and Pose mode, plus one context per Edit mode (mesh, curve, armature, text, lattice, metaball, grease pencil, point cloud)
+- **Geometry Nodes**, **Shader Editor**, **Compositor**: Node editors, by tree type
+- **UV Editor**: UV / Image Editor, with its Paint mode
+- **Video Sequencer**, **Movie Clip**: Video editors
+- **Dope Sheet**, **Graph Editor**, **NLA Editor**: Animation editors
 
-Each context tab shows only mappings relevant to that editor, making it easier to manage context-specific shortcuts. Mappings set to "All Contexts" appear in every tab.
+See [Contexts](../concepts/contexts.md) for the full list. Selecting a context also sets the context used by **Add New Chord**.
+
+Each mapping row has a **Contexts** button (globe icon) that opens one dialog showing every context as a toggle. Contexts where an identical copy of the chord already exists are pre-ticked, so the dialog shows where the chord is active right now:
+
+- **Tick** a context to create a copy of the chord there.
+- **Untick** a context to remove that copy.
+- **Make Global** replaces every copy with one Global mapping, active in every editor.
+
+The row you opened the dialog from is kept, re-contexted if you unticked its own context, so its place in the list survives. Setting a mapping's **Context** dropdown does a plain relabel of that one mapping only; use the dialog when copies are involved.
+
+Context tabs turn red when a chord in that context is in conflict. A conflict between a Global chord and an editor chord marks both tabs, and each tab lists the other party greyed out next to the chord it clashes with. While a search is active, editor tabs also list matching Global chords greyed out, so a search finds every chord active in that editor.
+
+## Leader Key
+
+The **Leader Key (default)** field at the top of the Mappings tab is the key for the 3D View and the default for every other editor. Open an editor's rollout to see its **Leader Key** line: the field shows the key in use, greyed while it is the default. To give that editor a different key, for example when ++space++ should keep driving playback in the Video Sequencer, press the **Override** icon next to the field and then press the new key. The arrow icon that replaces it resets the editor to the default key. A note under the default field says how many editors use their own key. Changing the default key moves the editors that still followed it; editors with their own key keep it.
 
 ## Search Functionality
 

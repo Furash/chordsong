@@ -9,13 +9,16 @@ from typing import Optional
 import json
 import os
 
+from .contexts import CONTEXTS, detect_context_token
+
 # Context tokens are organized in strict nesting levels:
-#   1. editor:      view3d, geonodes, shader, image
+#   1. editor:      view3d, geonodes, shader, image, sequencer, ... (one
+#                   per editor context in core.contexts)
 #   2. object type: mesh, curve, ... (active object's type)
 #   3. mode:        object, edit, sculpt, ...
 # Folders nest editor > type > mode; levels may be skipped downward
 # (a bare `object/` at root means "view3d, any type, object mode").
-EDITOR_TOKENS = ("view3d", "geonodes", "shader", "image")
+EDITOR_TOKENS = tuple(dict.fromkeys(c.script_token for c in CONTEXTS))
 TYPE_TOKENS = (
     "mesh", "curve", "curves", "surface", "metaball", "text",
     "armature", "lattice", "empty", "greasepencil",
@@ -66,6 +69,7 @@ _MODE_TOKENS_MAP = {
     "EDIT_LATTICE": ("edit", "lattice"),
     "EDIT_GPENCIL": ("edit", "greasepencil"),
     "EDIT_GREASE_PENCIL": ("edit", "greasepencil"),
+    "EDIT_POINTCLOUD": ("edit", "pointcloud"),
     "POSE": ("pose", "armature"),
     "SCULPT": ("sculpt", None),
     "SCULPT_CURVES": ("sculpt", "curves"),
@@ -105,10 +109,10 @@ def script_contexts_for(space_type, tree_type=None, mode=None, active_object_typ
         if type_token:
             tokens.add(type_token)
         return tokens
-    if space_type == "NODE_EDITOR":
-        return {"geonodes"} if tree_type == "GeometryNodeTree" else {"shader"}
-    if space_type == "IMAGE_EDITOR":
-        return {"image"}
+    token = detect_context_token(space_type, tree_type, mode)
+    for ctx in CONTEXTS:
+        if ctx.token == token and ctx.space_type == space_type:
+            return {ctx.script_token}
     return set()
 
 

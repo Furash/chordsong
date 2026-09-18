@@ -319,49 +319,40 @@ def extract_context_path(button_prop, button_pointer, context=None):
 
 def detect_editor_context(context, operator=None, kwargs=None):
     """Auto-detect editor context based on current editor or operator prefix."""
+    from ...core.contexts import (
+        DEFAULT_CONTEXT,
+        OPERATOR_PREFIX_CONTEXTS,
+        detect_context_token,
+    )
+
+    from ..common import editor_state
+    (space_type, tree_type, mode), hints = editor_state(context)
+
     # Based on operator prefix
     if operator and "." in operator:
         parts = operator.split(".")
         if len(parts) == 2:
             module = parts[0].lower()
-            if module in ["uv", "image"]:
-                return "IMAGE_EDITOR"
-            elif module == "node":
+            if module in OPERATOR_PREFIX_CONTEXTS:
+                return OPERATOR_PREFIX_CONTEXTS[module]
+            if module == "node":
                 # Check kwargs for hints (e.g. type='ShaderNodeMath')
                 if kwargs:
                     if "ShaderNode" in kwargs:
                         return "SHADER_EDITOR"
                     if "GeometryNode" in kwargs:
                         return "GEOMETRY_NODE"
-                
+                    if "CompositorNode" in kwargs:
+                        return "COMPOSITOR"
+
                 # Try based on current space if available
-                space = context.space_data
-                if space and space.type == 'NODE_EDITOR':
-                    if hasattr(space, 'tree_type') and space.tree_type == 'GeometryNodeTree':
-                        return "GEOMETRY_NODE"
-                    return "SHADER_EDITOR"
-                
+                if space_type == 'NODE_EDITOR':
+                    return detect_context_token(space_type, tree_type, mode, **hints)
+
                 # Default for node module if we really can't tell
                 return "GEOMETRY_NODE"
 
-    # Based on current space
-    space = context.space_data
-    if space:
-        if space.type == 'VIEW_3D':
-            if context.mode and context.mode.startswith('EDIT'):
-                return "VIEW_3D_EDIT"
-            return "VIEW_3D"
-        elif space.type == 'NODE_EDITOR':
-            if hasattr(space, 'tree_type'):
-                if space.tree_type == 'GeometryNodeTree':
-                    return "GEOMETRY_NODE"
-                elif space.tree_type == 'ShaderNodeTree':
-                    return "SHADER_EDITOR"
-                else:
-                    return "SHADER_EDITOR"
-            else:
-                return "GEOMETRY_NODE"
-        elif space.type == 'IMAGE_EDITOR':
-            return "IMAGE_EDITOR"
-
-    return "VIEW_3D"
+    # Based on current space. Editors without a chord context of their own
+    # (Properties, Outliner, Info, File Browser, ...) fall back to 3D View,
+    # which is what their buttons usually drive.
+    return detect_context_token(space_type, tree_type, mode, **hints)

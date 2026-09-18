@@ -6,6 +6,10 @@ import bpy  # type: ignore
 from bpy.props import StringProperty, EnumProperty  # type: ignore
 
 from ..common import prefs
+from ...core.contexts import DEFAULT_CONTEXT, enum_items as _context_enum_items
+
+# "Global" (ALL) included so the sidebar's Global tab can add global chords.
+_CONTEXT_ENUM_ITEMS = _context_enum_items(include_all=True, icons=False)
 
 class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
     bl_idname = "chordsong.mapping_add"
@@ -21,14 +25,8 @@ class CHORDSONG_OT_Mapping_Add(bpy.types.Operator):
     context: EnumProperty(
         name="Context",
         description="Editor context for the new chord",
-        items=(
-            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)"),
-            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)"),
-            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor"),
-            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor"),
-            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor"),
-        ),
-        default="VIEW_3D",
+        items=_CONTEXT_ENUM_ITEMS,
+        default=DEFAULT_CONTEXT,
     )
 
     def execute(self, context: bpy.types.Context):

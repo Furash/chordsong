@@ -16,26 +16,32 @@ __all__ = [
 
 
 def detect_editor_context(context: bpy.types.Context) -> str:
-    """Detect the current editor context as a mapping-context token."""
-    space = context.space_data
-    if space:
-        space_type = space.type
-        if space_type == 'VIEW_3D':
-            if context.mode and context.mode.startswith('EDIT'):
-                return "VIEW_3D_EDIT"
-            return "VIEW_3D"
-        elif space_type == 'IMAGE_EDITOR':
-            return "IMAGE_EDITOR"
-        elif space_type == 'NODE_EDITOR':
-            if hasattr(space, 'tree_type'):
-                if space.tree_type == 'GeometryNodeTree':
-                    return "GEOMETRY_NODE"
-                elif space.tree_type == 'ShaderNodeTree':
-                    return "SHADER_EDITOR"
-            # Default to shader editor for other node editors
-            return "SHADER_EDITOR"
-    # Default to 3D View if we can't detect
-    return "VIEW_3D"
+    """Detect the current editor context as a mapping-context token.
+
+    Thin bpy adapter over core.contexts.detect_context_token: reads the
+    space type, node tree type and object mode off the live context.
+    """
+    from ..core.contexts import detect_context_token
+    positional, hints = editor_state(context)
+    return detect_context_token(*positional, **hints)
+
+
+def editor_state(context):
+    """(positional, keyword) arguments for core.contexts.detect_context_token
+    read off a live context: space type, node tree, object mode, the
+    editor's own mode, Sequencer view/region and File Browser mode."""
+    space = getattr(context, "space_data", None)
+    region = getattr(context, "region", None)
+    space_type = getattr(space, "type", None) if space else None
+    tree_type = getattr(space, "tree_type", None) if space else None
+    mode = getattr(context, "mode", None)
+    hints = {
+        "space_mode": getattr(space, "mode", None) if space else None,
+        "view_type": getattr(space, "view_type", None) if space else None,
+        "region_type": getattr(region, "type", None) if region else None,
+        "browse_mode": getattr(space, "browse_mode", None) if space else None,
+    }
+    return (space_type, tree_type, mode), hints
 
 
 def current_script_contexts(context: bpy.types.Context) -> set:

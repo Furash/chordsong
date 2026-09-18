@@ -3,6 +3,8 @@
 # pyright: reportMissingImports=false
 # pylint: disable=import-error,broad-exception-caught
 
+import time
+
 import bpy
 from bpy.types import UIList
 
@@ -49,13 +51,27 @@ TYPE_ICONS = {
 }
 
 
+# How long the shared idname -> hotkey map is reused. Keymaps change only
+# when the user edits them or toggles an add-on, and the column is purely
+# informational, so a short staleness window is a good trade for not
+# walking every keymap on every redraw.
+_HOTKEY_TTL_SECONDS = 5.0
+
+
+def invalidate_hotkeys():
+    """Force the hotkey column to re-read the keymaps on the next draw."""
+    CHORDSONG_UL_Stats._hotkeys = None
+
+
 class CHORDSONG_UL_Stats(UIList):
     """Statistics rows: type, name, existing hotkey, count, blacklist toggle."""
 
-    # Per-draw-cycle caches (invalidated in filter_items)
+    # Per-draw-cycle cache (invalidated in filter_items)
     _cached_blacklist: set = set()
     _blacklist_cache_valid = False
-    _cached_hotkeys: dict = {}
+    # Shared hotkey map, rebuilt at most every _HOTKEY_TTL_SECONDS
+    _hotkeys = None
+    _hotkeys_built = 0.0
 
     @classmethod
     def _get_blacklist(cls, prefs) -> set:
@@ -66,46 +82,67 @@ class CHORDSONG_UL_Stats(UIList):
             cls._blacklist_cache_valid = True
         return cls._cached_blacklist
 
-    @classmethod
-    def _get_operator_hotkey(cls, idname: str) -> str:
-        """First active keymap binding for an operator, e.g. 'Ctrl+A'."""
-        if idname in cls._cached_hotkeys:
-            return cls._cached_hotkeys[idname]
+    @staticmethod
+    def _format_hotkey(kmi) -> str:
+        parts = []
+        if kmi.ctrl:
+            parts.append('Ctrl')
+        if kmi.alt:
+            parts.append('Alt')
+        if kmi.shift:
+            parts.append('Shift')
+        if kmi.oskey:
+            parts.append('Cmd' if bpy.app.build_platform == b'Darwin' else 'Win')
+        key = (kmi.type or "").replace("_", " ")
+        if key and key != 'NONE':
+            parts.append(key if len(key) == 1 else key.title())
+        return '+'.join(parts) if parts else ""
 
-        hotkey = ""
+    @classmethod
+    def _hotkey_map(cls) -> dict:
+        """idname -> first active binding, for every operator at once.
+
+        Built in a single pass over both keyconfigs. Looking each operator
+        up on its own meant walking every keymap item per visible row —
+        with a dozen rows on screen and a real keyconfig (thousands of
+        items, more with add-ons) that dominated the frame while the
+        preferences window was being dragged.
+
+        Kept between draws because keymaps only change when the user edits
+        them or toggles an add-on; the column is informational, so a few
+        seconds of staleness costs nothing. `invalidate_hotkeys` forces it.
+        """
+        now = time.monotonic()
+        if cls._hotkeys is not None and (now - cls._hotkeys_built) < _HOTKEY_TTL_SECONDS:
+            return cls._hotkeys
+
+        found = {}
         try:
             wm = bpy.context.window_manager
+            # User config first, then addon: same precedence the per-row
+            # lookup had, and the first binding seen for an idname wins.
             for kc in (wm.keyconfigs.user, wm.keyconfigs.addon):
                 if not kc:
                     continue
                 for km in kc.keymaps:
                     for kmi in km.keymap_items:
-                        if kmi.idname != idname or not kmi.active:
+                        idname = kmi.idname
+                        if not idname or idname in found or not kmi.active:
                             continue
-                        parts = []
-                        if kmi.ctrl:
-                            parts.append('Ctrl')
-                        if kmi.alt:
-                            parts.append('Alt')
-                        if kmi.shift:
-                            parts.append('Shift')
-                        if kmi.oskey:
-                            parts.append('Cmd' if bpy.app.build_platform == b'Darwin' else 'Win')
-                        key = (kmi.type or "").replace("_", " ")
-                        if key and key != 'NONE':
-                            parts.append(key if len(key) == 1 else key.title())
-                        if parts:
-                            hotkey = '+'.join(parts)
-                            break
-                    if hotkey:
-                        break
-                if hotkey:
-                    break
+                        hotkey = cls._format_hotkey(kmi)
+                        if hotkey:
+                            found[idname] = hotkey
         except Exception:
             pass
 
-        cls._cached_hotkeys[idname] = hotkey
-        return hotkey
+        cls._hotkeys = found
+        cls._hotkeys_built = now
+        return found
+
+    @classmethod
+    def _get_operator_hotkey(cls, idname: str) -> str:
+        """First active keymap binding for an operator, e.g. 'Ctrl+A'."""
+        return cls._hotkey_map().get(idname, "")
 
     def draw_item(self, context, layout, _data, item, _icon, _active_data, _active_propname):
         if self.layout_type == 'GRID':
@@ -177,8 +214,9 @@ class CHORDSONG_UL_Stats(UIList):
             col.label(text="")
 
     def filter_items(self, _context, _data, _propname):
-        # New draw cycle: invalidate caches
+        # New draw cycle: the blacklist is cheap to re-read and can change
+        # from one draw to the next. The hotkey map is not re-read here —
+        # see _hotkey_map for why.
         cls = type(self)
         cls._blacklist_cache_valid = False
-        cls._cached_hotkeys = {}
         return [], []

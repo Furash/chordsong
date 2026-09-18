@@ -8,44 +8,98 @@ import bpy
 from bpy.types import Operator
 
 from ..core import stats_manager, stats_store
+from ..core.contexts import DEFAULT_CONTEXT, enum_items as _context_enum_items
 from ..core.engine import humanize_chord, split_chord, tokens_match
 from ..utils.addon_package import addon_root_package
 from .common import prefs, schedule_autosave_safe
 from .context_menu.extractors import detect_editor_context
 from .context_menu.suggester import suggest_chord
 
+# Global included: a chord converted from the stats list is often one the
+# user wants everywhere, and this was the only picker that could not.
+_CONTEXT_ENUM_ITEMS = _context_enum_items(include_all=True, icons=True)
+# Matches the other context pickers; one row of 25 was unreadable.
+_CONTEXT_GRID_COLUMNS = 3
+
 
 def _prefs_from_context(context):
     return context.preferences.addons[addon_root_package(__package__)].preferences
 
 
-def _find_mapping_for_script(p, script_name):
-    """Find a mapping whose python_file matches a recorded script file name."""
+def _base_key(tokens):
+    """The chord's tokens with modifiers stripped.
+
+    `tokens_match` requires the base characters to be equal before it looks
+    at modifiers, so two chords can only match if this key matches — which
+    makes it a safe index for finding candidates without scanning the whole
+    mapping list per row.
+    """
+    from ..core.engine import _get_token_parts
+    return tuple(_get_token_parts(t)[1] for t in tokens)
+
+
+def _mappings_digest(p):
+    """Everything about the mappings that the stats list displays.
+
+    Plain attribute reads, no chord parsing: this runs on every redraw just
+    to decide whether the list needs rebuilding, so it has to stay cheap.
+    """
+    return tuple(
+        ((m.chord or "").strip(), m.label or "", m.group or "",
+         getattr(m, "mapping_type", "OPERATOR"),
+         (getattr(m, "python_file", "") or "").strip(),
+         (getattr(m, "context_path", "") or "").strip())
+        for m in p.mappings
+    )
+
+
+def _mapping_indexes(p):
+    """The three lookups the stats list needs, in one pass.
+
+    Built per rebuild rather than per row: matching each row back to a
+    mapping used to rescan and re-split the whole mapping list, which is
+    O(rows x mappings) of string work on every redraw.
+    """
     import os
 
+    by_base = {}      # base-token key -> [(tokens, mapping)]
+    by_script = {}    # script file name -> mapping
+    by_path = {}      # context path -> mapping
+
     for m in p.mappings:
-        path = (getattr(m, "python_file", "") or "").strip()
-        if path and os.path.basename(path) == script_name:
-            return m
-    return None
+        chord = (m.chord or "").strip()
+        mapping_type = getattr(m, "mapping_type", "OPERATOR")
+        python_file = (getattr(m, "python_file", "") or "").strip()
+        context_path = (getattr(m, "context_path", "") or "").strip()
+
+        if chord:
+            toks = split_chord(chord)
+            if toks:
+                by_base.setdefault(_base_key(toks), []).append((toks, m))
+        if python_file:
+            by_script.setdefault(os.path.basename(python_file), m)
+        if mapping_type in ("CONTEXT_PROPERTY", "CONTEXT_TOGGLE") and context_path:
+            by_path.setdefault(context_path, m)
+
+    return by_base, by_script, by_path
 
 
-def _find_mapping_for_property(p, path):
-    """Find a CONTEXT_PROPERTY/TOGGLE mapping whose context_path matches."""
-    for m in p.mappings:
-        if getattr(m, "mapping_type", "") in ("CONTEXT_PROPERTY", "CONTEXT_TOGGLE") \
-                and (getattr(m, "context_path", "") or "").strip() == path:
-            return m
-    return None
+def _find_mapping_for_script(by_script, script_name):
+    """The mapping whose python_file matches a recorded script file name."""
+    return by_script.get(script_name)
 
 
-def _find_mapping_for_chord(p, chord_str):
-    """Find the mapping whose chord matches a recorded chord token string."""
+def _find_mapping_for_property(by_path, path):
+    """The CONTEXT_PROPERTY/TOGGLE mapping whose context_path matches."""
+    return by_path.get(path)
+
+
+def _find_mapping_for_chord(by_base, chord_str):
+    """The mapping whose chord matches a recorded chord token string."""
     key_tokens = split_chord(chord_str)
     if not key_tokens:
         return None
-    for m in p.mappings:
-        m_tokens = split_chord((m.chord or "").strip())
+    for m_tokens, m in by_base.get(_base_key(key_tokens), ()):
         if len(m_tokens) == len(key_tokens) and all(
             tokens_match(mt, kt) for mt, kt in zip(m_tokens, key_tokens)
         ):
@@ -53,9 +107,36 @@ def _find_mapping_for_chord(p, chord_str):
     return None
 
 
-def refresh_stats_ui(p):
-    """Rebuild the stats UI collection from current counts, minus blacklist."""
+# What the built list depends on. Rebuilding is expensive (it clears and
+# refills an RNA collection), and the Statistics tab asks for it on every
+# redraw — which is every frame while the preferences window is dragged.
+_last_list_signature = None
+
+
+def invalidate_stats_ui():
+    """Force the next refresh_stats_ui to rebuild."""
+    global _last_list_signature  # pylint: disable=global-statement
+    _last_list_signature = None
+
+
+def refresh_stats_ui(p, force=False):
+    """Rebuild the stats UI collection from current counts, minus blacklist.
+
+    Returns True when the collection is up to date — including the case
+    where nothing changed and the existing rows were kept.
+    """
+    global _last_list_signature  # pylint: disable=global-statement
     try:
+        signature = (
+            stats_manager.revision(),
+            getattr(p, "stats_blacklist", "") or "",
+            bool(getattr(p, "stats_sort_by_usage", False)),
+            _mappings_digest(p),
+        )
+        if not force and signature == _last_list_signature and len(p.stats_collection):
+            return True
+
+        by_base, by_script, by_path = _mapping_indexes(p)
         p.stats_collection.clear()
         blacklist = stats_store.parse_blacklist(p.stats_blacklist)
 
@@ -76,18 +157,21 @@ def refresh_stats_ui(p):
             item.name = name
             item.count = count
             if category == "chords":
-                mapping = _find_mapping_for_chord(p, name)
+                mapping = _find_mapping_for_chord(by_base, name)
             elif category == "scripts":
-                mapping = _find_mapping_for_script(p, name)
+                mapping = _find_mapping_for_script(by_script, name)
             elif category == "properties":
-                mapping = _find_mapping_for_property(p, name)
+                mapping = _find_mapping_for_property(by_path, name)
             else:
                 mapping = None
             if mapping:
                 item.group = mapping.group or ""
                 item.label = mapping.label or ""
+
+        _last_list_signature = signature
         return True
     except Exception:
+        _last_list_signature = None
         return False
 
 
@@ -98,7 +182,7 @@ class CHORDSONG_OT_Stats_Refresh(Operator):
     bl_options = {'INTERNAL'}
 
     def execute(self, context):
-        if not refresh_stats_ui(_prefs_from_context(context)):
+        if not refresh_stats_ui(_prefs_from_context(context), force=True):
             self.report({'ERROR'}, "Failed to refresh statistics")
             return {'CANCELLED'}
         return {'FINISHED'}
@@ -277,14 +361,8 @@ class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
     kwargs: bpy.props.StringProperty(name="Parameters", default="")
     editor_context: bpy.props.EnumProperty(
         name="Editor Context",
-        items=(
-            ("VIEW_3D", "3D View (Object)", "Active in 3D View (Object Mode)", "OBJECT_DATAMODE", 0),
-            ("VIEW_3D_EDIT", "3D View (Edit)", "Active in 3D View (Edit Modes)", "EDITMODE_HLT", 1),
-            ("GEOMETRY_NODE", "Geometry Nodes", "Active in Geometry Nodes editor", "GEOMETRY_NODES", 2),
-            ("SHADER_EDITOR", "Shader Editor", "Active in Shader Editor", "NODE_MATERIAL", 3),
-            ("IMAGE_EDITOR", "UV Editor", "Active in UV Editor", "IMAGE_COL", 4),
-        ),
-        default="VIEW_3D",
+        items=_CONTEXT_ENUM_ITEMS,
+        default=DEFAULT_CONTEXT,
     )
 
     def invoke(self, context, _event):
@@ -320,7 +398,9 @@ class CHORDSONG_OT_Stats_Convert_To_Chord(Operator):
         col.prop(self, "chord", text="")
         col.separator()
         col.label(text="Editor Context:")
-        col.row(align=True).prop(self, "editor_context", expand=True)
+        grid = col.grid_flow(row_major=True, columns=_CONTEXT_GRID_COLUMNS,
+                             even_columns=True, align=True)
+        grid.prop(self, "editor_context", expand=True)
         col.separator()
         col.prop(self, "name", text="Label")
         col.prop(self, "group", text="Group")
