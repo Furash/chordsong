@@ -21,7 +21,7 @@ There are several ways to add chord mappings:
 
 ## Context-Specific Organization
 
-The Mappings tab organizes chords by **Context** using one rollout per editor, laid out in two columns. Each editor button shows how many chords it holds; open a rollout to pick one of the editor's modes and to see that editor's leader key. The first entry, **Global**, holds the chords that are active in every editor. They are managed only there: an editor's tab lists that editor's own mappings and shows an "Also active here" link for Global and for the parent contexts it inherits from. The contexts are:
+The Mappings tab organizes chords by **Context** using one rollout per editor, laid out in two columns. Each editor button shows how many chords it holds; open a rollout to pick one of the editor's modes and to see that editor's leader key. ++ctrl++ +click on a rollout arrow or header rolls every editor the same way as the clicked one — open it when it was closed, close them all when it was open. The first entry, **Global**, holds the chords that are active in every editor. They are managed only there: an editor's tab lists that editor's own mappings and shows an "Also active here" link for Global and for the parent contexts it inherits from. The contexts are:
 
 - **3D View**: Object, Sculpt, Paint and Pose mode, plus one context per Edit mode (mesh, curve, armature, text, lattice, metaball, grease pencil, point cloud)
 - **Geometry Nodes**, **Shader Editor**, **Compositor**: Node editors, by tree type

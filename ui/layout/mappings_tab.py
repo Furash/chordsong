@@ -381,6 +381,8 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
       * Open state: prefs.open_editor_families via chordsong.family_toggle;
         selecting a context rolls its family open (prefs update callback);
         the arrow and, for the active editor, the header button collapse it.
+        Ctrl+click on either rolls every editor the same way as the clicked
+        one (closed → all open, open → all closed).
         A rollout body holds the editor's mode buttons. The
         editor's own leader key is the first body row: greyed with an
         Override icon while it follows the default, live with a reset arrow

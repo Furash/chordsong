@@ -9,7 +9,7 @@ holding the selected context is always shown open (see mappings_tab).
 """
 
 import bpy  # type: ignore
-from bpy.props import StringProperty  # type: ignore
+from bpy.props import BoolProperty, StringProperty  # type: ignore
 
 from ..common import prefs
 
@@ -87,12 +87,21 @@ class CHORDSONG_OT_Context_Select(bpy.types.Operator):
 
 
 class CHORDSONG_OT_Family_Toggle(bpy.types.Operator):
-    """Roll this editor's contexts open or closed"""
+    """Roll this editor's contexts open or closed.
+    Ctrl+click: roll every editor the same way as this one"""
     bl_idname = "chordsong.family_toggle"
     bl_label = "Toggle Editor Rollout"
     bl_options = {"INTERNAL"}
 
     space_type: StringProperty(default="")
+    # Ctrl+click: the clicked rollout decides the direction and every other
+    # editor follows it. SKIP_SAVE so a modified click is never remembered
+    # into the next, unmodified one.
+    all_editors: BoolProperty(default=False, options={"SKIP_SAVE"})
+
+    def invoke(self, context, event):
+        self.all_editors = bool(event.ctrl)
+        return self.execute(context)
 
     def execute(self, context):
         p = prefs(context)
@@ -104,7 +113,15 @@ class CHORDSONG_OT_Family_Toggle(bpy.types.Operator):
             p.open_editor_families = ""
             return {"FINISHED"}
         opened = open_families(p)
-        if self.space_type in opened:
+        if self.all_editors:
+            # Closed → open them all, open → close them all.
+            from ...core.contexts import EDITOR_FAMILIES, family_contexts
+            if self.space_type in opened:
+                opened = set()
+            else:
+                opened = {space for space, _, _ in EDITOR_FAMILIES if family_contexts(space)}
+                opened.add(self.space_type)
+        elif self.space_type in opened:
             opened.discard(self.space_type)
         else:
             opened.add(self.space_type)
