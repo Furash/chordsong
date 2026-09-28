@@ -172,10 +172,15 @@ def draw_mappings_tab(prefs, context, layout):
         mapping_context = getattr(m, "context", DEFAULT_CONTEXT) or DEFAULT_CONTEXT
         readonly = False
         if mapping_context != current_context:
-            if mapping_context in inherited_counts:
+            if search_query:
+                # A search spans every context: "where is my Cavity chord"
+                # must be answerable from any tab. Foreign hits are listed
+                # read-only with a link to their own tab.
+                pass
+            elif mapping_context in inherited_counts:
                 # Counted after the search filter below, so the link never
                 # advertises more rows than the list shows.
-                if not (search_query or conflicts_with_any(conflicts, idx, own_indices)):
+                if not conflicts_with_any(conflicts, idx, own_indices):
                     inherited_counts[mapping_context] += 1
                     continue
             elif contexts_overlap(mapping_context, current_context):
@@ -449,13 +454,15 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
             cell.label(text="")
             return
         if key == "master":
-            # 3D View: its key is the default set at the top — shown greyed,
-            # no override control (there is nothing to override it against).
+            # 3D View: its key *is* the default set at the top, so this is
+            # the same field, live — editing it here edits the default.
+            # There is nothing to override it against, so no Override
+            # button; a blank icon keeps the field the width of the others.
             if master_kmi is not None and master_km is not None:
                 field = cell.row(align=True)
-                field.enabled = False
                 field.context_pointer_set("keymap", master_km)
                 field.prop(master_kmi, "type", text="", full_event=True, emboss=True)
+                cell.label(text="", icon='BLANK1')
             else:
                 cell.label(text="")
             return
@@ -511,7 +518,9 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
         # button rather than prop_enum so it stays highlighted while any of
         # the editor's modes is selected.
         name = _row(box, arrow=(space_type, is_open, True))
-        name.alert = family_alert and not is_open
+        # Red whether open or closed: opening the family to find the
+        # conflict must not make the family look clean.
+        name.alert = family_alert
         if len(members) > 1:
             # The count is the whole family's, so the header must not also
             # select one context — clicking "3D View · 114" and landing on
@@ -550,10 +559,18 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
                 buttons = _row(box)
                 for ctx in chunk:
                     cell = buttons.row(align=True)
-                    cell.alert = ctx.token in conflicted
-                    cell.prop_enum(prefs, "mapping_context_tab", ctx.token,
-                                   text=_with_count(context_short_label(ctx.token), counts.get(ctx.token, 0)),
-                                   icon=ctx.icon)
+                    clashing = ctx.token in conflicted
+                    cell.alert = clashing
+                    # An operator button, not prop_enum: Blender's radio
+                    # buttons do not take the alert tint, so a conflicted
+                    # context stayed grey. The header and Global box use
+                    # this same button and do go red. The icon swap is a
+                    # second cue that survives any button state.
+                    op = cell.operator("chordsong.context_select",
+                                       text=_with_count(context_short_label(ctx.token), counts.get(ctx.token, 0)),
+                                       icon='ERROR' if clashing else ctx.icon,
+                                       depress=(current == ctx.token))
+                    op.token = ctx.token
                 for _ in range(_ROLLOUT_MODES_PER_ROW - len(chunk)):
                     buttons.row(align=True).label(text="")
 

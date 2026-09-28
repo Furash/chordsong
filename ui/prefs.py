@@ -1334,6 +1334,7 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Chord Search",
         description="Search chords by chord, label, operator, property, toggle, or script",
         default="",
+        options={'SKIP_SAVE'},
         update=_on_prefs_changed,
     )
 

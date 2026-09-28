@@ -287,93 +287,16 @@ def find_conflicts_util(mappings, generate_fixes=True):
     return conflicts
 
 def _are_mappings_identical(m1, m2):
-    """Check if two mappings are identical (same chord, label, type, and properties)."""
-    # Basic properties must match
-    if get_str_attr(m1, "chord") != get_str_attr(m2, "chord"):
-        return False
-    if get_str_attr(m1, "label") != get_str_attr(m2, "label"):
-        return False
-    if get_str_attr(m1, "group") != get_str_attr(m2, "group"):
-        return False
-    if get_str_attr(m1, "icon") != get_str_attr(m2, "icon"):
-        return False
-    if getattr(m1, "mapping_type", "OPERATOR") != getattr(m2, "mapping_type", "OPERATOR"):
-        return False
-    if getattr(m1, "context", "VIEW_3D") != getattr(m2, "context", "VIEW_3D"):
-        return False
-    if getattr(m1, "enabled", True) != getattr(m2, "enabled", True):
-        return False
+    """Same chord and same action — the identity the Contexts dialog uses.
 
-    mapping_type = getattr(m1, "mapping_type", "OPERATOR")
+    Label, icon, group, enabled flag and context are *not* compared. The
+    common way to end up with two identical chords is Duplicate, which
+    appends "(Copy)" to the label; requiring equal labels meant Merge was
+    never offered for exactly the case it exists for.
+    """
+    from ..core.chord_serialization import mapping_signature
+    return mapping_signature(m1) == mapping_signature(m2)
 
-    # Type-specific properties
-    if mapping_type == "OPERATOR":
-        if get_str_attr(m1, "operator") != get_str_attr(m2, "operator"):
-            return False
-        if getattr(m1, "call_context", "EXEC_DEFAULT") != getattr(m2, "call_context", "EXEC_DEFAULT"):
-            return False
-        if get_str_attr(m1, "kwargs_json") != get_str_attr(m2, "kwargs_json"):
-            return False
-
-        # Check sub_operators
-        sub1 = getattr(m1, "sub_operators", [])
-        sub2 = getattr(m2, "sub_operators", [])
-        if len(sub1) != len(sub2):
-            return False
-        for s1, s2 in zip(sub1, sub2):
-            if get_str_attr(s1, "operator") != get_str_attr(s2, "operator"):
-                return False
-            if getattr(s1, "call_context", "EXEC_DEFAULT") != getattr(s2, "call_context", "EXEC_DEFAULT"):
-                return False
-            if get_str_attr(s1, "kwargs_json") != get_str_attr(s2, "kwargs_json"):
-                return False
-
-    elif mapping_type == "PYTHON_FILE":
-        if get_str_attr(m1, "python_file") != get_str_attr(m2, "python_file"):
-            return False
-
-        # Check script_params
-        params1 = getattr(m1, "script_params", [])
-        params2 = getattr(m2, "script_params", [])
-        if len(params1) != len(params2):
-            return False
-        for p1, p2 in zip(params1, params2):
-            if get_str_attr(p1, "value") != get_str_attr(p2, "value"):
-                return False
-
-    elif mapping_type == "CONTEXT_TOGGLE":
-        if get_str_attr(m1, "context_path") != get_str_attr(m2, "context_path"):
-            return False
-        if getattr(m1, "sync_toggles", False) != getattr(m2, "sync_toggles", False):
-            return False
-
-        # Check sub_items
-        items1 = getattr(m1, "sub_items", [])
-        items2 = getattr(m2, "sub_items", [])
-        if len(items1) != len(items2):
-            return False
-        for i1, i2 in zip(items1, items2):
-            if get_str_attr(i1, "path") != get_str_attr(i2, "path"):
-                return False
-
-    elif mapping_type == "CONTEXT_PROPERTY":
-        if get_str_attr(m1, "context_path") != get_str_attr(m2, "context_path"):
-            return False
-        if get_str_attr(m1, "property_value") != get_str_attr(m2, "property_value"):
-            return False
-
-        # Check sub_items
-        items1 = getattr(m1, "sub_items", [])
-        items2 = getattr(m2, "sub_items", [])
-        if len(items1) != len(items2):
-            return False
-        for i1, i2 in zip(items1, items2):
-            if get_str_attr(i1, "path") != get_str_attr(i2, "path"):
-                return False
-            if get_str_attr(i1, "value") != get_str_attr(i2, "value"):
-                return False
-
-    return True
 
 def _has_identical_mappings(mappings_list):
     """Check if there are any identical mappings in the list."""
@@ -482,7 +405,7 @@ class CHORDSONG_OT_ApplyConflictFix(bpy.types.Operator):
         return {"FINISHED"}
 
 class CHORDSONG_OT_MergeIdentical(bpy.types.Operator):
-    """Merge identical duplicate mappings (same chord, label, type, and properties)"""
+    """Merge duplicate mappings that run the same action for the same chord, keeping the one active in the most editors"""
 
     bl_idname = "chordsong.merge_identical"
     bl_label = "Merge Identical"
@@ -514,61 +437,36 @@ class CHORDSONG_OT_MergeIdentical(bpy.types.Operator):
 
         p = prefs(context)
 
-        # Find groups of identical mappings
-        to_remove_indices = []
-        kept = set()
+        from ..core.contexts import ALL_CONTEXT, context_chain
 
+        def _reach(m):
+            # Sort key: Global first, then a parent editor before its
+            # sub-views. Merging must keep the copy that fires in the most
+            # places, or it silently narrows the chord.
+            ctx = getattr(m, "context", "") or ""
+            return (ctx != ALL_CONTEXT, len(context_chain(ctx)) if ctx != ALL_CONTEXT else 0)
+
+        # Group identical mappings; keep the widest-reaching one of each group
+        to_remove = []
+        seen = set()
         for i, m1 in enumerate(mappings_list):
-            if i in kept:
+            if i in seen:
                 continue
+            group = [i] + [j for j in range(i + 1, len(mappings_list))
+                           if j not in seen and _are_mappings_identical(m1, mappings_list[j])]
+            seen.update(group)
+            if len(group) > 1:
+                group.sort(key=lambda k: _reach(mappings_list[k]))
+                to_remove.extend(mappings_list[k] for k in group[1:])
 
-            identical_group = [i]
-            for j, m2 in enumerate(mappings_list[i+1:], start=i+1):
-                if j in kept:
-                    continue
-                if _are_mappings_identical(m1, m2):
-                    identical_group.append(j)
-
-            # If we found identical mappings, keep the first one and mark others for removal
-            if len(identical_group) > 1:
-                kept.add(identical_group[0])
-                to_remove_indices.extend(identical_group[1:])
-
-        if not to_remove_indices:
+        if not to_remove:
             self.report({"INFO"}, "No identical mappings found to merge")
             return {"FINISHED"}
 
-        # Find the actual indices in prefs.mappings for the mappings to remove
-        # Build a list of mappings to remove
-        mappings_to_remove = [mappings_list[idx] for idx in to_remove_indices]
-        prefs_indices_to_remove = []
-        found_mappings = set()
-
-        # Find indices by iterating through all mappings
-        # First try object identity (fastest and most reliable)
-        for pref_idx, pref_mapping in enumerate(p.mappings):
-            for mapping_to_remove in mappings_to_remove:
-                if pref_mapping is mapping_to_remove:
-                    prefs_indices_to_remove.append(pref_idx)
-                    found_mappings.add(id(mapping_to_remove))
-                    break
-
-        # Fallback: if object identity didn't work, try property comparison
-        # This can happen if mappings were recreated or references are stale
-        if len(prefs_indices_to_remove) < len(mappings_to_remove):
-            for pref_idx, pref_mapping in enumerate(p.mappings):
-                if pref_idx in prefs_indices_to_remove:
-                    continue  # Already found
-                for mapping_to_remove in mappings_to_remove:
-                    if id(mapping_to_remove) in found_mappings:
-                        continue  # Already found
-                    # Compare by properties as fallback
-                    if _are_mappings_identical(pref_mapping, mapping_to_remove):
-                        # Also verify chord matches exactly
-                        if get_str_attr(pref_mapping, "chord") == get_str_attr(mapping_to_remove, "chord"):
-                            prefs_indices_to_remove.append(pref_idx)
-                            found_mappings.add(id(mapping_to_remove))
-                            break
+        # bpy returns a fresh Python wrapper on every collection access, so
+        # `is` never matches; the RNA pointer identifies the row.
+        pointers = {m.as_pointer() for m in to_remove}
+        prefs_indices_to_remove = [i for i, m in enumerate(p.mappings) if m.as_pointer() in pointers]
 
         if not prefs_indices_to_remove:
             self.report({"WARNING"}, "Could not find mappings to remove in preferences")
@@ -790,7 +688,7 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 if _has_identical_mappings(dup["mappings"]):
                     op = split.operator(
                         "chordsong.merge_identical",
-                        text="Merge Identical",
+                        text="Merge Duplicates",
                         icon="LINKED"
                     )
                     op.conflict_index = idx

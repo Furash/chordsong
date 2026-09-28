@@ -309,6 +309,14 @@ def register():
         except Exception:
             pass
 
+        # The mappings search box is session-only. Blender may still have
+        # persisted a stale query in userpref.blend from an older build, so
+        # clear it here (callbacks are suspended, so this doesn't autosave).
+        try:
+            prefs.chord_search = ""
+        except Exception:
+            pass
+
         user_config_exists = user_config_path and os.path.exists(user_config_path)
 
         try:
