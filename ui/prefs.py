@@ -38,23 +38,6 @@ _CONTEXT_ENUM_ITEMS = _context_enum_items(include_all=True, icons=True)
 _CONTEXT_TAB_ITEMS_CACHE = []
 
 
-def _on_mapping_context_tab_changed(self, _context):
-    """Selecting a context (a mode button, an "also active here" link, the
-    Add Chord flow) rolls its editor family open so the selection is visible."""
-    try:
-        from ..core.contexts import CONTEXT_BY_TOKEN
-        ctx = CONTEXT_BY_TOKEN.get(self.mapping_context_tab)
-        if ctx is None:
-            return
-        raw = self.open_editor_families or ""
-        opened = {s.strip() for s in raw.split(",") if s.strip()}
-        if ctx.space_type not in opened:
-            opened.add(ctx.space_type)
-            self.open_editor_families = ",".join(sorted(opened))
-    except Exception:  # pylint: disable=broad-exception-caught
-        pass
-
-
 def _on_mapping_context_changed(self, context):
     """A mapping's own Context dropdown *moves* it. Follow it with the tab
     selection, otherwise the row the user was editing simply vanishes from
@@ -786,15 +769,6 @@ class CHORDSONG_Preferences(AddonPreferences):
         name="Mapping Context Tab",
         description="Select the editor context for chord mappings",
         items=_mapping_context_tab_items,
-        update=_on_mapping_context_tab_changed,
-    )
-
-    # Editor families rolled open in the Mappings-tab context selector
-    # (comma-separated space types; see operators/mapping/family_toggle.py).
-    open_editor_families: StringProperty(
-        name="Open Editor Rollouts",
-        default="VIEW_3D",
-        options={'HIDDEN'},
     )
 
     # Editors that have their own leader key, as comma-separated space types.
@@ -807,10 +781,11 @@ class CHORDSONG_Preferences(AddonPreferences):
         options={'HIDDEN'},
     )
 
-    # Master leader binding as last seen by the preferences UI, as an event
+    # Default leader binding as last seen by the preferences UI, as an event
     # signature (see ui.keymap.event_signature). A differing live signature
     # means the user changed it, and the change is propagated to the editors
-    # that follow the default (see ui.keymap.schedule_master_sync).
+    # that follow the default (see ui.keymap.schedule_master_sync). Also the
+    # default's persistent record: re-applied to its keymap item at register.
     leader_key_last: StringProperty(
         name="Leader Key (last seen)",
         default="",
@@ -947,6 +922,21 @@ class CHORDSONG_Preferences(AddonPreferences):
         update=_on_prefs_changed,
     )
 
+    # One multiplier over every overlay (leader, recents, scripts, search,
+    # fading): fonts, gaps and offsets alike. Applied in
+    # utils.render.calculate_scale_factor on top of Blender's own scale.
+    overlay_ui_scale: FloatProperty(
+        name="UI Scale",
+        description="Scale every Chord Song overlay — text, icons and spacing — on top of Blender's interface scale",
+        default=1.0,
+        min=0.25,
+        soft_min=0.5,
+        max=4.0,
+        soft_max=2.5,
+        step=5,
+        precision=2,
+        update=_on_prefs_changed,
+    )
     overlay_font_size_header: IntProperty(
         name="Header font size",
         default=16,

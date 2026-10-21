@@ -21,12 +21,13 @@ There are several ways to add chord mappings:
 
 ## Context-Specific Organization
 
-The Mappings tab organizes chords by **Context** using one rollout per editor, laid out in two columns. Each editor button shows how many chords it holds; open a rollout to pick one of the editor's modes and to see that editor's leader key. ++ctrl++ +click on a rollout arrow or header rolls every editor the same way as the clicked one — open it when it was closed, close them all when it was open. The first entry, **Global**, holds the chords that are active in every editor. They are managed only there: an editor's tab lists that editor's own mappings and shows an "Also active here" link for Global and for the parent contexts it inherits from. The contexts are:
+The Mappings tab organizes chords by **Context** with one row per editor, laid out in two columns. A row is the editor button, then the editor's modes as icon buttons with their chord counts, then that editor's leader key. Hover an icon for the mode's name. Clicking the editor button selects its first mode; clicking an icon selects that mode. The 3D View's eight Edit modes get a row of their own, **Edit Modes**, right under the 3D View. The first entry, **Global**, holds the chords that are active in every editor. They are managed only there: an editor's tab lists that editor's own mappings and shows an "Also active here" link for Global and for the parent contexts it inherits from. The contexts are:
 
 - **3D View**: Object, Sculpt, Paint and Pose mode, plus one context per Edit mode (mesh, curve, armature, text, lattice, metaball, grease pencil, point cloud)
 - **Geometry Nodes**, **Shader Editor**, **Compositor**: Node editors, by tree type
 - **UV Editor**: UV / Image Editor, with its Paint mode
-- **Video Sequencer**, **Movie Clip**: Video editors
+- **Video Sequencer**: timeline, with its Preview
+- **Movie Clip**: Tracking (Clip view), Graph view, Dope Sheet view and Mask mode
 - **Dope Sheet**, **Graph Editor**, **NLA Editor**: Animation editors
 
 See [Contexts](../concepts/contexts.md) for the full list. Selecting a context also sets the context used by **Add New Chord**.
@@ -43,7 +44,7 @@ Context tabs turn red when a chord in that context is in conflict. A conflict be
 
 ## Leader Key
 
-The **Leader Key (default)** field at the top of the Mappings tab is the key for the 3D View and the default for every other editor. Open an editor's rollout to see its **Leader Key** line: the field shows the key in use, greyed while it is the default. To give that editor a different key, for example when ++space++ should keep driving playback in the Video Sequencer, press the **Override** icon next to the field and then press the new key. The arrow icon that replaces it resets the editor to the default key. A note under the default field says how many editors use their own key. Changing the default key moves the editors that still followed it; editors with their own key keep it.
+The **Leader Key (default)** field at the top of the Mappings tab is the key every editor follows until it is given one of its own. Each editor's row, the 3D View's included, ends with its own key (the key icon, then the field): the field shows the key in use, greyed while it is the default. To give that editor a different key, for example when ++space++ should keep driving playback in the Video Sequencer, press the **Override** icon next to the field and then press the new key. The arrow icon that replaces it resets the editor to the default key. A note under the default field says how many editors use their own key. Changing the default key moves the editors that still followed it; editors with their own key keep it.
 
 ## Search Functionality
 

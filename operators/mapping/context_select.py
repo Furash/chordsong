@@ -1,23 +1,13 @@
 # pyright: reportMissingImports=false
 # pyright: reportMissingModuleSource=false
 # pylint: disable=import-error,broad-exception-caught
-"""Roll an editor family open/closed in the Mappings tab context selector.
-
-Open families are stored as a comma-separated list of space types in
-prefs.open_editor_families so the layout survives restarts. The family
-holding the selected context is always shown open (see mappings_tab).
-"""
+"""Operators behind the Mappings-tab context selector: pick the context
+whose chords the tab lists, and give an editor its own leader key."""
 
 import bpy  # type: ignore
-from bpy.props import BoolProperty, StringProperty  # type: ignore
+from bpy.props import StringProperty  # type: ignore
 
 from ..common import prefs
-
-
-def open_families(p):
-    """Set of space types whose rollout is open."""
-    raw = getattr(p, "open_editor_families", "") or ""
-    return {s.strip() for s in raw.split(",") if s.strip()}
 
 
 def leader_override_spaces(p):
@@ -29,6 +19,18 @@ def leader_override_spaces(p):
 
 def set_leader_override_spaces(p, spaces):
     p.leader_key_overrides = ",".join(sorted(spaces))
+
+
+class CHORDSONG_OT_Leader_Default_Key(bpy.types.Operator):
+    """Holds the default leader key. Bound by an inactive keymap item that
+    exists only to be edited in the preferences; never meant to run."""
+    bl_idname = "chordsong.leader_default_key"
+    bl_label = "Leader Key (default)"
+    bl_options = {"INTERNAL"}
+
+    def execute(self, context):
+        # Should the item ever be switched on, let the key through.
+        return {"PASS_THROUGH"}
 
 
 class CHORDSONG_OT_Leader_Override_Toggle(bpy.types.Operator):
@@ -45,7 +47,7 @@ class CHORDSONG_OT_Leader_Override_Toggle(bpy.types.Operator):
 
         p = prefs(context)
         km_name = {space: name for name, space in LEADER_KEYMAPS}.get(self.space_type)
-        if not km_name or km_name == MASTER_KEYMAP_NAME:
+        if not km_name:
             return {"CANCELLED"}
         _, master = find_leader_kmi(MASTER_KEYMAP_NAME)
         _, kmi = find_leader_kmi(km_name)
@@ -74,6 +76,19 @@ class CHORDSONG_OT_Context_Select(bpy.types.Operator):
 
     token: StringProperty(default="")
 
+    @classmethod
+    def description(cls, context, properties):
+        # The Mappings-tab chips show only an icon and a count, so the
+        # tooltip has to carry the context's name.
+        from ...core.contexts import ALL_CONTEXT, CONTEXT_BY_TOKEN
+        token = getattr(properties, "token", "")
+        if token == ALL_CONTEXT:
+            return "Global: chords that run in every editor"
+        ctx = CONTEXT_BY_TOKEN.get(token)
+        if ctx is None:
+            return "Show this editor's chords"
+        return f"{ctx.label}: {ctx.description}"
+
     def execute(self, context):
         p = prefs(context)
         if not self.token:
@@ -83,47 +98,4 @@ class CHORDSONG_OT_Context_Select(bpy.types.Operator):
         except TypeError:
             self.report({"WARNING"}, f"Unknown context {self.token}")
             return {"CANCELLED"}
-        return {"FINISHED"}
-
-
-class CHORDSONG_OT_Family_Toggle(bpy.types.Operator):
-    """Roll this editor's contexts open or closed.
-    Ctrl+click: roll every editor the same way as this one"""
-    bl_idname = "chordsong.family_toggle"
-    bl_label = "Toggle Editor Rollout"
-    bl_options = {"INTERNAL"}
-
-    space_type: StringProperty(default="")
-    # Ctrl+click: the clicked rollout decides the direction and every other
-    # editor follows it. SKIP_SAVE so a modified click is never remembered
-    # into the next, unmodified one.
-    all_editors: BoolProperty(default=False, options={"SKIP_SAVE"})
-
-    def invoke(self, context, event):
-        self.all_editors = bool(event.ctrl)
-        return self.execute(context)
-
-    def execute(self, context):
-        p = prefs(context)
-        if not self.space_type:
-            return {"CANCELLED"}
-        if self.space_type == "*":
-            # Collapse every rollout — selecting contexts opens them, so
-            # they accumulate and there has to be a way back.
-            p.open_editor_families = ""
-            return {"FINISHED"}
-        opened = open_families(p)
-        if self.all_editors:
-            # Closed → open them all, open → close them all.
-            from ...core.contexts import EDITOR_FAMILIES, family_contexts
-            if self.space_type in opened:
-                opened = set()
-            else:
-                opened = {space for space, _, _ in EDITOR_FAMILIES if family_contexts(space)}
-                opened.add(self.space_type)
-        elif self.space_type in opened:
-            opened.discard(self.space_type)
-        else:
-            opened.add(self.space_type)
-        p.open_editor_families = ",".join(sorted(opened))
         return {"FINISHED"}

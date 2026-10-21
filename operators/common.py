@@ -29,15 +29,21 @@ def detect_editor_context(context: bpy.types.Context) -> str:
 def editor_state(context):
     """(positional, keyword) arguments for core.contexts.detect_context_token
     read off a live context: space type, node tree, object mode, the
-    editor's own mode, Sequencer view/region and File Browser mode."""
+    editor's own mode, Sequencer view / Clip view, region and File
+    Browser mode."""
     space = getattr(context, "space_data", None)
     region = getattr(context, "region", None)
     space_type = getattr(space, "type", None) if space else None
     tree_type = getattr(space, "tree_type", None) if space else None
     mode = getattr(context, "mode", None)
+    # The Sequencer calls it view_type, the Clip editor view; their values
+    # never overlap, so one hint carries both.
+    view = None
+    if space:
+        view = getattr(space, "view_type", None) or getattr(space, "view", None)
     hints = {
         "space_mode": getattr(space, "mode", None) if space else None,
-        "view_type": getattr(space, "view_type", None) if space else None,
+        "view_type": view,
         "region_type": getattr(region, "type", None) if region else None,
         "browse_mode": getattr(space, "browse_mode", None) if space else None,
     }

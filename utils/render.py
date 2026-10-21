@@ -175,8 +175,20 @@ def validate_viewport_context(ctx_viewport) -> dict:
         # Context objects are invalid (freed by Blender)
         return {}
 
+def _addon_ui_scale() -> float:
+    """The add-on's own UI Scale preference (UI tab), 1.0 when unavailable."""
+    try:
+        from .addon_package import addon_root_package
+        p = bpy.context.preferences.addons[addon_root_package(__package__)].preferences
+        return float(getattr(p, "overlay_ui_scale", 1.0)) or 1.0
+    except Exception:
+        return 1.0
+
+
 def calculate_scale_factor(context) -> float:
-    """Calculate UI scale factor for fonts and spacing, respecting Blender UI settings.
+    """Calculate UI scale factor for fonts and spacing, respecting Blender UI settings
+    and the add-on's own UI Scale preference (every overlay draws through this,
+    so that one float scales text, icons and spacing everywhere).
 
     Args:
         context: Blender context object
@@ -184,6 +196,11 @@ def calculate_scale_factor(context) -> float:
     Returns:
         Scale factor as a float
     """
+    return _blender_scale_factor() * _addon_ui_scale()
+
+
+def _blender_scale_factor() -> float:
+    """Blender's interface scale: UI scale, DPI, pixel size and line width."""
     try:
         # Access preferences via bpy.context for robustness in draw handlers
         prefs = bpy.context.preferences

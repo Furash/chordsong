@@ -18,6 +18,7 @@ def clear_overlay_cache():
 def get_prefs_hash(p, region_w, region_h):
     """Get a hash of preferences that affect overlay layout."""
     return (
+        getattr(p, "overlay_ui_scale", 1.0),
         p.overlay_font_size_header,
         p.overlay_font_size_chord,
         p.overlay_font_size_body,

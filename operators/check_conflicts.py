@@ -279,6 +279,7 @@ def find_conflicts_util(mappings, generate_fixes=True):
                     "full_group": get_str_attr(full_mapping, "group"),
                     "context": _context_label([prefix_mapping, full_mapping], live_ctx),
                     "prefix_mapping": prefix_mapping,
+                    "full_mapping": full_mapping,
                 }
                 if generate_fixes:
                     conflict_data["suggested_fix"] = generate_chord(prefix_chord, all_chords, exclude_chord=full_chord)
@@ -545,6 +546,66 @@ class CHORDSONG_OT_MergeIdentical(bpy.types.Operator):
         bpy.app.timers.register(delayed_refresh, first_interval=0.2)
         return {"FINISHED"}
 
+def _goto_context(involved):
+    """Context tab to open for a conflict: the first editor context among
+    the involved mappings, Global only when every party is Global. Foreign
+    parties still show up there read-only, since the chord search spans
+    every context."""
+    from ..core.contexts import ALL_CONTEXT, DEFAULT_CONTEXT
+    tokens = [getattr(m, "context", DEFAULT_CONTEXT) or DEFAULT_CONTEXT for m in involved]
+    for tok in tokens:
+        if tok != ALL_CONTEXT:
+            return tok
+    return tokens[0] if tokens else DEFAULT_CONTEXT
+
+def _draw_goto_chord(layout, chord, involved, text=""):
+    op = layout.operator(CHORDSONG_OT_GotoChord.bl_idname, text=text, icon="VIEWZOOM")
+    op.chord = chord
+    op.context_token = _goto_context(involved)
+
+class CHORDSONG_OT_GotoChord(bpy.types.Operator):
+    """Show this chord in the Mappings tab: opens its editor context and filters the list to the chord"""
+
+    bl_idname = "chordsong.goto_chord"
+    bl_label = "Go to Chord"
+    bl_options = {"INTERNAL"}
+
+    chord: bpy.props.StringProperty(default="")
+    context_token: bpy.props.StringProperty(default="")
+
+    def execute(self, context: bpy.types.Context):
+        from ..utils.redraw import tag_redraw_all_areas
+
+        if not self.chord:
+            return {"CANCELLED"}
+        p = prefs(context)
+        p.prefs_tab = "MAPPINGS"
+        if self.context_token:
+            try:
+                p.mapping_context_tab = self.context_token
+            except (TypeError, ValueError):
+                pass
+        # The "c:" filter lists the chord and anything it prefixes, and it
+        # unfolds the groups and rows on the way, so the conflict partners
+        # land on screen together.
+        p.chord_search = f"c:{self.chord}"
+
+        # The dialog can pop up from an autosave re-check with no
+        # Preferences window around; bring one up so the jump lands somewhere.
+        has_prefs_area = any(
+            area.type == "PREFERENCES"
+            for window in context.window_manager.windows
+            for area in window.screen.areas
+        )
+        if not has_prefs_area:
+            try:
+                bpy.ops.chordsong.open_prefs()
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+        tag_redraw_all_areas(context)
+        self.report({"INFO"}, f"Showing chord '{self.chord}' in the Mappings tab")
+        return {"FINISHED"}
+
 class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
     """Check for chord mapping conflicts (prefixes and duplicates)"""
 
@@ -641,6 +702,8 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 else:
                     # Show button without suggested fix if fix generation failed or wasn't requested
                     row.label(text="(Fix generation unavailable)", icon="INFO")
+                _draw_goto_chord(row, conflict["prefix_chord"],
+                                 [conflict["prefix_mapping"], conflict["full_mapping"]])
 
         # Duplicate chords - table layout
 
@@ -654,6 +717,7 @@ class CHORDSONG_OT_CheckConflicts(bpy.types.Operator):
                 # Header row with chord and context
                 header = dup_box.row(align=True)
                 header.label(text=f"'{dup['chord']}' ({dup['context']})", icon="COPYDOWN")
+                _draw_goto_chord(header, dup["chord"], dup["mappings"], text="Go to Chord")
 
                 # Table header row
                 table_header = dup_box.row(align=True)

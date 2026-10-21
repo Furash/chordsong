@@ -21,16 +21,16 @@ Switching a context will immediately send the chord to the new context's tab.
 - **Geometry Nodes**, **Shader Editor**, **Compositor**
 - **UV Editor** (UV / Image Editor) — with mode context **Image Paint**
 - **Video Sequencer** — with mode context **Sequencer Preview**
-- **Movie Clip** editor
+- **Movie Clip (Tracking)**, **Movie Clip (Graph)**, **Movie Clip (Dope Sheet)**, **Movie Clip (Mask)**
 - **Dope Sheet** — with mode context **Timeline**
 - **Graph Editor** — with mode context **Drivers**
 - **NLA Editor**
 
 Plus **Global**, which makes a mapping active in every editor above. Global chords live in their own **Global** tab in the Mappings preferences instead of being repeated in every context tab.
 
-## The 3D View is flat
+## The 3D View and Movie Clip editor are flat
 
-Every 3D View context stands on its own. A chord bound to **3D View (Object)** fires in Object mode only: it does not reach Sculpt, Paint, Pose or any Edit mode, and an **Edit Mesh** chord does not reach **Edit Curve**. Use **Global** for a chord that should fire everywhere, or give each mode its own copy with the **Contexts** button on the mapping row.
+Every 3D View context stands on its own. A chord bound to **3D View (Object)** fires in Object mode only: it does not reach Sculpt, Paint, Pose or any Edit mode, and an **Edit Mesh** chord does not reach **Edit Curve**. The Movie Clip editor works the same way: **Tracking** is the Tracking mode's Clip view, **Graph** and **Dope Sheet** its other two views, and **Mask** the Mask mode; none inherits from another. Use **Global** for a chord that should fire everywhere, or give each mode its own copy with the **Contexts** button on the mapping row.
 
 ## Sub-view Contexts
 

@@ -72,6 +72,7 @@ Select **Custom** to define your own sort string. Tokens are space-separated and
 
 Enhanced typography controls with separate font sizes for all overlay elements:
 
+- **UI Scale**: One multiplier over every overlay (leader, recents, scripts, search, fading): text, icons and spacing alike. Applied on top of Blender's own interface scale; 1.0 changes nothing
 - **Header Size**: Font size for overlay header text
 - **Chord Size**: Font size for chord sequence text
 - **Body Size**: Font size for labels and descriptions

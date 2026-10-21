@@ -29,6 +29,7 @@ from .operators import (
     CHORDSONG_OT_Clear_Search,
     CHORDSONG_OT_Clear_Operator_Cache,
     CHORDSONG_OT_CheckConflicts,
+    CHORDSONG_OT_GotoChord,
     CHORDSONG_OT_MergeIdentical,
     CHORDSONG_OT_ContextMenu,
     CHORDSONG_OT_Export_Config,
@@ -63,7 +64,7 @@ from .operators import (
     CHORDSONG_OT_Mapping_Duplicate,
     CHORDSONG_OT_Mapping_Contexts,
     CHORDSONG_OT_Context_Select,
-    CHORDSONG_OT_Family_Toggle,
+    CHORDSONG_OT_Leader_Default_Key,
     CHORDSONG_OT_Leader_Override_Toggle,
     CHORDSONG_OT_Mapping_Fold_All,
     CHORDSONG_OT_Mapping_Move_Down,
@@ -149,7 +150,7 @@ _classes = (
     CHORDSONG_OT_Mapping_Duplicate,
     CHORDSONG_OT_Mapping_Contexts,
     CHORDSONG_OT_Context_Select,
-    CHORDSONG_OT_Family_Toggle,
+    CHORDSONG_OT_Leader_Default_Key,
     CHORDSONG_OT_Leader_Override_Toggle,
     CHORDSONG_OT_Mapping_Fold_All,
     CHORDSONG_OT_Mapping_Move_Down,
@@ -161,6 +162,7 @@ _classes = (
     CHORDSONG_OT_Mapping_Toggle_Select,
     CHORDSONG_OT_Mapping_Unfold_All,
     CHORDSONG_OT_MergeIdentical,
+    CHORDSONG_OT_GotoChord,
     CHORDSONG_OT_Property_Mapping_Convert,
     CHORDSONG_OT_Open_Keymap,
     CHORDSONG_OT_Open_Prefs,
@@ -241,6 +243,29 @@ def register():
         # One leader keymap per supported editor; the list lives in
         # core.contexts so contexts, keymaps and draw handlers stay in sync.
         from .core.contexts import LEADER_KEYMAPS
+        from .ui.keymap import DEFAULT_KEYMAP_NAME, DEFAULT_KEY_IDNAME, apply_event_signature
+
+        # The default binding: its own item, inactive, bound to a no-op, so
+        # it is a value to edit and copy from, never a key that fires. See
+        # ui.keymap. Re-applied from prefs so it survives a keyconfig that
+        # did not keep the edit.
+        km = kc_addon.keymaps.new(name=DEFAULT_KEYMAP_NAME, space_type='EMPTY', region_type='WINDOW')
+        kmi = None
+        for item in km.keymap_items:
+            if item.idname == DEFAULT_KEY_IDNAME:
+                kmi = item
+                break
+        if not kmi:
+            kmi = km.keymap_items.new(DEFAULT_KEY_IDNAME, 'SPACE', 'PRESS')
+            kmi.repeat = False
+            try:
+                last = bpy.context.preferences.addons[__package__].preferences.leader_key_last
+                if last:
+                    apply_event_signature(kmi, last)
+            except Exception:
+                pass
+        kmi.active = False
+        addon_keymaps.append((km, kmi))
 
         for km_name, space_type in LEADER_KEYMAPS:
             km = kc_addon.keymaps.new(name=km_name, space_type=space_type)

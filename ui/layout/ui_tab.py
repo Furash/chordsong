@@ -67,7 +67,10 @@ def draw_ui_tab(prefs, layout):
     box = layout.box()
     header = box.row()
     header.label(text="Typography", icon='FONT_DATA')
-    
+
+    r = box.row(align=True)
+    r.prop(prefs, "overlay_ui_scale", text="UI Scale")
+
     r = box.row(align=True)
     r.prop(prefs, "overlay_font_size_header", text="Header Size")
     r.prop(prefs, "overlay_font_size_chord", text="Chord Size")

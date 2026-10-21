@@ -29,6 +29,12 @@ from ...utils.context_path import normalize_bpy_data_path
 _CONTEXT_FLAG_ENUM_ITEMS = _context_enum_items(include_all=False, icons=True, flags=True)
 # Context toggles per row in the dialog (dialog is ~450 px wide).
 _CONTEXT_GRID_COLUMNS = 3
+# Same items as the mapping's call_context in prefs; the dialog defaults to
+# Invoke because buttons clicked in the UI normally run with their dialog.
+_CALL_CONTEXT_ENUM_ITEMS = (
+    ("INVOKE_DEFAULT", "Invoke", "Invoke the operator (may show UI)"),
+    ("EXEC_DEFAULT", "Exec", "Run the operator immediately"),
+)
 
 def _group_search(_self, context, _edit_text):
     """Suggest existing group names; new names can still be typed freely."""
@@ -112,6 +118,13 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
         default=False,
     )
 
+    call_context: EnumProperty(
+        name="Call Context",
+        description="How to call the operator (invoke shows UI, exec runs immediately)",
+        items=_CALL_CONTEXT_ENUM_ITEMS,
+        default="INVOKE_DEFAULT",
+    )
+
     sub_operators_json: StringProperty(
         name="Sub-Operators",
         description="JSON string of additional operators for consecutive calls",
@@ -164,6 +177,7 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
             self.icon = ""
             self.editor_context = {DEFAULT_CONTEXT}
             self.global_context = False
+            self.call_context = "INVOKE_DEFAULT"
 
             button_operator = getattr(context, "button_operator", None)
             button_prop = getattr(context, "button_prop", None)
@@ -432,6 +446,10 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
             col.prop(self, "property_value", text="Value")
         else:
             col.prop(self, "kwargs", text="Parameters")
+        if self.mapping_type == "OPERATOR":
+            row = col.row(align=True)
+            row.label(text="Call:")
+            row.prop(self, "call_context", expand=True)
 
     def execute(self, context: bpy.types.Context):
         p = prefs(context)
@@ -545,7 +563,7 @@ class CHORDSONG_OT_ContextMenu(bpy.types.Operator):
                 m.icon = self.icon
                 m.context = ctx
                 m.operator = self.operator
-                m.call_context = "INVOKE_DEFAULT"
+                m.call_context = self.call_context
                 m.kwargs_json = self.kwargs if self.kwargs else ""
                 m.mapping_type = "OPERATOR"
 

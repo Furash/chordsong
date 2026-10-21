@@ -65,7 +65,7 @@ def test_tokens_unique_and_all_reserved():
     assert ALL_CONTEXT not in CONTEXT_TOKENS
     assert DEFAULT_CONTEXT in CONTEXT_TOKENS
     assert set(CONTEXT_BY_TOKEN) == set(CONTEXT_TOKENS)
-    assert len(CONTEXTS) == 25
+    assert len(CONTEXTS) == 28
     for tok in _RETIRED_TOKENS:
         assert tok not in CONTEXT_TOKENS, tok
 
@@ -252,6 +252,22 @@ def test_detect_editor_sub_modes():
         assert d("DOPESHEET_EDITOR", space_mode=m) == "DOPESHEET_EDITOR", m
     assert d("GRAPH_EDITOR", space_mode="DRIVERS") == "GRAPH_DRIVERS"
     assert d("GRAPH_EDITOR", space_mode="FCURVES") == "GRAPH_EDITOR"
+
+
+def test_detect_clip_editor_is_flat():
+    d = detect_context_token
+    assert d("CLIP_EDITOR", space_mode="TRACKING", view_type="CLIP") == "CLIP_EDITOR"
+    assert d("CLIP_EDITOR", space_mode="TRACKING", view_type="GRAPH") == "CLIP_GRAPH"
+    assert d("CLIP_EDITOR", space_mode="TRACKING", view_type="DOPESHEET") == "CLIP_DOPESHEET"
+    # Mask mode wins whatever view the editor last showed
+    for view in ("CLIP", "GRAPH", "DOPESHEET", None):
+        assert d("CLIP_EDITOR", space_mode="MASK", view_type=view) == "CLIP_MASK", view
+    # No hints at all: the base context
+    assert d("CLIP_EDITOR") == "CLIP_EDITOR"
+    # Siblings, no inheritance — like the 3D View
+    for tok in ("CLIP_GRAPH", "CLIP_DOPESHEET", "CLIP_MASK"):
+        assert CONTEXT_BY_TOKEN[tok].parent is None, tok
+        assert not contexts_overlap("CLIP_EDITOR", tok), tok
 
 
 def test_detect_plain_editors_map_to_own_token():

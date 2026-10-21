@@ -14,20 +14,22 @@
 
 Blender GUI, Chord Song preferences open, ideally 100+ chords loaded.
 
-**Mappings tab — rollouts**
+**Mappings tab — context selector**
 
-- [ ] Prefs window narrower than ~1100 px, then wider. **Expected:** rollouts switch from one column to two; expanding a family grows downward only, no horizontal jerk.
-- [ ] Click the 3D View header, then the Object button. **Expected:** header rolls open without selecting Object; clicking Object selects it, highlights the header too, and the count on the Object button matches the rows listed.
-- [ ] Inspect an open family. **Expected:** sub-modes in rows of 2, aligned to the header width; "Edit Modes" caption row present under 3D View.
-- [ ] Click the header of a single-context editor (Movie Clip, NLA). **Expected:** header click selects it (nothing in the body to select).
-- [ ] Select the Global tab. **Expected:** Global box highlighted, same as a selected sub-mode.
-- [ ] Open four or more families, click the collapse-all button (right of Multi-Toggle Modifier). **Expected:** all rollouts close; button is greyed while none are open.
-- [ ] Ctrl+click a family header. **Expected:** every rollout toggles together; plain click still behaves as above.
-- [ ] Create a conflict inside one editor, collapse that family. **Expected:** header red while collapsed; open it and the red moves to the sub-mode, header no longer red.
+- [ ] Prefs window narrower than ~1500 px, then wider. **Expected:** editor rows switch from one column to two; no horizontal jerk on redraw.
+- [ ] Inspect the rows. **Expected:** every editor button ends at the same x, mode chips line up in columns, key fields start at the same x; chips are icon + count, "0" where empty, never a hole; hovering a chip names its mode.
+- [ ] Click the 3D View button, then the Sculpt chip. **Expected:** the button selects Object (button and Object chip lit); Sculpt then lit instead; the count on a chip matches the rows listed.
+- [ ] Inspect the Edit Modes row under 3D View. **Expected:** eight chips, Mesh first; clicking its button selects Mesh; 3D View's count excludes the Edit Modes count.
+- [ ] Click the button of a single-context editor (NLA). **Expected:** selected, lit, no chips.
+- [ ] Select the Global tab. **Expected:** Global box highlighted, same as a selected chip.
+- [ ] Create a conflict inside one editor. **Expected:** that editor's button and the offending chip are red; other chips are not.
+- [ ] Movie Clip editor: Tracking mode with Clip, Graph and Dope Sheet views, then Mask mode. **Expected:** the leader overlay lists that view's chords only; a Tracking chord does not fire in Mask mode.
 
 **Leader key**
 
-- [ ] Open any family. **Expected:** a Leader Key row under the header, greyed while it follows the default.
+- [ ] Inspect any editor row, 3D View included. **Expected:** the key cell at the end (key icon, field, Override icon), greyed while it follows the default.
+- [ ] 3D View → Override → set Tab. **Expected:** Leader Key (default) still shows Space; Tab opens the leader in the 3D View, Space does not; Space still works in the other editors. Reset → back to Space.
+- [ ] Restart Blender after changing the default key. **Expected:** the default field and every following editor still show the new key.
 - [ ] Change the default leader (Space → Tab). **Expected:** every non-overridden editor shows Tab, greyed; one Info-panel message, not one per editor.
 - [ ] Sequencer → Override → set Ctrl+Space. Change the default back to Space. **Expected:** Sequencer keeps Ctrl+Space, un-greyed. Reset → back to Space, greyed, no stray Ctrl.
 - [ ] Press Ctrl+Space in the Sequencer, Space in the 3D View. **Expected:** leader overlay opens in each.
@@ -39,6 +41,7 @@ Blender GUI, Chord Song preferences open, ideally 100+ chords loaded.
 - [ ] On the Global tab, make a Global chord clash with a 3D View chord. **Expected:** the 3D View row appears greyed with "3D View chord — open its tab"; clicking it lands on the 3D View tab with the row visible.
 - [ ] Expand a row. **Expected:** Context dropdown wider than Type dropdown. Change Context to Video Sequencer. **Expected:** the tab follows to Video Sequencer; the row stays on screen.
 - [ ] Conflict inside a group. **Expected:** group header red.
+- [ ] Check for Conflicts → Go to Chord on a duplicate (and the magnifier on a prefix row). **Expected:** Mappings tab, context tab of the chord selected, search reads `c:<chord>`, both conflicting rows unfolded. From the Global tab on a Global-vs-3D View clash. **Expected:** lands on the 3D View tab, Global row listed read-only.
 
 **Contexts dialog (globe icon)**
 
@@ -50,6 +53,7 @@ Blender GUI, Chord Song preferences open, ideally 100+ chords loaded.
 
 - [ ] Right-click a button in the Sequencer → Add Chord Mapping. **Expected:** Video Sequencer pre-ticked. Same from the Properties editor. **Expected:** only 3D View ticked, no second copy.
 - [ ] Leave the chord empty → OK. **Expected:** warning; typed fields kept, not silently discarded.
+- [ ] Right-click an operator button → Add Chord Mapping. **Expected:** Call row (Invoke | Exec) under Parameters, Invoke preselected; absent for toggle/property mappings. Pick Exec → OK. **Expected:** new mapping shows Exec in the Mappings tab; reopening the dialog resets to Invoke.
 - [ ] Statistics tab → Convert to Chord. **Expected:** 3-column context grid including Global.
 
 **Runtime**

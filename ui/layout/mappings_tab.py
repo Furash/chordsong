@@ -1,34 +1,36 @@
 """
 Mappings tab for addon preferences.
 
-Layout (two fixed columns; every row is [arrow cell][control ...]):
+Layout (two fixed columns; one boxed row per editor):
   ┌ Leader Key (default)  [Space Bar]        ┐ ┌ Multi-Toggle Modifier  [Ctrl]     ┐
   └──────────────────────────────────────────┘ └───────────────────────────────────┘
-  ┌   🌐 Global · 18                          ┐ ┌ ▸ Movie Clip                      ┐
+  ┌ 🌐 Global · 18                            ┐ ┌ Movie Clip · 2        🔑[Tab    ]⧉ ┐
   └──────────────────────────────────────────┘ └───────────────────────────────────┘
-  ┌ ▾ 3D View · 114                          ┐ ┌ ▾ Dope Sheet · 3                  ┐
-  │   Leader Key          [Space Bar]        │ │   Leader Key        [Tab]       ↶ │
-  │   [Object · 84       ][Edit · 30       ] │ │   [Dope Sheet · 3  ][Timeline    ] │
-  │   [Sculpt            ][Paint           ] │ └───────────────────────────────────┘
-  │   [Pose              ][                ] │  …
+  ┌ 3D View · 84 [▣84][◐0][✎0][🦴0] 🔑[Space]  ┐ ┌ Dope Sheet · 3 [▤3][◷0]  🔑[Tab]↶ ┐
+  └──────────────────────────────────────────┘ └───────────────────────────────────┘
+  ┌ Edit Modes · 30 [△30][∿0][🦴0][A0][#0][●0][✏0][⁘0] ┐  …
   └──────────────────────────────────────────┘
   [Add Chord] [Conflicts] [Add Group] …
   [Search…]                                              [Copy] [Paste]
   ▾ Group … mapping rows …
-Rollouts per editor family (core.contexts.EDITOR_FAMILIES); the family of
-the selected context opens on selection; arrow or header re-click collapses it. The default leader key is the 3D View
-keymap and propagates to editors that follow it; the key cell at the end of
-an editor row gives that editor its own key (⧉ Override, then field + ↶ reset).
+One row per editor family (core.contexts.EDITOR_FAMILIES): the editor
+button (selects the editor's base context), its contexts as [icon count]
+chips, and the editor's own leader key (🔑 icon, field, ⧉ Override / ↶
+reset). A context group (EditorContext.group — the 3D View's Edit Modes,
+too many chips for the editor's row) gets a row of its own right under
+its editor. The default leader key is a binding of its own (see ui.keymap)
+and propagates to every editor that follows it; any editor, the 3D View
+included, can override it.
 """
 
 from ...core.contexts import (
     ALL_CONTEXT,
     DEFAULT_CONTEXT,
     EDITOR_FAMILIES,
+    GROUP_ICONS,
     LEADER_KEYMAPS,
     context_chain,
     context_label,
-    context_short_label,
     contexts_in_group,
     contexts_overlap,
     family_contexts,
@@ -46,22 +48,22 @@ from ..keymap import (
 from ...core.conflicts import conflict_map, conflicts_with_any, contexts_with_conflicts
 from .mapping_item import draw_mapping_item
 
-# Context rollouts flow into two columns when the preferences region is at
-# least this wide (pixels); one column below.
-_ROLLOUT_TWO_COLUMN_MIN_PX = 1100
-# Row grammar [arrow cell][control]: fixed arrow-cell width so every control
-# starts at the same x, and a fixed label cell for "Leader Key" / "Multi-Toggle
-# Modifier" lines so their fields line up too.
-_ROLLOUT_ARROW_UNITS_X = 1.1
-_ROLLOUT_LABEL_UNITS_X = 9.0
-_ROLLOUT_COLUMN_GAP = 1.0
-# Mode buttons per body row; a short last row is padded so widths match.
-_ROLLOUT_MODES_PER_ROW = 2
-# The body's "Leader Key" row is split like a mode row: label on the left,
-# key cell (field + Override/reset icon) on the right.
-_ROLLOUT_NAME_SHARE = 1.0 - 1.0 / _ROLLOUT_MODES_PER_ROW
-# Sentinel space type: chordsong.family_toggle closes every rollout.
-_COLLAPSE_ALL = "*"
+# The context selector flows into two columns when the preferences region
+# is at least this wide (UI pixels); one column below. An editor row needs
+# about 33 units — editor name, four [icon count] chips, key cell — so two
+# columns plus the sidebar want ~1500.
+_SELECTOR_TWO_COLUMN_MIN_PX = 1500
+# Fixed label cell for the "Leader Key (default)" / "Multi-Toggle Modifier"
+# lines so their fields line up.
+_SELECTOR_LABEL_UNITS_X = 9.0
+_SELECTOR_COLUMN_GAP = 1.0
+# Editor row shares: editor button, then [icon count] chips, then the
+# editor's own leader key cell ([key icon][field][Override/reset]). A
+# group row keeps the grammar with a blank key cell.
+_ROW_NAME_SHARE = 0.37
+_ROW_KEY_SHARE = 0.23
+# Gap between a row's button and its first chip (UILayout.separator factor).
+_CHIP_GAP = 1.5
 # Leader keymap name per editor family (space type).
 _KEYMAP_BY_SPACE = {space: name for name, space in LEADER_KEYMAPS}
 
@@ -78,7 +80,7 @@ def draw_mappings_tab(prefs, context, layout):
     # built once and handed around, never re-derived per row.
     conflicts = conflict_map(prefs.mappings)
 
-    _draw_context_rollouts(prefs, context, root, conflicts)
+    _draw_context_selector(prefs, context, root, conflicts)
     root.separator()
     col = root.column()
 
@@ -363,40 +365,44 @@ def draw_mappings_tab(prefs, context, layout):
     col.separator()
 
 
-def _draw_context_rollouts(prefs, context, layout, conflicts=None):
+def _draw_context_selector(prefs, context, layout, conflicts=None):
     """Top of the Mappings tab: leader key, modifier, Global and one boxed
-    rollout per editor — all rows in one two-column table.
+    row per editor (plus one per context group) in a two-column table.
 
     Design rules (keep them when editing):
-      * One row grammar everywhere: [arrow cell][control ...]. The header is
-        one full-width editor button; body rows are a two-cell grid (the
-        Leader Key line and the mode buttons), so all vertical edges coincide. The arrow
-        cell is a fixed width (_ROLLOUT_ARROW_UNITS_X), blank where a row
-        has no arrow, so every control starts at the same x. Controls run
-        to the box's right edge: header buttons, mode buttons and the
-        leader-key line all share both edges. Nothing is content-sized.
-      * Counts live inside the button label ("3D View · 114"), not in a
-        side column, so buttons can be full width.
+      * One row grammar: three fixed shares (_ROW_NAME_SHARE, the rest,
+        _ROW_KEY_SHARE). An editor row is the editor button; that editor's
+        contexts as [icon count] chips in a fixed number of even cells (the
+        widest family's count, padded on the left); the editor's own
+        leader key as [key icon][field][Override/reset]. So buttons end,
+        chips align and key fields start at the same x in every row. A
+        single-context editor has no chips and its button takes their
+        share too. A group row (EditorContext.group, e.g. Edit Modes) has
+        the same grammar; its chips wrap `chip_slots` per line, its button
+        spans the lines, and its key cell is blank — it has no key of its
+        own yet, it uses its editor's. A small gap sits between every
+        button and its first chip. Controls run to the box's right edge.
+        Nothing is content-sized.
+      * Counts live inside the button label ("3D View · 84", a chip's
+        bare "84" — "0" when empty, so the chip keeps its width), not in a
+        side column, so controls can be full width. A row's count is the
+        sum of its own chips, so an editor and its group never double
+        count. A chip's icon is its only name; the full label is its
+        tooltip.
       * Two fixed 50/50 columns (a split, not a row of columns) when the
         panel is wide enough, one column otherwise. Column widths never
-        depend on content; an open rollout only grows downward. Each
-        column starts with a settings box — Leader Key (default) on the
-        left, Multi-Toggle Modifier on the right — so those controls line
-        up with the editor buttons below them.
-      * Open state: prefs.open_editor_families via chordsong.family_toggle;
-        selecting a context rolls its family open (prefs update callback);
-        the arrow and, for the active editor, the header button collapse it.
-        Ctrl+click on either rolls every editor the same way as the clicked
-        one (closed → all open, open → all closed).
-        A rollout body holds the editor's mode buttons. The
-        editor's own leader key is the first body row: greyed with an
-        Override icon while it follows the default, live with a reset arrow
-        once overridden.
-      * Colour carries meaning only: a collapsed header turns red when any
-        of its contexts has a conflict; open, the offending mode button is
-        red instead.
+        depend on content. Each column starts with a settings box — Leader
+        Key (default) on the left, Multi-Toggle Modifier on the right — so
+        those controls line up with the editor buttons below them.
+      * A row's button selects its first context (the editor's base mode,
+        the group's first mode), so clicking a row always lights it up.
+        Nothing rolls open or closed; every context is one click away.
+      * The key field is greyed with an Override icon while the editor
+        follows the default key, live with a reset arrow once overridden.
+      * Colour carries meaning only: a row's button turns red when any of
+        its chips has a conflict, and the offending chip is red too.
     """
-    from ...operators.mapping.family_toggle import leader_override_spaces, open_families
+    from ...operators.mapping.context_select import leader_override_spaces
 
     wm = context.window_manager
     keyconfigs = (wm.keyconfigs.user, wm.keyconfigs.addon)
@@ -405,7 +411,6 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
 
     current = prefs.mapping_context_tab
     conflicted = contexts_with_conflicts(prefs.mappings, conflicts)
-    opened = open_families(prefs)
     # Which editors have their own leader key. The stored set is
     # authoritative, but an editor whose binding already differs — one the
     # user edited in Blender's own keymap editor, say — counts too, so the
@@ -419,53 +424,72 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
     def _with_count(text, n):
         return f"{text}  \u00b7  {n}" if n else text
 
-    def _row(box, *, arrow=None):
-        """[arrow cell][...]: returns the control area of one grammar row.
-        arrow — None for a blank cell, else (space_type, is_open, enabled)."""
-        row = box.row(align=True)
-        cell = row.row(align=True)
-        cell.ui_units_x = _ROLLOUT_ARROW_UNITS_X
-        if arrow is None:
-            cell.label(text="", icon='BLANK1')
-        else:
-            space_type, is_open, enabled = arrow
-            cell.enabled = enabled
-            op = cell.operator("chordsong.family_toggle", text="",
-                               icon='TRIA_DOWN' if is_open else 'TRIA_RIGHT', emboss=False)
-            op.space_type = space_type
-        return row.row(align=True)
+    # Chip cells per editor row: the widest family's ungrouped count, so
+    # every row splits the same way and chips align across editors.
+    chip_slots = max((len(contexts_in_group(space)) for space, _, _ in EDITOR_FAMILIES
+                      if len(family_contexts(space)) > 1), default=1)
+
+    def _row(box):
+        """The control area of one boxed row."""
+        return box.row(align=True)
 
     def _labelled(control_row, text, icon='NONE'):
         """Label in a fixed-width cell, then the remaining width for controls."""
         lab = control_row.row(align=True)
-        lab.ui_units_x = _ROLLOUT_LABEL_UNITS_X
+        lab.ui_units_x = _SELECTOR_LABEL_UNITS_X
         lab.label(text=text, icon=icon)
         return control_row.row(align=True)
 
+    def _chip(cell, ctx):
+        """One context as [icon count]: the icon is its identity, the
+        count its weight; the full name is the tooltip (the operator's
+        description is built from the token)."""
+        clashing = ctx.token in conflicted
+        cell.alert = clashing
+        # An operator button, not prop_enum: Blender's radio buttons do
+        # not take the alert tint, so a conflicted context stayed grey.
+        # The icon is kept even when clashing — swapping it for ERROR
+        # would strip the chip of the only thing that names it.
+        # A zero count is drawn as "0", never as no text: an icon-only
+        # button is laid out as fixed-size and centres its icon, so an
+        # empty chip shrank to the icon and left a hole in the row.
+        op = cell.operator("chordsong.context_select", text=str(counts.get(ctx.token, 0)),
+                           icon=ctx.icon, depress=(current == ctx.token))
+        op.token = ctx.token
+
+    def _chip_grid(parent_row, slots):
+        """`slots` equal cells for chips. A grid_flow, not a row: a row
+        hands its spare width to items in proportion to their text, so
+        "87" came out wider than "0"; even_columns makes every cell the
+        same width whatever it holds."""
+        return parent_row.grid_flow(row_major=True, columns=slots,
+                                    even_columns=True, even_rows=False, align=True)
+
+    def _row_button(cell, text, icon, members):
+        """The button that opens a row: selects the row's first context,
+        lit while any of the row's contexts is selected, red while any has
+        a conflict. An operator button rather than prop_enum so it stays
+        highlighted while any of the row's modes is selected."""
+        tokens = [c.token for c in members]
+        cell.alert = any(t in conflicted for t in tokens)
+        total = sum(counts.get(t, 0) for t in tokens)
+        op = cell.operator("chordsong.context_select", text=_with_count(text, total),
+                           icon=icon, depress=(current in tokens))
+        op.token = tokens[0]
+
     # --- context boxes ---------------------------------------------------
     def _key_cell(cell, key):
-        """The editor's own leader key, in the last third of a header row.
-        key — None (blank cell), or (km, kmi, space_type, differs, live).
-        The key field is always shown; it is greyed while the editor still
-        follows the default key, with an Override icon beside it. Once the
-        user presses Override (or the key differs) the field is live and the
-        icon becomes a reset arrow."""
+        """The editor's own leader key, the last cell of its row:
+        [key icon][field][Override/reset]. The icon is the only caption —
+        the row has no room for the words. key — None (blank cell) or
+        (km, kmi, space_type, differs, live). The field is greyed while the
+        editor still follows the default key, with an Override icon beside
+        it; once the user presses Override (or the key differs) the field
+        is live and the icon becomes a reset arrow."""
         if key is None:
             cell.label(text="")
             return
-        if key == "master":
-            # 3D View: its key *is* the default set at the top, so this is
-            # the same field, live — editing it here edits the default.
-            # There is nothing to override it against, so no Override
-            # button; a blank icon keeps the field the width of the others.
-            if master_kmi is not None and master_km is not None:
-                field = cell.row(align=True)
-                field.context_pointer_set("keymap", master_km)
-                field.prop(master_kmi, "type", text="", full_event=True, emboss=True)
-                cell.label(text="", icon='BLANK1')
-            else:
-                cell.label(text="")
-            return
+        cell.label(text="", icon='KEYINGSET')
         km, kmi, space_type, differs, live = key
         field = cell.row(align=True)
         field.enabled = live
@@ -475,17 +499,11 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
                            icon='LOOP_BACK' if live else 'DECORATE_OVERRIDE')
         op.space_type = space_type
 
-    def _thirds(row):
-        """Split a body control area into the same cells as a mode row:
-        label / first button on the left, key cell on the right."""
-        split = row.split(factor=_ROLLOUT_NAME_SHARE, align=True)
-        return split.row(align=True), split.row(align=True)
-
     def _draw_global(parent):
         box = parent.box()
         name = _row(box)
         name.alert = ALL_CONTEXT in conflicted
-        # Same pressed-button styling as the editor headers
+        # Same pressed-button styling as the editor rows
         op = name.operator("chordsong.context_select",
                            text=_with_count("Global", counts.get(ALL_CONTEXT, 0)),
                            icon='WORLD', depress=(current == ALL_CONTEXT))
@@ -495,92 +513,71 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
         members = family_contexts(space_type)
         if not members:
             return
-        tokens = [c.token for c in members]
-        total = sum(counts.get(t, 0) for t in tokens)
-        selected_here = current in tokens
-        is_open = space_type in opened
-        family_alert = any(t in conflicted for t in tokens)
 
-        # This editor's own leader key (the 3D View *is* the default above)
+        # This editor's own leader key, following the default until overridden
         key = None
         km_name = _KEYMAP_BY_SPACE.get(space_type)
-        if km_name == MASTER_KEYMAP_NAME:
-            key = "master"
-        elif km_name:
+        if km_name:
             km, kmi = find_leader_kmi(km_name, keyconfigs)
             if km is not None and kmi is not None:
                 differs = (space_type in overridden
                            or (master_event is not None and leader_event(kmi) != master_event))
                 key = (km, kmi, space_type, differs, differs)
 
-        box = parent.box()
-        # Header: the editor button spans the full control width. An operator
-        # button rather than prop_enum so it stays highlighted while any of
-        # the editor's modes is selected.
-        name = _row(box, arrow=(space_type, is_open, True))
-        # Red whether open or closed: opening the family to find the
-        # conflict must not make the family look clean.
-        name.alert = family_alert
-        if len(members) > 1:
-            # The count is the whole family's, so the header must not also
-            # select one context — clicking "3D View · 114" and landing on
-            # Object's 84 rows made the label a lie. Header rolls; the body
-            # buttons, each with its own count, select.
-            op = name.operator("chordsong.family_toggle", text=_with_count(family_label, total),
-                               icon=family_icon, depress=selected_here)
-            op.space_type = space_type
-        else:
-            # Single-context editor: nothing in the body to select, so the
-            # header is the selector and its count is that context's own.
-            op = name.operator("chordsong.context_select", text=_with_count(family_label, total),
-                               icon=family_icon, depress=selected_here)
-            op.token = tokens[0]
-        if not is_open:
-            return
+        # Editor row: [editor button | chip slots | key cell], fixed shares
+        # (_ROW_NAME_SHARE / _ROW_KEY_SHARE), so every editor ends its
+        # button, lines up its chips and starts its key field at the same
+        # x. The chip slots are `chip_slots` even cells (the widest
+        # family's count), padded on the left; a single-context editor has
+        # no chips and its button takes their share too.
+        # A single-context editor has no chips: its button selects that one
+        # context and the chip slots stay blank, so the row still reads
+        # like every other.
+        chips = list(contexts_in_group(space_type)) if len(members) > 1 else []
+        # The button counts and lights up for its own chips only; the
+        # group rows below carry theirs.
+        _context_row(parent, family_label, family_icon, chips or members, chips, key)
 
-        # Body row 1: the editor's leader key, in the two-cell grid
-        # [label | field + Override/reset icon] the mode rows use too.
-        if key is not None:
-            label_cell, key_cell = _thirds(_row(box))
-            label_cell.enabled = False
-            label_cell.label(text="Leader Key", icon='KEYINGSET')
-            _key_cell(key_cell, key)
+        # Group rows (EditorContext.group): one box each, right under the
+        # editor, in the same grammar, so the group's chips sit in the
+        # editor's chip columns. A group has no key of its own (yet): its
+        # key cell is blank.
+        for caption in group_captions(space_type):
+            grouped = list(contexts_in_group(space_type, caption))
+            _context_row(parent, caption, GROUP_ICONS.get(caption, 'DOT'), grouped, grouped, None)
 
-        # Body rows: context buttons, _ROLLOUT_MODES_PER_ROW equal cells per
-        # row; a short last row is padded so its buttons keep the width.
-        # The family's ungrouped contexts come first, then each group
-        # (EditorContext.group, e.g. "Edit Modes") under a greyed caption.
-        if len(members) < 2:
-            return
-
-        def _mode_rows(items):
-            for start in range(0, len(items), _ROLLOUT_MODES_PER_ROW):
-                chunk = items[start:start + _ROLLOUT_MODES_PER_ROW]
-                buttons = _row(box)
-                for ctx in chunk:
-                    cell = buttons.row(align=True)
-                    clashing = ctx.token in conflicted
-                    cell.alert = clashing
-                    # An operator button, not prop_enum: Blender's radio
-                    # buttons do not take the alert tint, so a conflicted
-                    # context stayed grey. The header and Global box use
-                    # this same button and do go red. The icon swap is a
-                    # second cue that survives any button state.
-                    op = cell.operator("chordsong.context_select",
-                                       text=_with_count(context_short_label(ctx.token), counts.get(ctx.token, 0)),
-                                       icon='ERROR' if clashing else ctx.icon,
-                                       depress=(current == ctx.token))
-                    op.token = ctx.token
-                for _ in range(_ROLLOUT_MODES_PER_ROW - len(chunk)):
-                    buttons.row(align=True).label(text="")
-
-        _mode_rows(list(contexts_in_group(space_type)))
-        for caption_text in group_captions(space_type):
-            grouped = list(contexts_in_group(space_type, caption_text))
-            caption = _row(box)
-            caption.enabled = False
-            caption.label(text=caption_text, icon='DOT')
-            _mode_rows(grouped)
+    def _context_row(parent, text, icon, members, chips, key):
+        """One boxed row [button | chip slots | key cell] in the fixed
+        shares. The button selects the first of `members` and lights up
+        for any of them; `chips` are laid out `chip_slots` per line (padded
+        on the left, blank when there are none). More chips than slots
+        wrap onto further lines and the button grows to span them; the key
+        cell stays on the first line."""
+        lines = max(1, -(-len(chips) // chip_slots))
+        row = _row(parent.box())
+        outer = row.split(factor=1.0 - _ROW_KEY_SHARE, align=True)
+        lead = outer.row(align=True)
+        key_col = outer.column(align=True)
+        split = lead.split(factor=_ROW_NAME_SHARE / (1.0 - _ROW_KEY_SHARE), align=True)
+        button = split.row(align=True)
+        # Aligned lines in a column stack with no gap, so a button scaled
+        # by the line count spans them exactly.
+        button.scale_y = lines
+        _row_button(button, text, icon, members)
+        chip_col = split.column(align=True)
+        for start in range(0, max(len(chips), 1), chip_slots):
+            chunk = chips[start:start + chip_slots]
+            line = chip_col.row(align=True)
+            # A breath between the button and its chips.
+            line.separator(factor=_CHIP_GAP)
+            grid = _chip_grid(line, chip_slots)
+            for _ in range(chip_slots - len(chunk)):
+                grid.label(text="")
+            for ctx in chunk:
+                _chip(grid.row(align=True), ctx)
+        _key_cell(key_col.row(align=True), key)
+        for _ in range(lines - 1):
+            key_col.row(align=True).label(text="")
 
     # --- settings boxes -------------------------------------------------
     def _draw_leader_key_box(parent):
@@ -607,23 +604,19 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
             ctrl.label(text="Leader keymap not found", icon='ERROR')
         overrides = leader_overrides(keyconfigs)
         if overrides:
-            note = _row(box)
+            # Same row as the field, at its right end: the box stays one
+            # line tall and level with the Multi-Toggle Modifier box.
+            note = row.row(align=True)
+            note.alignment = 'RIGHT'
             note.enabled = False
             n = len(overrides)
-            note.label(text=f"{n} editor{'s use' if n != 1 else ' uses'} its own key (see its rollout)", icon='INFO')
+            note.label(text=f"{n} editor{'s use' if n != 1 else ' uses'} its own key", icon='INFO')
 
     def _draw_modifier_box(parent):
         box = parent.box()
         row = _row(box)
         ctrl = _labelled(row, "Multi-Toggle Modifier")
         ctrl.prop(prefs, "toggle_multi_modifier", text="")
-        # Selecting a context opens its rollout, so they accumulate; without
-        # this the table grows until it pushes the mapping list off-screen.
-        tail = row.row(align=True)
-        tail.alignment = 'RIGHT'
-        tail.enabled = bool(opened)
-        collapse = tail.operator("chordsong.family_toggle", text="", icon='TRIA_UP_BAR')
-        collapse.space_type = _COLLAPSE_ALL
 
     # --- columns -----------------------------------------------------------
     try:
@@ -634,22 +627,31 @@ def _draw_context_rollouts(prefs, context, layout, conflicts=None):
     except Exception:  # pylint: disable=broad-exception-caught
         width = 0
     families = list(EDITOR_FAMILIES)
-    if width >= _ROLLOUT_TWO_COLUMN_MIN_PX:
+    if width >= _SELECTOR_TWO_COLUMN_MIN_PX:
         # A 50/50 split, not a row of two columns: a row hands width to
-        # whichever column has the wider content and would jerk on open.
+        # whichever column has the wider content and would jerk on redraw.
         outer = layout.split(factor=0.5, align=False)
         left = outer.column(align=False)
         right_wrap = outer.row(align=False)
-        right_wrap.separator(factor=_ROLLOUT_COLUMN_GAP)
+        right_wrap.separator(factor=_SELECTOR_COLUMN_GAP)
         right = right_wrap.column(align=False)
-        half = (len(families) + 1) // 2
+        # Balance the columns by row lines, not by family count: Global and
+        # the group rows (Edit Modes, two lines) all land on the left, so
+        # the left column fills up after fewer editors.
+        def _lines(space):
+            return 1 + sum(-(-len(contexts_in_group(space, g)) // chip_slots)
+                           for g in group_captions(space))
+        total = 1 + sum(_lines(space) for space, _, _ in families)
         _draw_leader_key_box(left)
         _draw_modifier_box(right)
         _draw_global(left)
-        for fam in families[:half]:
-            _draw_family(left, *fam)
-        for fam in families[half:]:
-            _draw_family(right, *fam)
+        used = 1
+        column = left
+        for fam in families:
+            if column is left and used >= total / 2:
+                column = right
+            _draw_family(column, *fam)
+            used += _lines(fam[0])
     else:
         col = layout.column(align=False)
         _draw_leader_key_box(col)

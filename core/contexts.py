@@ -21,7 +21,12 @@ Vocabulary:
                    The 3D View is deliberately FLAT: Object, Sculpt, Paint,
                    Pose and the per-object-type Edit contexts are siblings,
                    so an Object-mode chord never fires in Sculpt or Edit.
+                   The Movie Clip editor is flat the same way: Tracking,
+                   Graph, Dope Sheet and Mask are siblings.
                    Use Global for a chord that should fire everywhere.
+  group          — contexts sharing a group caption get a row of their own
+                   in the Mappings-tab selector, under their editor's row
+                   (the 3D View's eight Edit Modes).
   value          — stable enum value per token. Never renumber: Blender
                    stores EnumProperty values as ints in saved preferences.
 """
@@ -43,7 +48,7 @@ class EditorContext:
     script_token: str              # scripts-folder editor token (core.script_scanner)
     value: int                     # stable enum value (see module docstring)
     parent: Optional[str] = None   # editor context this context inherits from
-    group: Optional[str] = None    # caption grouping it under in the rollout body
+    group: Optional[str] = None    # caption of the selector row it shares (see GROUP_ICONS)
 
 
 # Display order (tabs, dialogs, "one mapping per context"): editor first,
@@ -89,8 +94,20 @@ CONTEXTS = (
                   "SEQUENCE", "SEQUENCE_EDITOR", "sequencer", 7),
     EditorContext("SEQUENCE_PREVIEW", "Sequencer Preview", "Active in the Video Sequencer Preview region",
                   "SEQ_PREVIEW", "SEQUENCE_EDITOR", "sequencer", 21, parent="SEQUENCE_EDITOR"),
-    EditorContext("CLIP_EDITOR", "Movie Clip", "Active in Movie Clip Editor",
+    # Movie Clip — flat, like the 3D View: Tracking mode's Clip view, its
+    # Graph and Dope Sheet views, and Mask mode are siblings.
+    EditorContext("CLIP_EDITOR", "Movie Clip (Tracking)",
+                  "Active in the Movie Clip editor's Tracking mode, Clip view",
                   "TRACKER", "CLIP_EDITOR", "clip", 8),
+    EditorContext("CLIP_GRAPH", "Movie Clip (Graph)",
+                  "Active in the Movie Clip editor's Graph view",
+                  "GRAPH", "CLIP_EDITOR", "clip", 33),
+    EditorContext("CLIP_DOPESHEET", "Movie Clip (Dope Sheet)",
+                  "Active in the Movie Clip editor's Dope Sheet view",
+                  "ACTION", "CLIP_EDITOR", "clip", 34),
+    EditorContext("CLIP_MASK", "Movie Clip (Mask)",
+                  "Active in the Movie Clip editor's Mask mode",
+                  "MOD_MASK", "CLIP_EDITOR", "clip", 35),
     EditorContext("DOPESHEET_EDITOR", "Dope Sheet", "Active in Dope Sheet, Action Editor and other Dope Sheet modes (inherited by the Timeline)",
                   "ACTION", "DOPESHEET_EDITOR", "dopesheet", 9),
     EditorContext("TIMELINE", "Timeline", "Active in the Timeline",
@@ -124,7 +141,7 @@ CONTEXT_BY_TOKEN = {c.token: c for c in CONTEXTS}
 SUPPORTED_SPACE_TYPES = frozenset(c.space_type for c in CONTEXTS)
 CONTEXT_PARENT = {c.token: c.parent for c in CONTEXTS}
 
-# Editor families for the Mappings-tab rollouts: one rollout per space
+# Editor families for the Mappings-tab context selector: one row per space
 # type, listing that editor's contexts (base editor + its modes). Order =
 # first appearance in CONTEXTS. Label/icon name the editor as a whole.
 EDITOR_FAMILIES = (
@@ -138,8 +155,13 @@ EDITOR_FAMILIES = (
     ("NLA_EDITOR", "NLA Editor", "NLA"),
 )
 
-# Short labels used inside a family rollout, where the editor name is
-# already given by the header ("3D View" → Object / Edit / Sculpt ...).
+# Icon of a context group's selector row (EditorContext.group caption).
+GROUP_ICONS = {
+    "Edit Modes": "EDITMODE_HLT",
+}
+
+# Short labels for a context next to its editor's name ("3D View" →
+# Object / Edit / Sculpt ...).
 _SHORT_LABELS = {
     "VIEW_3D": "Object", "VIEW_3D_SCULPT": "Sculpt",
     "VIEW_3D_PAINT": "Paint", "VIEW_3D_POSE": "Pose",
@@ -149,6 +171,8 @@ _SHORT_LABELS = {
     "GEOMETRY_NODE": "Geometry", "SHADER_EDITOR": "Shader", "COMPOSITOR": "Compositor",
     "IMAGE_EDITOR": "UV / Image", "IMAGE_PAINT": "Paint",
     "SEQUENCE_EDITOR": "Timeline", "SEQUENCE_PREVIEW": "Preview",
+    "CLIP_EDITOR": "Tracking", "CLIP_GRAPH": "Graph",
+    "CLIP_DOPESHEET": "Dope Sheet", "CLIP_MASK": "Mask",
     "DOPESHEET_EDITOR": "Dope Sheet", "TIMELINE": "Timeline",
     "GRAPH_EDITOR": "F-Curves", "GRAPH_DRIVERS": "Drivers",
 }
@@ -160,7 +184,7 @@ def family_contexts(space_type):
 
 
 def context_short_label(token):
-    """Label for a context inside its family rollout."""
+    """Label for a context next to its editor's name."""
     return _SHORT_LABELS.get(token) or context_label(token)
 
 # Leader keymap per space: (Blender keymap name, space_type). Names must
@@ -293,7 +317,7 @@ def normalize_context(token, default=DEFAULT_CONTEXT):
 
 
 def contexts_in_group(space_type, group=None):
-    """Contexts of one editor family that carry the given rollout group
+    """Contexts of one editor family that carry the given group
     caption (``None`` = the family's ungrouped contexts), in display order."""
     return tuple(c for c in CONTEXTS if c.space_type == space_type and c.group == group)
 
@@ -350,8 +374,10 @@ def detect_context_token(space_type, tree_type=None, mode=None, *,
     ``space_type`` is ``Space.type``; ``tree_type`` the Node Editor's tree
     type; ``mode`` is ``bpy.context.mode``; ``space_mode`` is the editor's
     own ``mode`` (Image: VIEW/UV/PAINT/MASK, Dope Sheet: ... /TIMELINE,
-    Graph: FCURVES/DRIVERS); ``view_type`` / ``region_type`` tell the
-    Sequencer preview apart; ``browse_mode`` is FILES/ASSETS.
+    Graph: FCURVES/DRIVERS, Clip: TRACKING/MASK); ``view_type`` is the
+    Sequencer's ``view_type`` or the Clip editor's ``view``
+    (CLIP/GRAPH/DOPESHEET) and, with ``region_type``, tells the Sequencer
+    preview apart; ``browse_mode`` is FILES/ASSETS.
     Unknown spaces (Preferences, Top Bar, Text Editor, ...) fall back to
     DEFAULT_CONTEXT for backward compatibility.
     """
@@ -371,6 +397,15 @@ def detect_context_token(space_type, tree_type=None, mode=None, *,
         if region_type == "PREVIEW" or view_type == "PREVIEW":
             return "SEQUENCE_PREVIEW"
         return "SEQUENCE_EDITOR"
+    if space_type == "CLIP_EDITOR":
+        # Mask mode always shows the clip; the view only matters in Tracking.
+        if space_mode == "MASK":
+            return "CLIP_MASK"
+        if view_type == "GRAPH":
+            return "CLIP_GRAPH"
+        if view_type == "DOPESHEET":
+            return "CLIP_DOPESHEET"
+        return "CLIP_EDITOR"
     if space_type == "DOPESHEET_EDITOR":
         return "TIMELINE" if space_mode == "TIMELINE" else "DOPESHEET_EDITOR"
     if space_type == "GRAPH_EDITOR":

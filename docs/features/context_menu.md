@@ -22,6 +22,7 @@ The pop up will appear with the following fields
 - **Icon**: Optional Nerd Fonts icon shown in the overlay. Use the dropdown button next to the field to pick one from the icon library.
 - **Group**: Chord group. Start typing to search existing groups, or enter a new name to create one.
 - **Parameters**: Operator parameters.
+- **Call**: How the operator runs — **Invoke** (default) lets it open its dialog or start its modal, **Exec** runs it immediately with the given parameters. Shown for operator mappings only.
 
 !!! note "Parameters Automatic Detection"
     If the operator is detected successfully, the parameters will be filled automatically. The non-conflicting chord will be also suggested based on the operator name.

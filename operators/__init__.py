@@ -1,4 +1,4 @@
-from .check_conflicts import CHORDSONG_OT_CheckConflicts, CHORDSONG_OT_ApplyConflictFix, CHORDSONG_OT_MergeIdentical
+from .check_conflicts import CHORDSONG_OT_CheckConflicts, CHORDSONG_OT_ApplyConflictFix, CHORDSONG_OT_GotoChord, CHORDSONG_OT_MergeIdentical
 from .context_menu import (
     CHORDSONG_OT_ContextMenu,
     register_context_menu,
@@ -30,9 +30,9 @@ from .mapping.mapping_convert import CHORDSONG_OT_Mapping_Convert
 from .mapping.mapping_copy import CHORDSONG_OT_Mapping_Copy, CHORDSONG_OT_Mapping_Copy_Single
 from .mapping.mapping_duplicate import CHORDSONG_OT_Mapping_Duplicate
 from .mapping.mapping_global import CHORDSONG_OT_Mapping_Contexts
-from .mapping.family_toggle import (
+from .mapping.context_select import (
     CHORDSONG_OT_Context_Select,
-    CHORDSONG_OT_Family_Toggle,
+    CHORDSONG_OT_Leader_Default_Key,
     CHORDSONG_OT_Leader_Override_Toggle,
 )
 from .mapping.mapping_fold import CHORDSONG_OT_Mapping_Fold_All, CHORDSONG_OT_Mapping_Unfold_All
@@ -80,6 +80,7 @@ __all__ = [
     "CHORDSONG_OT_Clear_Search",
     "CHORDSONG_OT_Clear_Operator_Cache",
     "CHORDSONG_OT_Export_Config",
+    "CHORDSONG_OT_GotoChord",
     "CHORDSONG_OT_MergeIdentical",
     "CHORDSONG_OT_Export_Config_Toggle_Groups",
     "CHORDSONG_PG_GroupSelection",
@@ -109,7 +110,7 @@ __all__ = [
     "CHORDSONG_OT_Mapping_Copy_Single",
     "CHORDSONG_OT_Mapping_Deselect_All",
     "CHORDSONG_OT_Context_Select",
-    "CHORDSONG_OT_Family_Toggle",
+    "CHORDSONG_OT_Leader_Default_Key",
     "CHORDSONG_OT_Leader_Override_Toggle",
     "CHORDSONG_OT_Mapping_Duplicate",
     "CHORDSONG_OT_Mapping_Fold_All",

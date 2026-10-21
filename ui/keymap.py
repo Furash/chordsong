@@ -6,11 +6,16 @@ so customizations persist. These functions live in ui/ rather than core/
 because they reach into bpy.context.window_manager.keyconfigs — a
 Blender UI-layer concern, not pure chord-engine logic.
 
-Model: the 3D View keymap is the *master* leader binding shown as the
-single "Leader Key (default)" field in preferences; changing it propagates
-to every editor that still follows it. An editor can be given its own
-binding from its rollout (tracked in prefs.leader_key_overrides), and a
-context-aware lookup returns the binding of the editor under the cursor.
+Model: the *default* leader binding lives in a keymap item of its own
+(DEFAULT_KEYMAP_NAME), bound to a no-op operator and kept inactive, so it
+never fires anywhere; it exists only to be edited by the "Leader Key
+(default)" field and copied from. Changing it propagates to every editor
+that still follows it. Any editor — the 3D View included — can be given
+its own binding from its row (tracked in prefs.leader_key_overrides),
+and a context-aware lookup returns the binding of the editor under the
+cursor. The default is also recorded in prefs.leader_key_last and
+re-applied at register, so it survives even if the keyconfig does not
+keep the edit.
 Bindings are whole events - Ctrl+Space differs from Space - so compare and
 copy them with leader_event / copy_leader_event, never by key type alone.
 
@@ -22,24 +27,36 @@ from ..core.engine import normalize_token
 from ..core.contexts import LEADER_KEYMAPS, LEADER_KEYMAP_NAMES
 from ..utils.addon_package import addon_root_package
 
-MASTER_KEYMAP_NAME = LEADER_KEYMAPS[0][0]  # "3D View"
+# The default binding's own keymap and the no-op operator its item binds.
+# An EMPTY-space keymap would be active everywhere, so the item is created
+# inactive (and the operator passes events through should it ever fire).
+DEFAULT_KEYMAP_NAME = "Chord Song Leader Default"
+DEFAULT_KEY_IDNAME = "chordsong.leader_default_key"
+# Kept under its old name for callers: the "master" binding is the default.
+MASTER_KEYMAP_NAME = DEFAULT_KEYMAP_NAME
+_LEADER_IDNAMES = frozenset({"chordsong.leader", DEFAULT_KEY_IDNAME})
+# The editor keymap used when the space under the cursor is unknown.
+_FALLBACK_EDITOR_KEYMAP = LEADER_KEYMAPS[0][0]  # "3D View"
 
 # A leader binding is a whole event, not just a key: the preferences fields
 # use full_event=True, so Ctrl+Space and Space are different bindings and
 # every comparison/copy below has to cover the modifiers too.
 LEADER_EVENT_FIELDS = ("type", "value", "ctrl", "shift", "alt", "oskey")
+# The binding the addon registers out of the box, in LEADER_EVENT_FIELDS
+# order: a plain Space press. The 3D View row's arrow resets to this.
+FACTORY_LEADER_EVENT = ("SPACE", "PRESS", False, False, False, False)
 _KEYMAP_BY_SPACE = {space: name for name, space in LEADER_KEYMAPS}
 
 
 def keymap_name_for_context(context=None) -> str:
-    """Leader keymap name for the editor under `context` (master when the
-    space is unknown or no context is given)."""
+    """Leader keymap name for the editor under `context` (the 3D View's
+    when the space is unknown or no context is given)."""
     try:
         space = getattr(context, "space_data", None) if context else None
         space_type = getattr(space, "type", None) if space else None
-        return _KEYMAP_BY_SPACE.get(space_type or "", MASTER_KEYMAP_NAME)
+        return _KEYMAP_BY_SPACE.get(space_type or "", _FALLBACK_EDITOR_KEYMAP)
     except Exception:  # pylint: disable=broad-exception-caught
-        return MASTER_KEYMAP_NAME
+        return _FALLBACK_EDITOR_KEYMAP
 
 
 def leader_event(kmi):
@@ -69,10 +86,36 @@ def copy_leader_event(dst, src) -> bool:
     return changed
 
 
+def apply_event_signature(kmi, signature: str) -> bool:
+    """Set a leader keymap item from an `event_signature` string. Returns
+    False, changing nothing, when the string does not parse."""
+    parts = (signature or "").split("|")
+    if len(parts) != len(LEADER_EVENT_FIELDS):
+        return False
+    values = []
+    for f, raw in zip(LEADER_EVENT_FIELDS, parts):
+        if f in ("type", "value"):
+            if not raw:
+                return False
+            values.append(raw)
+        else:
+            values.append(raw == "True")
+    changed = False
+    for f, v in zip(LEADER_EVENT_FIELDS, values):
+        try:
+            if getattr(kmi, f) != v:
+                setattr(kmi, f, v)
+                changed = True
+        except Exception:  # pylint: disable=broad-exception-caught
+            return False
+    return changed
+
+
 def find_leader_kmi(km_name=MASTER_KEYMAP_NAME, keyconfigs=None):
-    """Return (keymap, keymap_item) for the leader operator in `km_name`,
-    searching the user keyconfig first (customizations live there), then
-    the addon keyconfig. (None, None) when not found."""
+    """Return (keymap, keymap_item) for the leader binding in `km_name` —
+    an editor's leader operator, or the default's no-op item — searching
+    the user keyconfig first (customizations live there), then the addon
+    keyconfig. (None, None) when not found."""
     try:
         import bpy  # type: ignore
         wm = bpy.context.window_manager
@@ -85,7 +128,7 @@ def find_leader_kmi(km_name=MASTER_KEYMAP_NAME, keyconfigs=None):
             if not km:
                 continue
             for kmi in km.keymap_items:
-                if kmi.idname == "chordsong.leader":
+                if kmi.idname in _LEADER_IDNAMES:
                     return km, kmi
     except Exception:  # pylint: disable=broad-exception-caught
         pass
@@ -126,10 +169,11 @@ def get_leader_key_token(context=None) -> str:
 
 
 def set_leader_key_in_keymap(key_type: str) -> bool:
-    """Set the leader key type across every editor keymap, clearing the
-    modifiers. Used when a loaded config carries a plain "leader_key"
-    string; the interactive path goes through propagate_master_event,
-    which copies the whole binding. Returns True if anything changed."""
+    """Set the leader key type on the default and across every editor
+    keymap, clearing the modifiers. Used when a loaded config carries a
+    plain "leader_key" string; the interactive path goes through
+    propagate_master_event, which copies the whole binding. Returns True
+    if anything changed."""
     updated = False
     try:
         import bpy  # type: ignore
@@ -138,12 +182,12 @@ def set_leader_key_in_keymap(key_type: str) -> bool:
         for kc in (wm.keyconfigs.addon, wm.keyconfigs.user):
             if not kc:
                 continue
-            for km_name in LEADER_KEYMAP_NAMES:
+            for km_name in (DEFAULT_KEYMAP_NAME, *LEADER_KEYMAP_NAMES):
                 km = kc.keymaps.get(km_name)
                 if not km:
                     continue
                 for kmi in km.keymap_items:
-                    if kmi.idname == "chordsong.leader":
+                    if kmi.idname in _LEADER_IDNAMES:
                         kmi.type = key_type
                         for mod in ("ctrl", "shift", "alt", "oskey"):
                             try:
@@ -158,7 +202,7 @@ def set_leader_key_in_keymap(key_type: str) -> bool:
 
 
 def leader_overrides(keyconfigs=None):
-    """Editors whose leader binding differs from the master, as a list of
+    """Editors whose leader binding differs from the default, as a list of
     (keymap_name, key_type). Empty when every editor matches. Compares the
     whole event, so Ctrl+Space counts as an override of Space."""
     _, master = find_leader_kmi(MASTER_KEYMAP_NAME, keyconfigs)
@@ -167,8 +211,6 @@ def leader_overrides(keyconfigs=None):
     master_event = leader_event(master)
     diffs = []
     for km_name in LEADER_KEYMAP_NAMES:
-        if km_name == MASTER_KEYMAP_NAME:
-            continue
         _, kmi = find_leader_kmi(km_name, keyconfigs)
         if kmi is not None and leader_event(kmi) != master_event:
             diffs.append((km_name, kmi.type))
@@ -176,7 +218,7 @@ def leader_overrides(keyconfigs=None):
 
 
 def propagate_master_event(skip_keymaps=()) -> bool:
-    """Copy the master leader binding onto every editor keymap except the
+    """Copy the default leader binding onto every editor keymap except the
     ones named in `skip_keymaps` (the editors the user gave their own key).
     Writes to both keyconfigs so the change survives a disable/enable."""
     try:

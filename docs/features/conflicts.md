@@ -46,6 +46,8 @@ Only the first mapping executes, leading to unpredictable behavior.
 
 Edit the "Chord" field of one conflicting mapping to a unique sequence.
 
+Every conflict in the dialog has a **Go to Chord** button (magnifier icon on prefix rows). It switches the preferences to the Mappings tab, selects the editor context of the conflicting chord and filters the list to that chord with the `c:` search, so both parties are unfolded on screen. Close the dialog to edit them.
+
 ### Automatic Fixes
 
 The Conflict Checker suggests fixes:
